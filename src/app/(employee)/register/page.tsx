@@ -97,6 +97,7 @@ export default function RegisterPage() {
                 position: formData.position,
                 role: "employee",
                 type: "รายเดือน", // Default type
+                status: "ทำงาน", // Default status: working
                 registeredDate: new Date(),
                 leaveQuota: {
                     sick: 30,
@@ -211,8 +212,8 @@ export default function RegisterPage() {
                     <button
                         onClick={() => setMode("register")}
                         className={`flex-1 py-4 text-sm font-medium transition-colors ${mode === "register"
-                                ? "text-[#0047BA] border-b-2 border-[#0047BA]"
-                                : "text-gray-500 hover:text-gray-700"
+                            ? "text-[#0047BA] border-b-2 border-[#0047BA]"
+                            : "text-gray-500 hover:text-gray-700"
                             }`}
                     >
                         ลงทะเบียนใหม่
@@ -220,8 +221,8 @@ export default function RegisterPage() {
                     <button
                         onClick={() => setMode("connect")}
                         className={`flex-1 py-4 text-sm font-medium transition-colors ${mode === "connect"
-                                ? "text-[#0047BA] border-b-2 border-[#0047BA]"
-                                : "text-gray-500 hover:text-gray-700"
+                            ? "text-[#0047BA] border-b-2 border-[#0047BA]"
+                            : "text-gray-500 hover:text-gray-700"
                             }`}
                     >
                         มีบัญชีอยู่แล้ว
