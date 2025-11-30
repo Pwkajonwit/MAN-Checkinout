@@ -51,10 +51,9 @@ export default function AdminLoginPage() {
             <div className="w-full max-w-md">
                 {/* Logo/Header */}
                 <div className="text-center mb-8">
-                    <div className="w-20 h-20 bg-[#553734] rounded-3xl mx-auto mb-4 flex items-center justify-center shadow-lg">
+                    <div className="w-20 h-20 bg-[#000000] rounded-3xl mx-auto mb-4 flex items-center justify-center shadow-lg">
                         <Lock className="w-10 h-10 text-white" />
                     </div>
-                    <h1 className="text-3xl font-bold text-[#553734] mb-2">Admin Login</h1>
                     <p className="text-gray-600">เข้าสู่ระบบจัดการ CHECKINOUT</p>
                 </div>
 
@@ -112,11 +111,11 @@ export default function AdminLoginPage() {
                             <label className="flex items-center gap-2 cursor-pointer">
                                 <input
                                     type="checkbox"
-                                    className="w-4 h-4 rounded border-gray-300 text-[#553734] focus:ring-[#EBDACA]"
+                                    className="w-4 h-4 rounded border-gray-300 text-[#000000] focus:ring-[#EBDACA]"
                                 />
                                 <span className="text-gray-600">จดจำฉันไว้</span>
                             </label>
-                            <a href="#" className="text-[#553734] hover:underline">
+                            <a href="#" className="text-[#000000] hover:underline">
                                 ลืมรหัสผ่าน?
                             </a>
                         </div>
@@ -125,7 +124,7 @@ export default function AdminLoginPage() {
                         <Button
                             type="submit"
                             disabled={loading}
-                            className="w-full h-12 bg-[#553734] hover:bg-[#553734]/90 text-white rounded-xl font-medium text-base shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full h-12 bg-[#000000] hover:bg-[#000000]/90 text-white rounded-xl font-medium text-base shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {loading ? (
                                 <div className="flex items-center gap-2">
@@ -151,7 +150,7 @@ export default function AdminLoginPage() {
                     {/* Additional Info */}
                     <p className="text-center text-sm text-gray-600">
                         ต้องการความช่วยเหลือ?{" "}
-                        <a href="#" className="text-[#553734] font-medium hover:underline">
+                        <a href="#" className="text-[#000000] font-medium hover:underline">
                             ติดต่อผู้ดูแลระบบ
                         </a>
                     </p>

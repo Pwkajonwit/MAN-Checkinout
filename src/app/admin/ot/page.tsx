@@ -7,14 +7,16 @@ import { OTTable } from "@/components/ot/OTTable";
 import { OTFormModal } from "@/components/ot/OTFormModal";
 import { Button } from "@/components/ui/button";
 import { Pencil, Plus } from "lucide-react";
-import { otService, type OTRequest, employeeService } from "@/lib/firestore";
+import { otService, type OTRequest, employeeService, adminService } from "@/lib/firestore";
 import { sendPushMessage } from "@/app/actions/line";
+import { auth } from "@/lib/firebase";
 
 export default function OTPage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedOT, setSelectedOT] = useState<OTRequest | null>(null);
     const [otRequests, setOTRequests] = useState<OTRequest[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
     const loadOTRequests = async () => {
         try {
@@ -29,11 +31,38 @@ export default function OTPage() {
 
     useEffect(() => {
         loadOTRequests();
+
+        // Check if current user is super_admin
+        const checkAdminRole = async () => {
+            const user = auth.currentUser;
+            if (user?.email) {
+                const admin = await adminService.getByEmail(user.email);
+                if (admin?.role === "super_admin") {
+                    setIsSuperAdmin(true);
+                }
+            }
+        };
+        checkAdminRole();
     }, []);
 
     const handleAddOT = () => {
         setSelectedOT(null);
         setIsModalOpen(true);
+    };
+
+    const handleEditOT = (ot: OTRequest) => {
+        setSelectedOT(ot);
+        setIsModalOpen(true);
+    };
+
+    const handleDeleteOT = async (id: string) => {
+        try {
+            await otService.delete(id);
+            loadOTRequests();
+        } catch (error) {
+            console.error("Error deleting OT:", error);
+            alert("เกิดข้อผิดพลาดในการลบคำขอ OT");
+        }
     };
 
     const handleSuccess = () => {
@@ -204,9 +233,7 @@ export default function OTPage() {
                             <Plus className="w-4 h-4" />
                             เพิ่มข้อมูลโอที
                         </Button>
-                        <Button variant="outline" size="icon" className="rounded-xl border-gray-200 text-gray-400 hover:text-gray-600">
-                            <Pencil className="w-4 h-4" />
-                        </Button>
+
                     </div>
                 }
             />
@@ -236,7 +263,13 @@ export default function OTPage() {
                     <p className="text-gray-600 mt-4">กำลังโหลดข้อมูล...</p>
                 </div>
             ) : (
-                <OTTable otRequests={otRequests} onStatusUpdate={handleStatusUpdate} />
+                <OTTable
+                    otRequests={otRequests}
+                    onStatusUpdate={handleStatusUpdate}
+                    onEdit={handleEditOT}
+                    onDelete={handleDeleteOT}
+                    isSuperAdmin={isSuperAdmin}
+                />
             )}
 
             <OTFormModal

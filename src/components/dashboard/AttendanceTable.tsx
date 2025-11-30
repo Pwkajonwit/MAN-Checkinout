@@ -3,14 +3,17 @@ import { type Attendance } from "@/lib/firestore";
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
 import { isLate, getLateMinutes, isEligibleForOT, getOTMinutes, formatMinutesToHours } from "@/lib/workTime";
-import { MapPin, X } from "lucide-react";
+import { MapPin, X, Edit2, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 interface AttendanceTableProps {
     attendances: Attendance[];
+    onEdit?: (attendance: Attendance) => void;
+    onDelete?: (id: string) => void;
+    isSuperAdmin?: boolean;
 }
 
-export function AttendanceTable({ attendances }: AttendanceTableProps) {
+export function AttendanceTable({ attendances, onEdit, onDelete, isSuperAdmin = false }: AttendanceTableProps) {
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
     const openMap = (lat: number, lng: number) => {
@@ -31,12 +34,15 @@ export function AttendanceTable({ attendances }: AttendanceTableProps) {
                                 <th className="py-4 px-6 text-xs font-medium text-gray-400 uppercase tracking-wider">สถานที่</th>
                                 <th className="py-4 px-6 text-xs font-medium text-gray-400 uppercase tracking-wider">พิกัด</th>
                                 <th className="py-4 px-6 text-xs font-medium text-gray-400 uppercase tracking-wider">หมายเหตุ</th>
+                                {isSuperAdmin && (
+                                    <th className="py-4 px-6 text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+                                )}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
                             {attendances.length === 0 ? (
                                 <tr>
-                                    <td colSpan={7} className="py-12 text-center text-gray-500">
+                                    <td colSpan={isSuperAdmin ? 8 : 7} className="py-12 text-center text-gray-500">
                                         ไม่มีข้อมูลการลงเวลาวันนี้
                                     </td>
                                 </tr>
@@ -103,14 +109,21 @@ export function AttendanceTable({ attendances }: AttendanceTableProps) {
                                         </td>
                                         <td className="py-4 px-6">
                                             {attendance.latitude && attendance.longitude ? (
-                                                <button
-                                                    onClick={() => openMap(attendance.latitude!, attendance.longitude!)}
-                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 transition-colors text-xs font-medium"
-                                                    title={`${attendance.latitude}, ${attendance.longitude}`}
-                                                >
-                                                    <MapPin className="w-3.5 h-3.5" />
-                                                    ดูแผนที่
-                                                </button>
+                                                <div className="flex flex-col items-start gap-1">
+                                                    <button
+                                                        onClick={() => openMap(attendance.latitude!, attendance.longitude!)}
+                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 transition-colors text-xs font-medium"
+                                                        title={`${attendance.latitude}, ${attendance.longitude}`}
+                                                    >
+                                                        <MapPin className="w-3.5 h-3.5" />
+                                                        แผนที่
+                                                    </button>
+                                                    {attendance.distance !== undefined && (
+                                                        <span className="text-xs text-gray-500 ml-1">
+                                                            ห่าง {attendance.distance < 1000 ? `${Math.round(attendance.distance)} ม.` : `${(attendance.distance / 1000).toFixed(2)} กม.`}
+                                                        </span>
+                                                    )}
+                                                </div>
                                             ) : (
                                                 <span className="text-sm text-gray-400">-</span>
                                             )}
@@ -141,6 +154,14 @@ export function AttendanceTable({ attendances }: AttendanceTableProps) {
                                                     }
                                                 }
 
+                                                if (attendance.locationNote) {
+                                                    notes.push(
+                                                        <span key="location-note" className="inline-flex items-center px-2 py-1 rounded-md bg-orange-50 text-orange-700 text-xs font-medium" title={attendance.locationNote}>
+                                                            นอกพื้นที่: {attendance.locationNote}
+                                                        </span>
+                                                    );
+                                                }
+
                                                 return notes.length > 0 ? (
                                                     <div className="flex flex-wrap gap-1">{notes}</div>
                                                 ) : (
@@ -148,6 +169,34 @@ export function AttendanceTable({ attendances }: AttendanceTableProps) {
                                                 );
                                             })()}
                                         </td>
+                                        {isSuperAdmin && attendance.id && (
+                                            <td className="py-4 px-6">
+                                                <div className="flex gap-2">
+                                                    {onEdit && (
+                                                        <button
+                                                            onClick={() => onEdit(attendance)}
+                                                            className="p-2 hover:bg-blue-100 rounded-lg transition-colors"
+                                                            title="แก้ไข"
+                                                        >
+                                                            <Edit2 className="w-4 h-4 text-blue-600" />
+                                                        </button>
+                                                    )}
+                                                    {onDelete && (
+                                                        <button
+                                                            onClick={() => {
+                                                                if (confirm(`คุณต้องการลบบันทึกการลงเวลาของ ${attendance.employeeName} ใช่หรือไม่?`)) {
+                                                                    onDelete(attendance.id!);
+                                                                }
+                                                            }}
+                                                            className="p-2 hover:bg-red-100 rounded-lg transition-colors"
+                                                            title="ลบ"
+                                                        >
+                                                            <Trash2 className="w-4 h-4 text-red-600" />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        )}
                                     </tr>
                                 ))
                             )}

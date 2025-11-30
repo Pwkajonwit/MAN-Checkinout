@@ -4,14 +4,14 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { employeeService } from "@/lib/firestore";
+import { employeeService, systemConfigService } from "@/lib/firestore";
 import { useEmployee } from "@/contexts/EmployeeContext";
 import { CheckCircle, UserPlus, CreditCard, User, Briefcase, Mail, Phone, Link as LinkIcon } from "lucide-react";
 import { Employee } from "@/lib/firestore";
 
 export default function RegisterPage() {
     const router = useRouter();
-    const { lineUserId, lineProfile } = useEmployee();
+    const { lineUserId, lineProfile, refreshEmployee } = useEmployee();
     const [mounted, setMounted] = useState(false);
     const [loading, setLoading] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
@@ -27,8 +27,20 @@ export default function RegisterPage() {
         position: "",
     });
 
+    const [allowNewRegister, setAllowNewRegister] = useState(true);
+
     useEffect(() => {
         setMounted(true);
+        const loadConfig = async () => {
+            const config = await systemConfigService.get();
+            if (config) {
+                setAllowNewRegister(config.allowNewRegistration ?? true);
+                if (config.allowNewRegistration === false) {
+                    setMode("connect");
+                }
+            }
+        };
+        loadConfig();
     }, []);
 
     // Auto-fill name when lineProfile is available
@@ -101,12 +113,13 @@ export default function RegisterPage() {
                 registeredDate: new Date(),
                 leaveQuota: {
                     sick: 30,
-                    personal: 6,
-                    vacation: 10
+                    personal: 3,
+                    vacation: 5
                 }
             };
 
             await employeeService.create(employeeData);
+            await refreshEmployee(); // Refresh context
 
             setShowSuccess(true);
 
@@ -151,6 +164,7 @@ export default function RegisterPage() {
 
             if (employee.id) {
                 await employeeService.update(employee.id, { lineUserId });
+                await refreshEmployee(); // Refresh context
                 setShowSuccess(true);
                 setTimeout(() => {
                     router.push("/check-in");
@@ -209,15 +223,17 @@ export default function RegisterPage() {
 
                 {/* Mode Switcher */}
                 <div className="flex border-b border-gray-100">
-                    <button
-                        onClick={() => setMode("register")}
-                        className={`flex-1 py-4 text-sm font-medium transition-colors ${mode === "register"
-                            ? "text-[#0047BA] border-b-2 border-[#0047BA]"
-                            : "text-gray-500 hover:text-gray-700"
-                            }`}
-                    >
-                        ลงทะเบียนใหม่
-                    </button>
+                    {allowNewRegister && (
+                        <button
+                            onClick={() => setMode("register")}
+                            className={`flex-1 py-4 text-sm font-medium transition-colors ${mode === "register"
+                                ? "text-[#0047BA] border-b-2 border-[#0047BA]"
+                                : "text-gray-500 hover:text-gray-700"
+                                }`}
+                        >
+                            ลงทะเบียนใหม่
+                        </button>
+                    )}
                     <button
                         onClick={() => setMode("connect")}
                         className={`flex-1 py-4 text-sm font-medium transition-colors ${mode === "connect"

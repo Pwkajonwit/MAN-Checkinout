@@ -33,7 +33,6 @@ export function EmployeeTable({ employees, onEdit, onDelete, onView, canManage =
                         <tr className="bg-gray-50/50 border-b border-gray-100 text-left">
                             <th className="py-4 px-6 text-xs font-medium text-gray-400 uppercase tracking-wider">Name</th>
                             <th className="py-4 px-6 text-xs font-medium text-gray-400 uppercase tracking-wider">รหัสพนักงาน</th>
-                            <th className="py-4 px-6 text-xs font-medium text-gray-400 uppercase tracking-wider">Email</th>
                             <th className="py-4 px-6 text-xs font-medium text-gray-400 uppercase tracking-wider">LINE ID</th>
                             <th className="py-4 px-6 text-xs font-medium text-gray-400 uppercase tracking-wider">แผนก/ตำแหน่ง</th>
                             <th className="py-4 px-6 text-xs font-medium text-gray-400 uppercase tracking-wider">ข้อมูลการลา</th>
@@ -64,9 +63,6 @@ export function EmployeeTable({ employees, onEdit, onDelete, onView, canManage =
                                         <span className="text-sm text-gray-600 font-mono">
                                             {employee.employeeId || "-"}
                                         </span>
-                                    </td>
-                                    <td className="py-4 px-6">
-                                        <span className="text-sm text-gray-600">{employee.email}</span>
                                     </td>
                                     <td className="py-4 px-6">
                                         {employee.lineUserId ? (

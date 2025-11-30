@@ -96,17 +96,19 @@ export function LeaveFormModal({ isOpen, onClose, leave, onSuccess }: LeaveFormM
                 leaveType: formData.leaveType,
                 startDate: new Date(formData.startDate),
                 endDate: new Date(formData.endDate),
-                days: calculateDays(),
                 reason: formData.reason,
                 status: formData.status,
-                createdAt: new Date(),
             };
 
             if (leave?.id) {
-                // Update not implemented in this version
-                alert("การแก้ไขจะพัฒนาในเวอร์ชันถัดไป");
+                // Update existing leave
+                await leaveService.update(leave.id, leaveData);
             } else {
-                await leaveService.create(leaveData);
+                // Create new leave
+                await leaveService.create({
+                    ...leaveData,
+                    createdAt: new Date(),
+                });
             }
             onSuccess();
             onClose();

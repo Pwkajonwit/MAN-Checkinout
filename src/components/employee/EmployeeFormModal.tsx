@@ -21,15 +21,16 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
         email: "",
         phone: "",
         type: "รายเดือน" as "รายเดือน" | "รายวัน" | "ชั่วคราว",
+        employmentType: "ประจำ" as "ประจำ" | "ชั่วคราว",
         position: "",
         department: "",
         baseSalary: 0,
         status: "ทำงาน" as "ทำงาน" | "ลาออก" | "พ้นสภาพ",
         endDate: undefined as Date | undefined,
         leaveQuota: {
-            personal: 6,
+            personal: 3,
             sick: 30,
-            vacation: 10,
+            vacation: 5,
         },
     });
 
@@ -42,15 +43,16 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
                 email: employee.email || "",
                 phone: employee.phone || "",
                 type: employee.type || "รายเดือน",
+                employmentType: employee.employmentType || (employee.type === "ชั่วคราว" ? "ชั่วคราว" : "ประจำ"),
                 position: employee.position || "",
                 department: employee.department || "",
                 baseSalary: employee.baseSalary || 0,
                 status: employee.status || "ทำงาน",
                 endDate: employee.endDate,
                 leaveQuota: {
-                    personal: employee.leaveQuota?.personal || 6,
+                    personal: employee.leaveQuota?.personal || 3,
                     sick: employee.leaveQuota?.sick || 30,
-                    vacation: employee.leaveQuota?.vacation || 10,
+                    vacation: employee.leaveQuota?.vacation || 5,
                 },
             });
         } else {
@@ -61,19 +63,20 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
                 email: "",
                 phone: "",
                 type: "รายเดือน",
+                employmentType: "ประจำ",
                 position: "",
                 department: "",
                 baseSalary: 0,
                 status: "ทำงาน",
                 endDate: undefined,
                 leaveQuota: {
-                    personal: 6,
+                    personal: 3,
                     sick: 30,
-                    vacation: 10,
+                    vacation: 5,
                 },
             });
         }
-    }, [employee]);
+    }, [employee, isOpen]); // Added isOpen to reset when opening empty
 
     if (!isOpen) return null;
 
@@ -93,6 +96,27 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
                     registeredDate: new Date(),
                 });
             }
+
+            // Reset form
+            setFormData({
+                employeeId: "",
+                name: "",
+                email: "",
+                phone: "",
+                type: "รายเดือน",
+                employmentType: "ประจำ",
+                position: "",
+                department: "",
+                baseSalary: 0,
+                status: "ทำงาน",
+                endDate: undefined,
+                leaveQuota: {
+                    personal:3,
+                    sick: 30,
+                    vacation: 5,
+                },
+            });
+
             onSuccess();
             onClose();
         } catch (error) {
@@ -156,7 +180,7 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    อีเมล <span className="text-red-500">*</span>
+                                    อีเมล
                                 </label>
                                 <input
                                     type="email"
@@ -164,7 +188,6 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
                                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                                     className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#EBDACA] focus:border-transparent disabled:bg-gray-50 disabled:text-gray-500"
                                     placeholder="example@email.com"
-                                    required
                                     disabled={readOnly}
                                 />
                             </div>
@@ -215,7 +238,23 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    ประเภทพนักงาน <span className="text-red-500">*</span>
+                                    รูปแบบการจ้าง <span className="text-red-500">*</span>
+                                </label>
+                                <select
+                                    value={formData.employmentType}
+                                    onChange={(e) => setFormData({ ...formData, employmentType: e.target.value as any })}
+                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#EBDACA] focus:border-transparent disabled:bg-gray-50 disabled:text-gray-500"
+                                    required
+                                    disabled={readOnly}
+                                >
+                                    <option value="ประจำ">ประจำ</option>
+                                    <option value="ชั่วคราว">ชั่วคราว</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    การจ่ายเงิน <span className="text-red-500">*</span>
                                 </label>
                                 <select
                                     value={formData.type}
@@ -226,7 +265,6 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
                                 >
                                     <option value="รายเดือน">รายเดือน</option>
                                     <option value="รายวัน">รายวัน</option>
-                                    <option value="ชั่วคราว">ชั่วคราว</option>
                                 </select>
                             </div>
 
@@ -365,3 +403,4 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
         </div>
     );
 }
+

@@ -23,6 +23,8 @@ interface PayrollItem {
     otPayNormal: number;
     otPayHoliday: number;
     otPaySpecial: number;
+    customHolidayWorkHours: number; // Hours worked on custom holidays (workday pay)
+    customHolidayWorkPay: number;   // Pay for working on custom holidays
     totalIncome: number;
     totalDeduction: number;
     netTotal: number;
@@ -30,7 +32,7 @@ interface PayrollItem {
 
 export default function PayrollPage() {
     const [loading, setLoading] = useState(false);
-    const [employeeType, setEmployeeType] = useState<"รายเดือน" | "รายวัน" | "ชั่วคราว">("รายเดือน");
+    const [employeeType, setEmployeeType] = useState<"ประจำ - รายเดือน" | "ประจำ - รายวัน" | "ชั่วคราว">("ประจำ - รายเดือน");
     const [calculationPeriod, setCalculationPeriod] = useState<"month" | "custom">("month");
     const [selectedDate, setSelectedDate] = useState(new Date()); // For month selection
     const [customRange, setCustomRange] = useState({
@@ -39,15 +41,21 @@ export default function PayrollPage() {
     });
     const [payrollData, setPayrollData] = useState<PayrollItem[]>([]);
     const [config, setConfig] = useState<SystemConfig | null>(null);
-
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const [departments, setDepartments] = useState<string[]>([]);
+    const [selectedDepartment, setSelectedDepartment] = useState<string>("all");
 
     useEffect(() => {
-        const loadConfig = async () => {
+        const loadData = async () => {
             const sysConfig = await systemConfigService.get();
             setConfig(sysConfig);
+
+            // Load departments
+            const employees = await employeeService.getAll();
+            const uniqueDepts = Array.from(new Set(employees.map(e => e.department).filter(Boolean))) as string[];
+            setDepartments(uniqueDepts.sort());
         };
-        loadConfig();
+        loadData();
     }, []);
 
     const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -236,25 +244,31 @@ export default function PayrollPage() {
                             <tbody>
                                 <tr>
                                     <td>เงินเดือน / ค่าจ้าง</td>
-                                    <td class="amount">${item.baseSalary.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                                    <td class="amount">${item.baseSalary.toLocaleString()}</td>
                                     <td>หักมาสาย (${item.lateMinutes} นาที)</td>
-                                    <td class="amount">${item.totalDeduction > 0 ? item.totalDeduction.toLocaleString(undefined, { minimumFractionDigits: 2 }) : "-"}</td>
+                                    <td class="amount">${item.totalDeduction > 0 ? item.totalDeduction.toLocaleString() : "-"}</td>
                                 </tr>
                                 <tr>
-                                    <td>ค่าล่วงเวลา ปกติ (${item.otHoursNormal.toFixed(1)} ชม.)</td>
-                                    <td class="amount">${item.otPayNormal > 0 ? item.otPayNormal.toLocaleString(undefined, { minimumFractionDigits: 2 }) : "-"}</td>
+                                    <td>ค่าล่วงเวลา ปกติ (${item.otHoursNormal.toFixed(0)} ชม.)</td>
+                                    <td class="amount">${item.otPayNormal > 0 ? item.otPayNormal.toLocaleString() : "-"}</td>
                                     <td></td>
                                     <td class="amount"></td>
                                 </tr>
                                 <tr>
-                                    <td>ค่าล่วงเวลา วันหยุด (${item.otHoursHoliday.toFixed(1)} ชม.)</td>
-                                    <td class="amount">${item.otPayHoliday > 0 ? item.otPayHoliday.toLocaleString(undefined, { minimumFractionDigits: 2 }) : "-"}</td>
+                                    <td>ค่าล่วงเวลา วันหยุด (${item.otHoursHoliday.toFixed(0)} ชม.)</td>
+                                    <td class="amount">${item.otPayHoliday > 0 ? item.otPayHoliday.toLocaleString() : "-"}</td>
                                     <td></td>
                                     <td class="amount"></td>
                                 </tr>
                                 <tr>
-                                    <td>ค่าล่วงเวลา วันหยุดพิเศษ (${item.otHoursSpecial.toFixed(1)} ชม.)</td>
-                                    <td class="amount">${item.otPaySpecial > 0 ? item.otPaySpecial.toLocaleString(undefined, { minimumFractionDigits: 2 }) : "-"}</td>
+                                    <td>ค่าล่วงเวลา วันหยุดพิเศษ (${item.otHoursSpecial.toFixed(0)} ชม.)</td>
+                                    <td class="amount">${item.otPaySpecial > 0 ? item.otPaySpecial.toLocaleString() : "-"}</td>
+                                    <td></td>
+                                    <td class="amount"></td>
+                                </tr>
+                                <tr>
+                                    <td>ค่าทำงานวันหยุดพิเศษ (${item.customHolidayWorkHours.toFixed(0)} ชม.)</td>
+                                    <td class="amount">${item.customHolidayWorkPay > 0 ? item.customHolidayWorkPay.toLocaleString() : "-"}</td>
                                     <td></td>
                                     <td class="amount"></td>
                                 </tr>
@@ -264,16 +278,16 @@ export default function PayrollPage() {
                                 </tr>
                                 <tr class="total-row">
                                     <td>รวมรายได้</td>
-                                    <td class="amount">${item.totalIncome.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                                    <td class="amount">${item.totalIncome.toLocaleString()}</td>
                                     <td>รวมรายการหัก</td>
-                                    <td class="amount">${item.totalDeduction.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                                    <td class="amount">${item.totalDeduction.toLocaleString()}</td>
                                 </tr>
                             </tbody>
                         </table>
 
                         <div class="net-pay">
                             <span>เงินได้สุทธิ (Net Pay)</span>
-                            <span>${item.netTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })} บาท</span>
+                            <span>${item.netTotal.toLocaleString()} บาท</span>
                         </div>
 
                         <div class="signature">
@@ -321,7 +335,21 @@ export default function PayrollPage() {
 
             // 2. Fetch Employees
             const allEmployees = await employeeService.getAll();
-            const targetEmployees = allEmployees.filter(e => e.type === employeeType);
+            let targetEmployees: Employee[] = [];
+
+            if (employeeType === "ประจำ - รายเดือน") {
+                targetEmployees = allEmployees.filter(e => e.type === "รายเดือน" && e.employmentType !== "ชั่วคราว");
+            } else if (employeeType === "ประจำ - รายวัน") {
+                targetEmployees = allEmployees.filter(e => e.type === "รายวัน" && e.employmentType !== "ชั่วคราว");
+            } else {
+                // ชั่วคราว
+                targetEmployees = allEmployees.filter(e => e.employmentType === "ชั่วคราว" || e.type === "ชั่วคราว");
+            }
+
+            // Filter by Department
+            if (selectedDepartment !== "all") {
+                targetEmployees = targetEmployees.filter(e => e.department === selectedDepartment);
+            }
 
             // 3. Fetch Data & Calculate
             const results: PayrollItem[] = [];
@@ -389,7 +417,10 @@ export default function PayrollPage() {
                 // Hourly Rate Estimate
                 let hourlyRate = 0;
 
-                if (employeeType === "รายเดือน") {
+                // Determine calculation method based on EMPLOYEE'S type, not the filter
+                const isMonthly = emp.type === "รายเดือน";
+
+                if (isMonthly) {
                     if (calculationPeriod === "month") {
                         income = baseSalary;
                         hourlyRate = baseSalary / 30 / 8;
@@ -404,10 +435,45 @@ export default function PayrollPage() {
                         hourlyRate = baseSalary / 30 / 8;
                     }
                 } else {
-                    // Daily / Temp
+                    // Daily (รายวัน) or Legacy Temp (ชั่วคราว)
                     income = baseSalary * workDays;
                     hourlyRate = baseSalary / 8;
                 }
+
+                // Round initial income
+                income = Math.round(income);
+
+                // Calculate Custom Holiday Work Pay
+                let customHolidayWorkHours = 0;
+                let customHolidayWorkPay = 0;
+                const customHolidays = config?.customHolidays ?? [];
+
+                dailyAttendance.forEach((records, dateKey) => {
+                    // Check if this date is a custom holiday
+                    const customHoliday = customHolidays.find(h => {
+                        const hDate = h.date instanceof Date ? h.date : (h.date as any).toDate();
+                        return format(hDate, "yyyy-MM-dd") === dateKey;
+                    });
+
+                    if (customHoliday) {
+                        // Assume 8 hours work day for simplicity, or calculate from check-in/out if needed
+                        // For now, using standard 8 hours if they showed up
+                        const hours = 8;
+                        customHolidayWorkHours += hours;
+
+                        // Calculate extra pay based on multiplier
+                        // Note: Base pay (1x) is already included in salary/daily wage
+                        // So we add the extra portion: (multiplier - 1)
+                        if (customHoliday.workdayMultiplier > 1) {
+                            const extraMultiplier = customHoliday.workdayMultiplier - 1;
+                            customHolidayWorkPay += hours * hourlyRate * extraMultiplier;
+                        }
+                    }
+                });
+
+                // Round Custom Holiday Pay
+                customHolidayWorkPay = Math.round(customHolidayWorkPay);
+                income += customHolidayWorkPay;
 
                 // Calculate OT Pay
                 let totalOtHours = 0;
@@ -454,6 +520,11 @@ export default function PayrollPage() {
                     }
                 });
 
+                // Round OT Pays
+                otPayNormal = Math.round(otPayNormal);
+                otPayHoliday = Math.round(otPayHoliday);
+                otPaySpecial = Math.round(otPaySpecial);
+
                 totalOtPay = otPayNormal + otPayHoliday + otPaySpecial;
 
                 // OT Pay
@@ -466,6 +537,9 @@ export default function PayrollPage() {
                 } else if (lateDeductionType === "fixed_per_minute") {
                     lateDeduction = totalLateMinutes * lateDeductionRate;
                 }
+
+                // Round Late Deduction
+                lateDeduction = Math.round(lateDeduction);
                 deduction += lateDeduction;
 
                 results.push({
@@ -482,6 +556,8 @@ export default function PayrollPage() {
                     otPayNormal,
                     otPayHoliday,
                     otPaySpecial,
+                    customHolidayWorkHours: customHolidayWorkHours,
+                    customHolidayWorkPay: customHolidayWorkPay,
                     totalIncome: income,
                     totalDeduction: deduction,
                     netTotal: income - deduction
@@ -501,7 +577,7 @@ export default function PayrollPage() {
     };
 
     return (
-        <div className="p-8 max-w-7xl mx-auto space-y-8">
+        <div>
             <PageHeader
                 title="คำนวณเงินเดือน"
                 subtitle="จัดการและคำนวณเงินเดือนพนักงาน"
@@ -512,12 +588,12 @@ export default function PayrollPage() {
                 <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700">ประเภทพนักงาน</label>
                     <div className="flex gap-2">
-                        {(["รายเดือน", "รายวัน", "ชั่วคราว"] as const).map((type) => (
+                        {(["ประจำ - รายเดือน", "ประจำ - รายวัน", "ชั่วคราว"] as const).map((type) => (
                             <button
                                 key={type}
                                 onClick={() => setEmployeeType(type)}
                                 className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${employeeType === type
-                                    ? "bg-[#553734] text-white shadow-lg shadow-[#553734]/20"
+                                    ? "bg-[#000000] text-white shadow-lg shadow-[#000000]/20"
                                     : "bg-gray-50 text-gray-600 hover:bg-gray-100"
                                     }`}
                             >
@@ -525,6 +601,22 @@ export default function PayrollPage() {
                             </button>
                         ))}
                     </div>
+                </div>
+
+                <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">แผนก/สังกัด</label>
+                    <select
+                        value={selectedDepartment}
+                        onChange={(e) => setSelectedDepartment(e.target.value)}
+                        className="px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#EBDACA] bg-white min-w-[150px]"
+                    >
+                        <option value="all">ทั้งหมด</option>
+                        {departments.map((dept) => (
+                            <option key={dept} value={dept}>
+                                {dept}
+                            </option>
+                        ))}
+                    </select>
                 </div>
 
                 <div className="space-y-2">
@@ -612,12 +704,24 @@ export default function PayrollPage() {
 
             {/* Config Summary */}
             {config && (
-                <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 text-sm text-blue-800 flex flex-wrap gap-6">
+                <div className="bg-blue-50 mt-1 rounded-xl p-4 text-sm text-blue-800 flex flex-wrap gap-y-2 gap-x-6">
+                    <div>
+                        <span className="font-medium">เวลาทำงาน:</span> {config.checkInHour.toString().padStart(2, '0')}:{config.checkInMinute.toString().padStart(2, '0')} - {config.checkOutHour.toString().padStart(2, '0')}:{config.checkOutMinute.toString().padStart(2, '0')}
+                    </div>
+                    <div>
+                        <span className="font-medium">สายได้:</span> {config.lateGracePeriod} นาที
+                    </div>
+                    <div>
+                        <span className="font-medium">OT ขั้นต่ำ:</span> {config.minOTMinutes} นาที
+                    </div>
                     <div>
                         <span className="font-medium">OT ปกติ:</span> {config.otMultiplier ?? 1.5} เท่า
                     </div>
                     <div>
                         <span className="font-medium">OT วันหยุด:</span> {config.otMultiplierHoliday ?? 3.0} เท่า
+                    </div>
+                    <div>
+                        <span className="font-medium">วันหยุด:</span> {(config.weeklyHolidays || []).map(d => ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"][d]).join(", ")}
                     </div>
                     <div>
                         <span className="font-medium">การหักสาย:</span> {
@@ -636,7 +740,7 @@ export default function PayrollPage() {
                         <h3 className="font-semibold text-gray-800">ผลการคำนวณ</h3>
                         <div className="text-sm text-gray-500">
                             รวมจ่ายสุทธิ: <span className="text-green-600 font-bold text-lg ml-2">
-                                ฿{payrollData.reduce((sum, item) => sum + item.netTotal, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                ฿{payrollData.reduce((sum, item) => sum + item.netTotal, 0).toLocaleString()}
                             </span>
                         </div>
                     </div>
@@ -652,12 +756,13 @@ export default function PayrollPage() {
                                             className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                         />
                                     </th>
-                                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">พนักงาน</th>
+                                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">พนักงาน</th>
                                     <th className="px-6 py-4 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">วันทำงาน</th>
                                     <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">ฐานเงินเดือน/ค่าจ้าง</th>
                                     <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">OT ปกติ (ชม.)</th>
                                     <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">OT วันหยุด (ชม.)</th>
                                     <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">OT พิเศษ (ชม.)</th>
+                                    <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">วันหยุดพิเศษ (ชม.)</th>
                                     <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">สาย (นาที)</th>
                                     <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">รายรับรวม</th>
                                     <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">หัก</th>
@@ -678,31 +783,40 @@ export default function PayrollPage() {
                                         <td className="px-6 py-4">
                                             <div className="font-medium text-gray-900">{item.name}</div>
                                             <div className="text-xs text-gray-500">{item.employeeId}</div>
+                                            <div className={`text-[10px] px-2 py-0.5 rounded-full inline-block mt-1 ${item.type === 'รายเดือน'
+                                                ? 'bg-blue-50 text-blue-600 border border-blue-100'
+                                                : 'bg-orange-50 text-orange-600 border border-orange-100'
+                                                }`}>
+                                                {item.type}
+                                            </div>
                                         </td>
                                         <td className="px-6 py-4 text-center text-gray-600">{item.workDays}</td>
                                         <td className="px-6 py-4 text-right text-gray-600">
                                             {item.baseSalary.toLocaleString()}
                                         </td>
                                         <td className="px-6 py-4 text-right text-gray-600">
-                                            {item.otHoursNormal.toFixed(1)}
+                                            {item.otHoursNormal.toFixed(0)}
                                         </td>
                                         <td className="px-6 py-4 text-right text-gray-600">
-                                            {item.otHoursHoliday.toFixed(1)}
+                                            {item.otHoursHoliday.toFixed(0)}
                                         </td>
                                         <td className="px-6 py-4 text-right text-gray-600">
-                                            {item.otHoursSpecial.toFixed(1)}
+                                            {item.otHoursSpecial.toFixed(0)}
+                                        </td>
+                                        <td className="px-6 py-4 text-right text-gray-600">
+                                            {item.customHolidayWorkHours.toFixed(0)}
                                         </td>
                                         <td className="px-6 py-4 text-right text-red-500">
                                             {item.lateMinutes}
                                         </td>
                                         <td className="px-6 py-4 text-right text-green-600 font-medium">
-                                            {item.totalIncome.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            {item.totalIncome.toLocaleString()}
                                         </td>
                                         <td className="px-6 py-4 text-right text-red-600 font-medium">
-                                            {item.totalDeduction.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            {item.totalDeduction.toLocaleString()}
                                         </td>
                                         <td className="px-6 py-4 text-right font-bold text-gray-900">
-                                            {item.netTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            {item.netTotal.toLocaleString()}
                                         </td>
                                     </tr>
                                 ))}

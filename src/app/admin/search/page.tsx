@@ -39,7 +39,7 @@ export default function SearchPage() {
             const query = searchQuery.toLowerCase();
             const filtered = employees.filter(emp =>
                 emp.name.toLowerCase().includes(query) ||
-                emp.email.toLowerCase().includes(query) ||
+                emp.email?.toLowerCase().includes(query) ||
                 emp.employeeId?.toLowerCase().includes(query) ||
                 emp.lineUserId?.toLowerCase().includes(query)
             );

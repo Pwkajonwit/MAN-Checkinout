@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
-import { Save, Clock, AlertCircle, CheckCircle2, DollarSign, HardDrive, Calendar, Plus, Trash2 } from "lucide-react";
+import { Save, Clock, AlertCircle, CheckCircle2, DollarSign, HardDrive, Calendar, Plus, Trash2, MapPin, Crosshair } from "lucide-react";
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
 import { WORK_TIME_CONFIG } from "@/lib/workTime";
@@ -27,11 +27,18 @@ export default function SettingsPage() {
         adminLineGroupId: "",
         enableDailyReport: false,
         customHolidays: [],
+        locationConfig: {
+            enabled: false,
+            latitude: 0,
+            longitude: 0,
+            radius: 100
+        }
     });
 
     const [newHoliday, setNewHoliday] = useState({
         date: format(new Date(), "yyyy-MM-dd"),
         name: "",
+        workdayMultiplier: 2.0,
         otMultiplier: 3.0
     });
 
@@ -41,6 +48,7 @@ export default function SettingsPage() {
     const [storageUsage, setStorageUsage] = useState({ totalBytes: 0, fileCount: 0 });
     const [loadingStorage, setLoadingStorage] = useState(true);
     const [cleanupLoading, setCleanupLoading] = useState(false);
+    const [gettingLocation, setGettingLocation] = useState(false);
 
     useEffect(() => {
         const fetchSettings = async () => {
@@ -63,6 +71,12 @@ export default function SettingsPage() {
                         adminLineGroupId: config.adminLineGroupId ?? "",
                         enableDailyReport: config.enableDailyReport ?? false,
                         customHolidays: config.customHolidays ?? [],
+                        locationConfig: config.locationConfig ?? {
+                            enabled: false,
+                            latitude: 0,
+                            longitude: 0,
+                            radius: 100
+                        }
                     });
                 }
             } catch (error) {
@@ -97,6 +111,7 @@ export default function SettingsPage() {
         holidays.push({
             date: holidayDate,
             name: newHoliday.name,
+            workdayMultiplier: newHoliday.workdayMultiplier,
             otMultiplier: newHoliday.otMultiplier
         });
 
@@ -107,6 +122,7 @@ export default function SettingsPage() {
         setNewHoliday({
             date: format(new Date(), "yyyy-MM-dd"),
             name: "",
+            workdayMultiplier: 2.0,
             otMultiplier: 3.0
         });
     };
@@ -133,6 +149,34 @@ export default function SettingsPage() {
             alert("เกิดข้อผิดพลาดในการลบรูปภาพ");
         } finally {
             setCleanupLoading(false);
+        }
+    };
+
+    const handleGetCurrentLocation = () => {
+        setGettingLocation(true);
+        if ("geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    setSettings(prev => ({
+                        ...prev,
+                        locationConfig: {
+                            ...prev.locationConfig!,
+                            latitude: position.coords.latitude,
+                            longitude: position.coords.longitude
+                        }
+                    }));
+                    setGettingLocation(false);
+                },
+                (error) => {
+                    console.error("Error getting location:", error);
+                    alert("ไม่สามารถดึงตำแหน่งปัจจุบันได้ กรุณาตรวจสอบการอนุญาตเข้าถึงตำแหน่ง");
+                    setGettingLocation(false);
+                },
+                { enableHighAccuracy: true }
+            );
+        } else {
+            alert("เบราว์เซอร์ของคุณไม่รองรับการระบุตำแหน่ง");
+            setGettingLocation(false);
         }
     };
 
@@ -168,6 +212,12 @@ export default function SettingsPage() {
             lateDeductionRate: 0,
             requirePhoto: true,
             customHolidays: [],
+            locationConfig: {
+                enabled: false,
+                latitude: 0,
+                longitude: 0,
+                radius: 100
+            }
         });
     };
 
@@ -201,7 +251,43 @@ export default function SettingsPage() {
                     </div>
                 )}
 
-                {/* Photo Requirement Setting - MOVED TO TOP */}
+                {/* Employee Registration Setting */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
+                    <div className="flex items-center justify-between mb-4">
+                        <div>
+                            <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                                <span className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
+                                    📝
+                                </span>
+                                การลงทะเบียนพนักงานใหม่
+                            </h2>
+                            <p className="text-sm text-gray-500 mt-1">
+                                เปิด/ปิด การลงทะเบียนสำหรับพนักงานใหม่ (หากปิด จะลงได้เฉพาะผู้ที่มีข้อมูลในระบบแล้ว)
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setSettings({ ...settings, allowNewRegistration: !settings.allowNewRegistration })}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.allowNewRegistration ? 'bg-blue-600' : 'bg-gray-200'
+                                }`}
+                        >
+                            <span
+                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.allowNewRegistration ? 'translate-x-6' : 'translate-x-1'
+                                    }`}
+                            />
+                        </button>
+                    </div>
+
+                    <div className="text-sm text-gray-600">
+                        {settings.allowNewRegistration ? (
+                            <p className="text-green-600 font-medium">✓ เปิดรับลงทะเบียนพนักงานใหม่</p>
+                        ) : (
+                            <p className="text-red-500">✕ ปิดรับลงทะเบียน (เฉพาะพนักงานที่มีข้อมูลแล้วเท่านั้น)</p>
+                        )}
+                    </div>
+                </div>
+
+                {/* Photo Requirement Setting */}
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
                     <div className="flex items-center justify-between mb-4">
                         <div>
@@ -319,6 +405,113 @@ export default function SettingsPage() {
                             <p className="text-xs text-gray-400 mt-2">
                                 * การลบรูปภาพจะไม่สามารถกู้คืนได้
                             </p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Location Settings */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center">
+                                <MapPin className="w-5 h-5 text-red-600" />
+                            </div>
+                            <div>
+                                <h2 className="text-lg font-bold text-gray-800">พิกัดที่ทำงาน</h2>
+                                <p className="text-sm text-gray-500">กำหนดพื้นที่สำหรับการลงเวลา (Geofencing)</p>
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setSettings(prev => ({
+                                ...prev,
+                                locationConfig: {
+                                    ...prev.locationConfig!,
+                                    enabled: !prev.locationConfig?.enabled
+                                }
+                            }))}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.locationConfig?.enabled ? 'bg-blue-600' : 'bg-gray-200'
+                                }`}
+                        >
+                            <span
+                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.locationConfig?.enabled ? 'translate-x-6' : 'translate-x-1'
+                                    }`}
+                            />
+                        </button>
+                    </div>
+
+                    <div className={`space-y-6 transition-opacity ${settings.locationConfig?.enabled ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    ละติจูด (Latitude)
+                                </label>
+                                <input
+                                    type="number"
+                                    step="any"
+                                    value={settings.locationConfig?.latitude ?? 0}
+                                    onChange={(e) => setSettings(prev => ({
+                                        ...prev,
+                                        locationConfig: {
+                                            ...prev.locationConfig!,
+                                            latitude: parseFloat(e.target.value) || 0
+                                        }
+                                    }))}
+                                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    ลองจิจูด (Longitude)
+                                </label>
+                                <input
+                                    type="number"
+                                    step="any"
+                                    value={settings.locationConfig?.longitude ?? 0}
+                                    onChange={(e) => setSettings(prev => ({
+                                        ...prev,
+                                        locationConfig: {
+                                            ...prev.locationConfig!,
+                                            longitude: parseFloat(e.target.value) || 0
+                                        }
+                                    }))}
+                                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex items-end gap-4">
+                            <div className="flex-1">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    รัศมี (เมตร)
+                                </label>
+                                <input
+                                    type="number"
+                                    min="10"
+                                    value={settings.locationConfig?.radius ?? 100}
+                                    onChange={(e) => setSettings(prev => ({
+                                        ...prev,
+                                        locationConfig: {
+                                            ...prev.locationConfig!,
+                                            radius: parseInt(e.target.value) || 100
+                                        }
+                                    }))}
+                                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                                <p className="text-xs text-gray-500 mt-2">
+                                    ระยะห่างที่ยอมรับได้จากจุดพิกัดที่กำหนด
+                                </p>
+                            </div>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={handleGetCurrentLocation}
+                                disabled={gettingLocation || !settings.locationConfig?.enabled}
+                                className="mb-[2px] h-[46px] gap-2"
+                            >
+                                <Crosshair className={`w-4 h-4 ${gettingLocation ? 'animate-spin' : ''}`} />
+                                {gettingLocation ? 'กำลังค้นหา...' : 'ใช้ตำแหน่งปัจจุบัน'}
+                            </Button>
                         </div>
                     </div>
                 </div>
@@ -577,6 +770,18 @@ export default function SettingsPage() {
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     />
                                 </div>
+                                <div className="w-28">
+                                    <label className="block text-xs text-gray-500 mb-1">ค่าแรง (เท่า)</label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="5"
+                                        step="0.1"
+                                        value={newHoliday.workdayMultiplier}
+                                        onChange={(e) => setNewHoliday({ ...newHoliday, workdayMultiplier: parseFloat(e.target.value) || 2.0 })}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
                                 <div className="w-24">
                                     <label className="block text-xs text-gray-500 mb-1">OT (เท่า)</label>
                                     <input
@@ -612,6 +817,9 @@ export default function SettingsPage() {
                                                     </span>
                                                 </div>
                                                 <span className="font-medium text-gray-800">{holiday.name}</span>
+                                                <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-md font-medium">
+                                                    ค่าแรง x{holiday.workdayMultiplier}
+                                                </span>
                                                 <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-md font-medium">
                                                     OT x{holiday.otMultiplier}
                                                 </span>

@@ -1,14 +1,17 @@
 import { cn } from "@/lib/utils";
 import { type LeaveRequest } from "@/lib/firestore";
-import { Check, X } from "lucide-react";
+import { Check, X, Edit2, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 
 interface LeaveTableProps {
     leaves: LeaveRequest[];
     onStatusUpdate: (id: string, status: LeaveRequest["status"]) => void;
+    onEdit?: (leave: LeaveRequest) => void;
+    onDelete?: (id: string) => void;
+    isSuperAdmin?: boolean;
 }
 
-export function LeaveTable({ leaves, onStatusUpdate }: LeaveTableProps) {
+export function LeaveTable({ leaves, onStatusUpdate, onEdit, onDelete, isSuperAdmin = false }: LeaveTableProps) {
     return (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="overflow-x-auto">
@@ -79,24 +82,55 @@ export function LeaveTable({ leaves, onStatusUpdate }: LeaveTableProps) {
                                         </span>
                                     </td>
                                     <td className="py-4 px-6">
-                                        {leave.status === "รออนุมัติ" && leave.id && (
-                                            <div className="flex gap-2">
-                                                <button
-                                                    onClick={() => onStatusUpdate(leave.id!, "อนุมัติ")}
-                                                    className="p-2 hover:bg-green-100 rounded-lg transition-colors"
-                                                    title="อนุมัติ"
-                                                >
-                                                    <Check className="w-4 h-4 text-green-600" />
-                                                </button>
-                                                <button
-                                                    onClick={() => onStatusUpdate(leave.id!, "ไม่อนุมัติ")}
-                                                    className="p-2 hover:bg-red-100 rounded-lg transition-colors"
-                                                    title="ไม่อนุมัติ"
-                                                >
-                                                    <X className="w-4 h-4 text-red-600" />
-                                                </button>
-                                            </div>
-                                        )}
+                                        <div className="flex gap-2">
+                                            {/* Approve/Reject buttons for pending requests */}
+                                            {leave.status === "รออนุมัติ" && leave.id && (
+                                                <>
+                                                    <button
+                                                        onClick={() => onStatusUpdate(leave.id!, "อนุมัติ")}
+                                                        className="p-2 hover:bg-green-100 rounded-lg transition-colors"
+                                                        title="อนุมัติ"
+                                                    >
+                                                        <Check className="w-4 h-4 text-green-600" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => onStatusUpdate(leave.id!, "ไม่อนุมัติ")}
+                                                        className="p-2 hover:bg-red-100 rounded-lg transition-colors"
+                                                        title="ไม่อนุมัติ"
+                                                    >
+                                                        <X className="w-4 h-4 text-red-600" />
+                                                    </button>
+                                                </>
+                                            )}
+
+                                            {/* Edit and Delete buttons for super_admin */}
+                                            {isSuperAdmin && leave.id && (
+                                                <>
+                                                    {onEdit && (
+                                                        <button
+                                                            onClick={() => onEdit(leave)}
+                                                            className="p-2 hover:bg-blue-100 rounded-lg transition-colors"
+                                                            title="แก้ไข"
+                                                        >
+                                                            <Edit2 className="w-4 h-4 text-blue-600" />
+                                                        </button>
+                                                    )}
+                                                    {onDelete && (
+                                                        <button
+                                                            onClick={() => {
+                                                                if (confirm(`คุณต้องการลบคำขอลาของ ${leave.employeeName} ใช่หรือไม่?`)) {
+                                                                    onDelete(leave.id!);
+                                                                }
+                                                            }}
+                                                            className="p-2 hover:bg-red-100 rounded-lg transition-colors"
+                                                            title="ลบ"
+                                                        >
+                                                            <Trash2 className="w-4 h-4 text-red-600" />
+                                                        </button>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
                                     </td>
                                 </tr>
                             ))

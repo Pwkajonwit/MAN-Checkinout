@@ -7,14 +7,16 @@ import { LeaveTable } from "@/components/leave/LeaveTable";
 import { LeaveFormModal } from "@/components/leave/LeaveFormModal";
 import { Button } from "@/components/ui/button";
 import { Pencil, Plus } from "lucide-react";
-import { leaveService, type LeaveRequest, employeeService } from "@/lib/firestore";
+import { leaveService, type LeaveRequest, employeeService, adminService } from "@/lib/firestore";
 import { sendPushMessage } from "@/app/actions/line";
+import { auth } from "@/lib/firebase";
 
 export default function LeavePage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedLeave, setSelectedLeave] = useState<LeaveRequest | null>(null);
     const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
     const loadLeaves = async () => {
         try {
@@ -29,11 +31,38 @@ export default function LeavePage() {
 
     useEffect(() => {
         loadLeaves();
+
+        // Check if current user is super_admin
+        const checkAdminRole = async () => {
+            const user = auth.currentUser;
+            if (user?.email) {
+                const admin = await adminService.getByEmail(user.email);
+                if (admin?.role === "super_admin") {
+                    setIsSuperAdmin(true);
+                }
+            }
+        };
+        checkAdminRole();
     }, []);
 
     const handleAddLeave = () => {
         setSelectedLeave(null);
         setIsModalOpen(true);
+    };
+
+    const handleEditLeave = (leave: LeaveRequest) => {
+        setSelectedLeave(leave);
+        setIsModalOpen(true);
+    };
+
+    const handleDeleteLeave = async (id: string) => {
+        try {
+            await leaveService.delete(id);
+            loadLeaves();
+        } catch (error) {
+            console.error("Error deleting leave:", error);
+            alert("เกิดข้อผิดพลาดในการลบคำขอลา");
+        }
     };
 
     const handleSuccess = () => {
@@ -193,9 +222,7 @@ export default function LeavePage() {
                             <Plus className="w-4 h-4" />
                             เพิ่มการลางาน
                         </Button>
-                        <Button variant="outline" size="icon" className="rounded-xl border-gray-200 text-gray-400 hover:text-gray-600">
-                            <Pencil className="w-4 h-4" />
-                        </Button>
+
                     </div>
                 }
             />
@@ -225,7 +252,13 @@ export default function LeavePage() {
                     <p className="text-gray-600 mt-4">กำลังโหลดข้อมูล...</p>
                 </div>
             ) : (
-                <LeaveTable leaves={leaves} onStatusUpdate={handleStatusUpdate} />
+                <LeaveTable
+                    leaves={leaves}
+                    onStatusUpdate={handleStatusUpdate}
+                    onEdit={handleEditLeave}
+                    onDelete={handleDeleteLeave}
+                    isSuperAdmin={isSuperAdmin}
+                />
             )}
 
             <LeaveFormModal

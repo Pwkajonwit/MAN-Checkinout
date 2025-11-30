@@ -7,9 +7,10 @@ import { AttendanceTable } from "@/components/dashboard/AttendanceTable";
 import { AttendanceFormModal } from "@/components/dashboard/AttendanceFormModal";
 import { Button } from "@/components/ui/button";
 import { Plus, Calendar as CalendarIcon } from "lucide-react";
-import { attendanceService, type Attendance } from "@/lib/firestore";
+import { attendanceService, type Attendance, adminService } from "@/lib/firestore";
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
+import { auth } from "@/lib/firebase";
 
 export default function DashboardPage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -17,6 +18,7 @@ export default function DashboardPage() {
     const [attendances, setAttendances] = useState<Attendance[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+    const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
     const loadAttendances = async (date: Date) => {
         setLoading(true);
@@ -32,11 +34,38 @@ export default function DashboardPage() {
 
     useEffect(() => {
         loadAttendances(selectedDate);
+
+        // Check if current user is super_admin
+        const checkAdminRole = async () => {
+            const user = auth.currentUser;
+            if (user?.email) {
+                const admin = await adminService.getByEmail(user.email);
+                if (admin?.role === "super_admin") {
+                    setIsSuperAdmin(true);
+                }
+            }
+        };
+        checkAdminRole();
     }, [selectedDate]);
 
     const handleAddAttendance = () => {
         setSelectedAttendance(null);
         setIsModalOpen(true);
+    };
+
+    const handleEditAttendance = (attendance: Attendance) => {
+        setSelectedAttendance(attendance);
+        setIsModalOpen(true);
+    };
+
+    const handleDeleteAttendance = async (id: string) => {
+        try {
+            await attendanceService.delete(id);
+            loadAttendances(selectedDate);
+        } catch (error) {
+            console.error("Error deleting attendance:", error);
+            alert("เกิดข้อผิดพลาดในการลบบันทึกการลงเวลา");
+        }
     };
 
     const handleSuccess = () => {
@@ -79,19 +108,19 @@ export default function DashboardPage() {
                 subtitle={`${attendances.length} results found`}
                 searchPlaceholder="Employee |"
                 action={
-                    <div className="flex gap-3">
-                        <div className="relative">
+                    <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                        <div className="relative w-full sm:w-auto">
                             <input
                                 type="date"
                                 value={format(selectedDate, "yyyy-MM-dd")}
                                 onChange={(e) => setSelectedDate(new Date(e.target.value))}
-                                className="pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                className="w-full sm:w-auto pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
                             />
                             <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
                         </div>
                         <Button
                             onClick={handleAddAttendance}
-                            className="bg-[#5C6BC0] hover:bg-[#5C6BC0]/90 text-white rounded-xl px-6 gap-2"
+                            className="w-full sm:w-auto bg-[#5C6BC0] hover:bg-[#5C6BC0]/90 text-white rounded-xl px-6 gap-2"
                         >
                             <Plus className="w-4 h-4" />
                             บันทึกการลงเวลา
@@ -125,7 +154,12 @@ export default function DashboardPage() {
                     <p className="text-gray-600 mt-4">กำลังโหลดข้อมูล...</p>
                 </div>
             ) : (
-                <AttendanceTable attendances={attendances} />
+                <AttendanceTable
+                    attendances={attendances}
+                    onEdit={handleEditAttendance}
+                    onDelete={handleDeleteAttendance}
+                    isSuperAdmin={isSuperAdmin}
+                />
             )}
 
             <AttendanceFormModal

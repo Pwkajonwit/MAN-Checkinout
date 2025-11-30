@@ -18,9 +18,10 @@ export interface Employee {
     id?: string;
     employeeId?: string;
     name: string;
-    email: string;
+    email?: string;
     phone: string;
-    type: "รายเดือน" | "รายวัน" | "ชั่วคราว";
+    type: "รายเดือน" | "รายวัน" | "ชั่วคราว"; // Payment type
+    employmentType?: "ประจำ" | "ชั่วคราว"; // Employment status
     position: string;
     registeredDate: Date;
     status: "ทำงาน" | "ลาออก" | "พ้นสภาพ";
@@ -51,6 +52,8 @@ export interface Attendance {
     photo?: string;
     latitude?: number;
     longitude?: number;
+    locationNote?: string;
+    distance?: number; // Distance from workplace in meters
 }
 
 // Leave Request types
@@ -245,6 +248,29 @@ export const attendanceService = {
         })) as Attendance[];
     },
 
+    async getByDateRange(startDate: Date, endDate: Date) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+
+        const q = query(
+            collection(db, "attendance"),
+            where("date", ">=", Timestamp.fromDate(start)),
+            where("date", "<=", Timestamp.fromDate(end)),
+            orderBy("date", "desc")
+        );
+
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            date: doc.data().date?.toDate(),
+            checkIn: doc.data().checkIn?.toDate(),
+            checkOut: doc.data().checkOut?.toDate(),
+        })) as Attendance[];
+    },
+
     async update(id: string, data: Partial<Attendance>) {
         const docRef = doc(db, "attendance", id);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -252,6 +278,10 @@ export const attendanceService = {
         if (data.checkIn) updateData.checkIn = Timestamp.fromDate(data.checkIn);
         if (data.checkOut) updateData.checkOut = Timestamp.fromDate(data.checkOut);
         await updateDoc(docRef, updateData);
+    },
+
+    async delete(id: string) {
+        await deleteDoc(doc(db, "attendance", id));
     },
 };
 
@@ -279,9 +309,62 @@ export const leaveService = {
         })) as LeaveRequest[];
     },
 
+    async getByDateRange(startDate: Date, endDate: Date) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+
+        // Note: This query checks if the leave *starts* within the range. 
+        // For more complex overlap (starts before, ends after), we'd need client-side filtering or multiple queries.
+        // For analytics, checking start date is usually sufficient for "New leaves in period".
+        // However, for "People on leave", we might want overlap. 
+        // Let's stick to a simple query for now and filter more if needed.
+        const q = query(
+            collection(db, "leaveRequests"),
+            where("startDate", ">=", Timestamp.fromDate(start)),
+            where("startDate", "<=", Timestamp.fromDate(end)),
+            orderBy("startDate", "desc")
+        );
+
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            startDate: doc.data().startDate?.toDate(),
+            endDate: doc.data().endDate?.toDate(),
+            createdAt: doc.data().createdAt?.toDate(),
+        })) as LeaveRequest[];
+    },
+
     async updateStatus(id: string, status: LeaveRequest["status"]) {
         const docRef = doc(db, "leaveRequests", id);
         await updateDoc(docRef, { status });
+    },
+
+    async update(id: string, leave: Partial<Omit<LeaveRequest, "id">>) {
+        const docRef = doc(db, "leaveRequests", id);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const data: any = { ...leave };
+
+        if (leave.startDate) {
+            data.startDate = Timestamp.fromDate(leave.startDate);
+        }
+        if (leave.endDate) {
+            data.endDate = Timestamp.fromDate(leave.endDate);
+        }
+        if (leave.createdAt) {
+            data.createdAt = Timestamp.fromDate(leave.createdAt);
+        }
+
+        // Remove undefined fields
+        Object.keys(data).forEach(key => data[key] === undefined && delete data[key]);
+
+        await updateDoc(docRef, data);
+    },
+
+    async delete(id: string) {
+        await deleteDoc(doc(db, "leaveRequests", id));
     },
 
     async getByEmployeeId(employeeId: string) {
@@ -327,9 +410,61 @@ export const otService = {
         })) as OTRequest[];
     },
 
+    async getByDateRange(startDate: Date, endDate: Date) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+
+        const q = query(
+            collection(db, "otRequests"),
+            where("date", ">=", Timestamp.fromDate(start)),
+            where("date", "<=", Timestamp.fromDate(end)),
+            orderBy("date", "desc")
+        );
+
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            date: doc.data().date?.toDate(),
+            startTime: doc.data().startTime?.toDate(),
+            endTime: doc.data().endTime?.toDate(),
+            createdAt: doc.data().createdAt?.toDate(),
+        })) as OTRequest[];
+    },
+
     async updateStatus(id: string, status: OTRequest["status"]) {
         const docRef = doc(db, "otRequests", id);
         await updateDoc(docRef, { status });
+    },
+
+    async update(id: string, ot: Partial<Omit<OTRequest, "id">>) {
+        const docRef = doc(db, "otRequests", id);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const data: any = { ...ot };
+
+        if (ot.date) {
+            data.date = Timestamp.fromDate(ot.date);
+        }
+        if (ot.startTime) {
+            data.startTime = Timestamp.fromDate(ot.startTime);
+        }
+        if (ot.endTime) {
+            data.endTime = Timestamp.fromDate(ot.endTime);
+        }
+        if (ot.createdAt) {
+            data.createdAt = Timestamp.fromDate(ot.createdAt);
+        }
+
+        // Remove undefined fields
+        Object.keys(data).forEach(key => data[key] === undefined && delete data[key]);
+
+        await updateDoc(docRef, data);
+    },
+
+    async delete(id: string) {
+        await deleteDoc(doc(db, "otRequests", id));
     },
 
     async getByEmployeeId(employeeId: string) {
@@ -354,7 +489,8 @@ export const otService = {
 export interface CustomHoliday {
     date: Date;
     name: string;
-    otMultiplier: number;
+    workdayMultiplier: number; // Pay rate for working on this day (e.g. 2.0)
+    otMultiplier: number; // OT rate for this day (e.g. 3.0)
 }
 
 export interface SystemConfig {
@@ -369,13 +505,21 @@ export interface SystemConfig {
     otMultiplier: number; // Normal OT (e.g. 1.5)
     otMultiplierHoliday: number; // Holiday/Weekend OT (e.g. 3.0)
     weeklyHolidays: number[]; // Days of week that are holidays (0=Sun, 6=Sat)
-    customHolidays?: CustomHoliday[]; // Custom holidays with specific OT rates
     lateDeductionType: "none" | "pro-rated" | "fixed_per_minute";
-    lateDeductionRate: number; // Used if type is fixed_per_minute
+    lateDeductionRate: number; // Used if fixed_per_minute
+    customHolidays: CustomHoliday[];
+    lineNotifyToken?: string; // Line Notify Token
+    lineGroupId?: string; // Line Group ID for notifications
+    locationConfig?: {
+        enabled: boolean;
+        latitude: number;
+        longitude: number;
+        radius: number; // meters
+    };
     requirePhoto: boolean; // Require photo during check-in
     adminLineGroupId?: string; // Line Group ID for admin notifications
     enableDailyReport?: boolean; // Enable daily summary report
-
+    allowNewRegistration?: boolean; // Allow new employee registration
 }
 // System Config CRUD operations
 export const systemConfigService = {

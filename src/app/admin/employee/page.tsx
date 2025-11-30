@@ -19,6 +19,7 @@ export default function EmployeePage() {
     const [loading, setLoading] = useState(true);
     const [filterType, setFilterType] = useState<"all" | "รายเดือน" | "รายวัน" | "ชั่วคราว">("all");
     const [statusFilter, setStatusFilter] = useState<"active" | "inactive" | "all">("active");
+    const [searchQuery, setSearchQuery] = useState("");
 
     const loadEmployees = async () => {
         try {
@@ -39,9 +40,27 @@ export default function EmployeePage() {
     useEffect(() => {
         let result = employees;
 
+        // Filter by Search Query
+        if (searchQuery) {
+            const query = searchQuery.toLowerCase();
+            result = result.filter(e =>
+                e.name.toLowerCase().includes(query) ||
+                e.employeeId?.toLowerCase().includes(query) ||
+                e.position.toLowerCase().includes(query)
+            );
+        }
+
         // Filter by Type
         if (filterType !== "all") {
-            result = result.filter(e => e.type === filterType);
+            if (filterType === "ชั่วคราว") {
+                result = result.filter(e => e.employmentType === "ชั่วคราว" || e.type === "ชั่วคราว");
+            } else {
+                // For "รายเดือน" and "รายวัน", exclude "ชั่วคราว" unless specifically requested
+                result = result.filter(e =>
+                    e.type === filterType &&
+                    e.employmentType !== "ชั่วคราว"
+                );
+            }
         }
 
         // Filter by Status
@@ -52,11 +71,9 @@ export default function EmployeePage() {
         }
 
         setFilteredEmployees(result);
-    }, [filterType, statusFilter, employees]);
+    }, [filterType, statusFilter, searchQuery, employees]);
 
     const [isReadOnly, setIsReadOnly] = useState(false);
-
-    // ... loadEmployees ...
 
     const handleAddEmployee = () => {
         setSelectedEmployee(null);
@@ -94,9 +111,9 @@ export default function EmployeePage() {
 
     // Calculate stats
     const stats = {
-        monthly: employees.filter(e => e.type === "รายเดือน" && (!e.status || e.status === "ทำงาน")).length,
-        daily: employees.filter(e => e.type === "รายวัน" && (!e.status || e.status === "ทำงาน")).length,
-        temporary: employees.filter(e => e.type === "ชั่วคราว" && (!e.status || e.status === "ทำงาน")).length,
+        monthly: employees.filter(e => e.type === "รายเดือน" && (e.employmentType !== "ชั่วคราว") && (!e.status || e.status === "ทำงาน")).length,
+        daily: employees.filter(e => e.type === "รายวัน" && (e.employmentType !== "ชั่วคราว") && (!e.status || e.status === "ทำงาน")).length,
+        temporary: employees.filter(e => (e.employmentType === "ชั่วคราว" || e.type === "ชั่วคราว") && (!e.status || e.status === "ทำงาน")).length,
         total: employees.filter(e => !e.status || e.status === "ทำงาน").length,
         inactive: employees.filter(e => e.status === "ลาออก" || e.status === "พ้นสภาพ").length,
     };
@@ -106,7 +123,8 @@ export default function EmployeePage() {
             <PageHeader
                 title="พนักงานทั้งหมด"
                 subtitle={`${filteredEmployees.length} results found`}
-                searchPlaceholder="Employee |"
+                searchPlaceholder="ค้นหา ชื่อ, รหัส, ตำแหน่ง..."
+                onSearch={setSearchQuery}
                 action={
                     isSuperAdmin ? (
                         <div className="flex gap-2">
@@ -117,26 +135,24 @@ export default function EmployeePage() {
                                 <Plus className="w-4 h-4" />
                                 Add Employee
                             </Button>
-                            <Button variant="outline" size="icon" className="rounded-xl border-gray-200 text-gray-400 hover:text-gray-600">
-                                <Pencil className="w-4 h-4" />
-                            </Button>
+
                         </div>
                     ) : null
                 }
             />
 
-            {/* ... Stats Cards ... */}
+            {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
                 <div onClick={() => { setFilterType("รายเดือน"); setStatusFilter("active"); }} className="cursor-pointer transition-transform hover:scale-105">
                     <StatsCard
-                        title="พนักงานรายเดือน"
+                        title="ประจำ - รายเดือน"
                         value={stats.monthly}
                         className={filterType === "รายเดือน" && statusFilter === "active" ? "ring-2 ring-blue-500 bg-blue-50" : ""}
                     />
                 </div>
                 <div onClick={() => { setFilterType("รายวัน"); setStatusFilter("active"); }} className="cursor-pointer transition-transform hover:scale-105">
                     <StatsCard
-                        title="พนักงานรายวัน"
+                        title="ประจำ - รายวัน"
                         value={stats.daily}
                         className={filterType === "รายวัน" && statusFilter === "active" ? "ring-2 ring-orange-500 bg-orange-50" : ""}
                     />

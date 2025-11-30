@@ -116,13 +116,17 @@ export function OTFormModal({ isOpen, onClose, ot, onSuccess }: OTFormModalProps
                 endTime: formData.endTime ? new Date(`${formData.date}T${formData.endTime}`) : new Date(formData.date),
                 reason: formData.reason,
                 status: formData.status,
-                createdAt: new Date(),
             };
 
             if (ot?.id) {
-                alert("การแก้ไขจะพัฒนาในเวอร์ชันถัดไป");
+                // Update existing OT
+                await otService.update(ot.id, otData);
             } else {
-                await otService.create(otData);
+                // Create new OT
+                await otService.create({
+                    ...otData,
+                    createdAt: new Date(),
+                });
             }
             onSuccess();
             onClose();

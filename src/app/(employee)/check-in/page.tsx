@@ -3,12 +3,15 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { MapPin, Camera, RotateCcw, CheckCircle, Clock } from "lucide-react";
+import { MapPin, Camera, RotateCcw, CheckCircle, Clock, AlertTriangle } from "lucide-react";
 import { attendanceService, systemConfigService } from "@/lib/firestore";
 import { isLate, getLateMinutes, isEligibleForOT, getOTMinutes, formatMinutesToHours } from "@/lib/workTime";
 import { useEmployee } from "@/contexts/EmployeeContext";
 import { EmployeeHeader } from "@/components/mobile/EmployeeHeader";
 import { uploadAttendancePhoto } from "@/lib/storage";
+import { calculateDistance } from "@/lib/location";
+
+import { CustomAlert } from "@/components/ui/custom-alert";
 
 export default function CheckInPage() {
     const router = useRouter();
@@ -17,6 +20,32 @@ export default function CheckInPage() {
     const [currentTime, setCurrentTime] = useState(new Date());
     const [loading, setLoading] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
+
+    // Alert State
+    const [alertState, setAlertState] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        type: "success" | "error" | "warning" | "info";
+    }>({
+        isOpen: false,
+        title: "",
+        message: "",
+        type: "info"
+    });
+
+    const showAlert = (title: string, message: string, type: "success" | "error" | "warning" | "info" = "info") => {
+        setAlertState({
+            isOpen: true,
+            title,
+            message,
+            type
+        });
+    };
+
+    const closeAlert = () => {
+        setAlertState(prev => ({ ...prev, isOpen: false }));
+    };
 
     // Step 1 Data
     const [checkInType, setCheckInType] = useState<"เข้างาน" | "ออกงาน" | "ระหว่างวัน">("เข้างาน");
@@ -35,9 +64,18 @@ export default function CheckInPage() {
     // Step 3 Data (Location)
     const [location, setLocation] = useState<{ lat: number, lng: number, address: string } | null>(null);
     const [locationLoading, setLocationLoading] = useState(false);
+    const [distance, setDistance] = useState<number | null>(null);
+    const [isLocationValid, setIsLocationValid] = useState(true);
+    const [locationNote, setLocationNote] = useState("");
 
     // Settings
     const [requirePhoto, setRequirePhoto] = useState(true);
+    const [locationConfig, setLocationConfig] = useState<{
+        enabled: boolean;
+        latitude: number;
+        longitude: number;
+        radius: number;
+    } | null>(null);
 
     useEffect(() => {
         const timer = setInterval(() => {
@@ -69,6 +107,9 @@ export default function CheckInPage() {
                 const config = await systemConfigService.get();
                 if (config) {
                     setRequirePhoto(config.requirePhoto ?? true);
+                    if (config.locationConfig) {
+                        setLocationConfig(config.locationConfig);
+                    }
                 }
             } catch (error) {
                 console.error("Error loading settings:", error);
@@ -133,7 +174,7 @@ export default function CheckInPage() {
             setPhoto(null);
         } catch (error) {
             console.error("Error accessing camera:", error);
-            alert("ไม่สามารถเข้าถึงกล้องได้");
+            showAlert("ไม่สามารถเข้าถึงกล้องได้", "กรุณาอนุญาตให้เข้าถึงกล้องเพื่อถ่ายรูป", "error");
         }
     };
 
@@ -188,6 +229,27 @@ export default function CheckInPage() {
                     const lat = position.coords.latitude;
                     const lng = position.coords.longitude;
 
+                    // Calculate distance if config exists
+                    if (locationConfig) {
+                        const dist = calculateDistance(
+                            lat,
+                            lng,
+                            locationConfig.latitude,
+                            locationConfig.longitude
+                        );
+                        setDistance(dist);
+
+                        // Validate only if enabled
+                        if (locationConfig.enabled) {
+                            setIsLocationValid(dist <= locationConfig.radius);
+                        } else {
+                            setIsLocationValid(true);
+                        }
+                    } else {
+                        setDistance(null);
+                        setIsLocationValid(true);
+                    }
+
                     try {
                         const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
                         const data = await res.json();
@@ -205,17 +267,18 @@ export default function CheckInPage() {
                 },
                 (error) => {
                     console.error("Geolocation error:", error);
-                    alert("ไม่สามารถระบุตำแหน่งได้");
+                    showAlert("ไม่สามารถระบุตำแหน่งได้", "กรุณาเปิดใช้งาน GPS หรืออนุญาตให้เข้าถึงตำแหน่ง", "error");
                     setLocationLoading(false);
-                }
+                },
+                { enableHighAccuracy: true }
             );
         } else {
-            alert("Browser ไม่รองรับ Geolocation");
+            showAlert("Browser ไม่รองรับ", "Browser ของคุณไม่รองรับการระบุตำแหน่ง", "error");
             setLocationLoading(false);
         }
     };
 
-    const sendFlexMessage = async (type: string, time: Date, location: string) => {
+    const sendFlexMessage = async (type: string, time: Date, location: string, dist: number | null) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const liff = (window as any).liff;
         if (liff && liff.isInClient()) {
@@ -248,7 +311,7 @@ export default function CheckInPage() {
                                 text: "เวลา",
                                 color: "#aaaaaa",
                                 size: "sm",
-                                flex: 1
+                                flex: 2
                             },
                             {
                                 type: "text",
@@ -274,7 +337,7 @@ export default function CheckInPage() {
                                 text: "สถานะ",
                                 color: "#aaaaaa",
                                 size: "sm",
-                                flex: 1
+                                flex: 2
                             },
                             {
                                 type: "text",
@@ -300,7 +363,7 @@ export default function CheckInPage() {
                             text: "สถานที่",
                             color: "#aaaaaa",
                             size: "sm",
-                            flex: 1
+                            flex: 2
                         },
                         {
                             type: "text",
@@ -312,6 +375,58 @@ export default function CheckInPage() {
                         }
                     ]
                 });
+
+                // Add distance row
+                if (dist !== null) {
+                    contents.push({
+                        type: "box",
+                        layout: "baseline",
+                        spacing: "sm",
+                        contents: [
+                            {
+                                type: "text",
+                                text: "ระยะห่าง",
+                                color: "#aaaaaa",
+                                size: "sm",
+                                flex: 2
+                            },
+                            {
+                                type: "text",
+                                text: dist < 1000 ? `${Math.round(dist)} เมตร` : `${(dist / 1000).toFixed(2)} กม.`,
+                                wrap: true,
+                                color: "#666666",
+                                size: "sm",
+                                flex: 5
+                            }
+                        ]
+                    });
+                }
+
+                // Add note row if exists
+                if (locationNote) {
+                    contents.push({
+                        type: "box",
+                        layout: "baseline",
+                        spacing: "sm",
+                        contents: [
+                            {
+                                type: "text",
+                                text: "หมายเหตุ",
+                                color: "#aaaaaa",
+                                size: "sm",
+                                flex: 2
+                            },
+                            {
+                                type: "text",
+                                text: locationNote,
+                                wrap: true,
+                                color: "#ef4444", // Red to highlight exception
+                                size: "sm",
+                                flex: 5
+                            }
+                        ]
+                    });
+                }
 
                 await liff.sendMessages([
                     {
@@ -370,11 +485,16 @@ export default function CheckInPage() {
 
     const handleSubmit = async () => {
         if (!employee) {
-            alert("ไม่พบข้อมูลพนักงาน");
+            showAlert("ไม่พบข้อมูลพนักงาน", "กรุณาลองใหม่อีกครั้ง หรือติดต่อผู้ดูแลระบบ", "error");
             return;
         }
         if (!location) {
-            alert("กรุณาระบุตำแหน่ง");
+            showAlert("กรุณาระบุตำแหน่ง", "กดปุ่ม 'แสดงที่อยู่ของคุณ' เพื่อระบุตำแหน่ง", "warning");
+            return;
+        }
+        // Validate location note if outside area
+        if (!isLocationValid && !locationNote.trim()) {
+            showAlert("กรุณาระบุเหตุผล", "คุณอยู่นอกพื้นที่ทำงาน กรุณาระบุเหตุผลก่อนบันทึก", "warning");
             return;
         }
 
@@ -391,13 +511,13 @@ export default function CheckInPage() {
                         photoURL = await uploadAttendancePhoto(employee.id, photo);
                     } catch (uploadError) {
                         console.error("Error uploading photo:", uploadError);
-                        alert("เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ กรุณาลองใหม่อีกครั้ง");
+                        showAlert("อัปโหลดรูปภาพไม่สำเร็จ", "เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ กรุณาลองใหม่อีกครั้ง", "error");
                         setLoading(false);
                         return; // Stop if photo is required but failed
                     }
                 } else {
                     // requirePhoto is true but no photo data
-                    alert("กรุณาถ่ายรูปก่อนบันทึกเวลา");
+                    showAlert("กรุณาถ่ายรูป", "ระบบต้องการรูปถ่ายเพื่อยืนยันตัวตน", "warning");
                     setLoading(false);
                     return;
                 }
@@ -417,7 +537,8 @@ export default function CheckInPage() {
                     status: checkInType,
                     location: location.address,
                     latitude: location.lat,
-                    longitude: location.lng
+                    longitude: location.lng,
+                    distance: distance || 0
                 };
 
                 // Conditionally add optional fields
@@ -433,17 +554,21 @@ export default function CheckInPage() {
                     attendanceData.photo = photoURL;
                 }
 
+                if (locationNote.trim()) {
+                    attendanceData.locationNote = locationNote.trim();
+                }
+
                 await attendanceService.create(attendanceData);
             } catch (dbError) {
                 console.error("Error saving to database:", dbError);
-                alert("เกิดข้อผิดพลาดในการบันทึกข้อมูลลงฐานข้อมูล: " + (dbError instanceof Error ? dbError.message : "Unknown error"));
+                showAlert("บันทึกข้อมูลไม่สำเร็จ", "เกิดข้อผิดพลาดในการบันทึกข้อมูลลงฐานข้อมูล", "error");
                 setLoading(false);
                 return;
             }
 
             // Send Flex Message (Non-blocking)
             try {
-                await sendFlexMessage(checkInType, now, location.address);
+                await sendFlexMessage(checkInType, now, location.address, locationConfig?.enabled ? distance : null);
             } catch (flexError) {
                 console.error("Error sending Flex Message:", flexError);
                 // Don't block success if Flex Message fails
@@ -459,11 +584,14 @@ export default function CheckInPage() {
                 setStep(1);
                 setLocation(null);
                 setPhoto(null);
+                setDistance(null);
+                setIsLocationValid(true);
+                setLocationNote("");
             }, 2000);
 
         } catch (error) {
             console.error("Unexpected error submitting:", error);
-            alert("เกิดข้อผิดพลาดที่ไม่คาดคิด: " + (error instanceof Error ? error.message : "Unknown error"));
+            showAlert("เกิดข้อผิดพลาด", "เกิดข้อผิดพลาดที่ไม่คาดคิด กรุณาลองใหม่อีกครั้ง", "error");
         } finally {
             setLoading(false);
         }
@@ -652,6 +780,38 @@ export default function CheckInPage() {
                                 <p className="text-gray-600 text-xs mt-0.5">{location.address}</p>
                             </div>
                         </div>
+
+                        {/* Distance Warning */}
+                        {distance !== null && locationConfig?.enabled && (
+                            <div className={`mt-3 p-3 rounded-xl flex items-start gap-2 ${isLocationValid ? "bg-green-50 border border-green-200" : "bg-red-50 border border-red-200"}`}>
+                                {isLocationValid ? (
+                                    <CheckCircle className="w-4 h-4 text-green-600 mt-0.5" />
+                                ) : (
+                                    <AlertTriangle className="w-4 h-4 text-red-600 mt-0.5" />
+                                )}
+                                <div className="text-xs w-full">
+                                    <p className={`font-bold ${isLocationValid ? "text-green-700" : "text-red-700"}`}>
+                                        {isLocationValid ? "อยู่ในพื้นที่ทำงาน" : "อยู่นอกพื้นที่ทำงาน"}
+                                    </p>
+                                    <p className="text-gray-600 mt-0.5">
+                                        ห่างจากจุดเช็คอิน {distance < 1000 ? `${Math.round(distance)} เมตร` : `${(distance / 1000).toFixed(2)} กม.`}
+                                    </p>
+
+                                    {!isLocationValid && (
+                                        <div className="mt-3">
+                                            <label className="block text-gray-700 font-medium mb-1">ระบุเหตุผล:</label>
+                                            <textarea
+                                                value={locationNote}
+                                                onChange={(e) => setLocationNote(e.target.value)}
+                                                placeholder="เช่น ไปพบลูกค้า, ทำงานนอกสถานที่"
+                                                className="w-full p-2 border border-red-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500 bg-white"
+                                                rows={2}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 ) : (
                     <div className="h-32 flex flex-col items-center justify-center text-gray-400 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
@@ -671,7 +831,7 @@ export default function CheckInPage() {
                 </Button>
                 <Button
                     onClick={handleSubmit}
-                    disabled={loading || !location || showSuccess}
+                    disabled={loading || !location || showSuccess || (!isLocationValid && !locationNote.trim())}
                     className="w-2/3 h-14 text-lg rounded-2xl bg-[#0047BA] hover:bg-[#00338D] shadow-lg shadow-blue-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     {loading ? "กำลังบันทึก..." : showSuccess ? "สำเร็จ!" : "ยืนยัน"}
@@ -683,27 +843,34 @@ export default function CheckInPage() {
     return (
         <div className="min-h-screen bg-gray-50 pb-10">
             <EmployeeHeader />
-
-            {/* Success Notification */}
-            {showSuccess && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
-                    <div className="bg-[#1DB446] text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 max-w-xs animate-in zoom-in-95 duration-300">
-                        <div className="p-2 bg-white/20 rounded-full">
-                            <CheckCircle className="w-5 h-5 text-white" />
-                        </div>
-                        <div>
-                            <h3 className="font-bold text-base">บันทึกสำเร็จ!</h3>
-                            <p className="text-white/90 text-xs">บันทึกเวลาเรียบร้อย</p>
+            <div className="container mx-auto px-4 pt-6 max-w-md">
+                {/* Success Notification */}
+                {showSuccess && (
+                    <div className="fixed top-0 left-0 right-0 z-50 p-4 animate-in slide-in-from-top-10 fade-in duration-300">
+                        <div className="bg-[#1DB446] text-white px-6 py-4 rounded-2xl shadow-xl flex items-center gap-3 mx-auto max-w-sm">
+                            <div className="p-2 bg-white/20 rounded-full">
+                                <CheckCircle className="w-5 h-5 text-white" />
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-lg">บันทึกสำเร็จ!</h3>
+                                <p className="text-white/90 text-sm">ระบบได้บันทึกเวลาของคุณแล้ว</p>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )}
 
-            <main className="px-6 -mt-6 relative z-10">
                 {step === 1 && renderStep1()}
                 {step === 2 && renderStep2()}
                 {step === 3 && renderStep3()}
-            </main>
+            </div>
+
+            <CustomAlert
+                isOpen={alertState.isOpen}
+                onClose={closeAlert}
+                title={alertState.title}
+                message={alertState.message}
+                type={alertState.type}
+            />
         </div>
     );
 }
