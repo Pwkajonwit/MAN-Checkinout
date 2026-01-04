@@ -85,8 +85,8 @@ export default function useAdminLiffAuth(): UseAdminLiffAuthReturn {
         try {
             const accessToken = liff.getAccessToken();
             if (!accessToken) {
-                setError('No access token');
-                setLoading(false);
+                console.log('[useAdminLiffAuth] No access token, triggering login...');
+                liff.login({ redirectUri: window.location.href });
                 return;
             }
 
@@ -99,7 +99,24 @@ export default function useAdminLiffAuth(): UseAdminLiffAuthReturn {
 
             if (!response.ok) {
                 const errBody = await response.text();
-                throw new Error(`Auth failed: ${response.status} ${errBody}`);
+                console.error('[useAdminLiffAuth] API Error:', response.status, errBody);
+
+                // Check if token expired
+                if (response.status === 401 && errBody.includes('expired')) {
+                    console.log('[useAdminLiffAuth] Token expired, re-authenticating...');
+                    // Logout from LIFF and re-login to get fresh token
+                    liff.logout();
+                    liff.login({ redirectUri: window.location.href });
+                    return;
+                }
+
+                // Parse error details if available
+                try {
+                    const errJson = JSON.parse(errBody);
+                    throw new Error(errJson.details || errJson.error || `Auth failed: ${response.status}`);
+                } catch {
+                    throw new Error(`Auth failed: ${response.status} ${errBody}`);
+                }
             }
 
             const data = await response.json();
@@ -123,6 +140,15 @@ export default function useAdminLiffAuth(): UseAdminLiffAuthReturn {
 
         } catch (err: any) {
             console.error('authenticateWithLine error:', err);
+
+            // If error contains "expired", try to re-login
+            if (err?.message?.includes('expired') && liff) {
+                console.log('[useAdminLiffAuth] Token expired (from error), re-authenticating...');
+                liff.logout();
+                liff.login({ redirectUri: window.location.href });
+                return;
+            }
+
             setError(err?.message || 'Authentication error');
             setLoading(false);
         }

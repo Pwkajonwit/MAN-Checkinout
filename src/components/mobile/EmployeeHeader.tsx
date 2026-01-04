@@ -50,7 +50,7 @@ export function EmployeeHeader() {
 
                         {/* Employee Info (Compact) */}
                         <div className="flex items-center gap-3">
-                            <Avatar className="w-10 h-10 border border-white/30 shadow-md bg-black/10">
+                            <Avatar className="w-10 h-10 border border-white/30 shadow-md">
                                 <AvatarImage src={displayAvatar} className="object-cover" />
                                 <AvatarFallback className="bg-white/10 text-white backdrop-blur-sm text-sm font-bold">
                                     {loading ? "" : displayInitial}

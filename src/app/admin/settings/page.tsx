@@ -267,7 +267,30 @@ export default function SettingsPage() {
         }
     };
 
+    const handleSyncHolidays = async () => {
+        if (!confirm("คุณต้องการใช้วันหยุดประจำสัปดาห์นี้ กับพนักงาน 'ทุกคน' ใช่หรือไม่? \n(การตั้งค่าวันหยุดเดิมของพนักงานจะถูกแทนที่)")) return;
 
+        setUpdatingAllHolidays(true);
+        try {
+            const count = await employeeService.updateWeeklyHolidaysForAll(settings.weeklyHolidays);
+            setAlertState({
+                isOpen: true,
+                title: "สำเร็จ",
+                message: `อัพเดทวันหยุดให้กับพนักงาน ${count} คน สำเร็จ`,
+                type: "success"
+            });
+        } catch (error) {
+            console.error("Error syncing holidays:", error);
+            setAlertState({
+                isOpen: true,
+                title: "ผิดพลาด",
+                message: "เกิดข้อผิดพลาดในการอัพเดทวันหยุดพนักงาน",
+                type: "error"
+            });
+        } finally {
+            setUpdatingAllHolidays(false);
+        }
+    };
 
     const handleSave = async () => {
         setLoading(true);
@@ -894,7 +917,20 @@ export default function SettingsPage() {
                                 <label className="block text-sm font-medium text-gray-700">
                                     วันหยุดประจำสัปดาห์
                                 </label>
-
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={handleSyncHolidays}
+                                    disabled={updatingAllHolidays}
+                                    className="h-7 text-xs gap-1 border-gray-300 hover:bg-gray-50"
+                                >
+                                    {updatingAllHolidays ? (
+                                        <RefreshCw className="w-3 h-3 animate-spin" />
+                                    ) : (
+                                        <Users className="w-3 h-3" />
+                                    )}
+                                    นำไปใช้กับพนักงานทั้งหมด
+                                </Button>
                             </div>
                             <div className="flex flex-wrap gap-3">
                                 {["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"].map((day, index) => (

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { attendanceService, employeeService, systemConfigService, type Attendance, type Employee } from "@/lib/firestore";
+import { attendanceService, employeeService, type Attendance, type Employee } from "@/lib/firestore";
 import { useAdmin } from "@/components/auth/AuthProvider";
 import { Users, Calendar, Clock, CheckCircle, XCircle, AlertTriangle, Download, Search } from "lucide-react";
 import { formatMinutesToHours } from "@/lib/workTime";
@@ -49,18 +49,14 @@ export default function DailySummaryPage() {
             const endDate = new Date(date);
             endDate.setHours(23, 59, 59, 999);
 
-            const [empData, attData, configData] = await Promise.all([
+            const [empData, attData] = await Promise.all([
                 employeeService.getAll(),
                 attendanceService.getByDateRange(startDate, endDate),
-                systemConfigService.get(),
             ]);
 
             const activeEmployees = empData.filter(e => e.status === "ทำงาน");
             setEmployees(activeEmployees);
             setAttendances(attData);
-
-            // Get weekly holidays from config (default to Sat, Sun if missing)
-            const weeklyHolidays = configData?.weeklyHolidays || [0, 6];
 
             // Build summaries
             const daySummaries: DailySummary[] = activeEmployees.map(emp => {
@@ -74,7 +70,7 @@ export default function DailySummaryPage() {
                 );
 
                 const hasCheckedIn = checkInRec || lateRec;
-                const isHoliday = weeklyHolidays.includes(date.getDay());
+                const isHoliday = emp.weeklyHolidays?.includes(date.getDay()) || false;
 
                 // ดึง lateMinutes จาก record (อาจอยู่ใน checkInRec หรือ lateRec)
                 const actualLateMinutes = lateRec?.lateMinutes || checkInRec?.lateMinutes || 0;

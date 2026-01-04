@@ -57,6 +57,7 @@ const menuGroups: MenuGroup[] = [
         items: [
             { icon: Users, label: "พนักงาน", href: "/admin/employee" },
             { icon: Shield, label: "ผู้ดูแลระบบ", href: "/admin/admins" },
+            { icon: Timer, label: "กะเวลาทำงาน", href: "/admin/shifts" },
         ]
     },
     {

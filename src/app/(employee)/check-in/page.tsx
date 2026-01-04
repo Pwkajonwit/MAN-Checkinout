@@ -4,7 +4,7 @@ import { useRef, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { MapPin, Camera, RotateCcw, CheckCircle, Clock, AlertTriangle } from "lucide-react";
-import { attendanceService, systemConfigService } from "@/lib/firestore";
+import { attendanceService, systemConfigService, shiftService, type Shift } from "@/lib/firestore";
 import { isLate, getLateMinutes, isEligibleForOT, getOTMinutes, formatMinutesToHours } from "@/lib/workTime";
 import { useEmployee } from "@/contexts/EmployeeContext";
 import { EmployeeHeader } from "@/components/mobile/EmployeeHeader";
@@ -20,7 +20,7 @@ export default function CheckInPage() {
     const [currentTime, setCurrentTime] = useState(new Date());
     const [loading, setLoading] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
-
+    const [currentShift, setCurrentShift] = useState<Shift | null>(null);
 
     // Alert State
     const [alertState, setAlertState] = useState<{
@@ -97,8 +97,9 @@ export default function CheckInPage() {
     // Load Shift and Status when Employee is ready
     useEffect(() => {
         if (employee?.id) {
-            console.log("=== Employee Changed ===", employee.name);
+            console.log("=== Employee Changed ===", employee.name, "shiftId:", employee.shiftId);
             checkTodayStatus();
+            loadEmployeeShift();
         }
     }, [employee]);
 
@@ -122,7 +123,29 @@ export default function CheckInPage() {
         loadSettings();
     }, []);
 
+    const loadEmployeeShift = async () => {
+        try {
+            // รีเซ็ต currentShift ก่อนโหลดใหม่ (สำคัญเมื่อเปลี่ยนกลับไป default)
+            setCurrentShift(null);
 
+            let shift: Shift | null = null;
+
+            if (employee?.shiftId) {
+                shift = await shiftService.getById(employee.shiftId);
+            }
+
+            // If no specific shift assigned or not found, try to find default shift
+            if (!shift) {
+                const allShifts = await shiftService.getAll();
+                shift = allShifts.find(s => s.isDefault) || null;
+            }
+
+            // ตั้งค่า shift (หรือ null ถ้าไม่เจอ)
+            setCurrentShift(shift);
+        } catch (error) {
+            console.error("Error loading shift:", error);
+        }
+    };
 
     const checkTodayStatus = async () => {
         if (!employee?.id) return;
@@ -280,6 +303,18 @@ export default function CheckInPage() {
     };
 
     const getEffectiveWorkTimeConfig = () => {
+        // 1. Priority: Assigned Shift or Loaded Default Shift
+        if (currentShift) {
+            return {
+                checkInHour: currentShift.checkInHour,
+                checkInMinute: currentShift.checkInMinute,
+                checkOutHour: currentShift.checkOutHour,
+                checkOutMinute: currentShift.checkOutMinute,
+                lateGracePeriod: currentShift.lateGracePeriod ?? 0
+            };
+        }
+
+        // 2. Priority: System Config
         if (systemConfig) {
             return {
                 checkInHour: systemConfig.checkInHour ?? 9,
@@ -642,8 +677,23 @@ export default function CheckInPage() {
 
                 // Calculate Late Logic for Database
                 if (checkInType === "เข้างาน" && workTimeEnabled) {
+                    // โหลด shift ใหม่โดยตรงเพื่อป้องกัน race condition
+                    let shiftConfig = null;
+
+                    if (employee?.shiftId) {
+                        const freshShift = await shiftService.getById(employee.shiftId);
+
+                        if (freshShift) {
+                            shiftConfig = {
+                                checkInHour: freshShift.checkInHour,
+                                checkInMinute: freshShift.checkInMinute,
+                                lateGracePeriod: freshShift.lateGracePeriod ?? 0
+                            };
+                        }
+                    }
+
                     // ถ้าไม่ได้ shift ให้ใช้ค่าจาก state หรือ system config
-                    const config = getEffectiveWorkTimeConfig();
+                    const config = shiftConfig || getEffectiveWorkTimeConfig();
 
                     // Custom isLate logic for SECONDS precision
                     const standardTime = new Date(now);
@@ -761,15 +811,26 @@ export default function CheckInPage() {
                 </div>
             </div>
 
-            {/* Work Time Info */}
-            <div className="bg-blue-50/50 rounded-xl px-4 py-2 border border-blue-100 text-xs text-center">
-                <span className="text-gray-500 mr-2">เวลาทำงาน:</span>
-                <span className="font-mono font-medium text-blue-800">
-                    {(() => {
-                        const conf = getEffectiveWorkTimeConfig();
-                        return `${conf.checkInHour.toString().padStart(2, '0')}:${conf.checkInMinute.toString().padStart(2, '0')} - ${conf.checkOutHour.toString().padStart(2, '0')}:${conf.checkOutMinute.toString().padStart(2, '0')}`;
-                    })()}
-                </span>
+            {/* Shift Info Card - Compact */}
+            <div className="bg-blue-50/50 rounded-xl px-4 py-2 border border-blue-100 text-xs">
+                <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                        <span className="text-gray-500">กะ:</span>
+                        <span className="font-semibold text-blue-800">
+                            {currentShift?.name || "ปกติ"}
+                        </span>
+                        <span className="text-gray-400">|</span>
+                        <span className="font-mono text-gray-700">
+                            {(() => {
+                                const conf = getEffectiveWorkTimeConfig();
+                                return `${conf.checkInHour.toString().padStart(2, '0')}:${conf.checkInMinute.toString().padStart(2, '0')} - ${conf.checkOutHour.toString().padStart(2, '0')}:${conf.checkOutMinute.toString().padStart(2, '0')}`;
+                            })()}
+                        </span>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] ${currentShift ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                        {currentShift ? "✓" : "ปกติ"}
+                    </span>
+                </div>
             </div>
 
             {/* Type Selection - 2 Columns */}
