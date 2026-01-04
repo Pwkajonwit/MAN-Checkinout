@@ -17,7 +17,7 @@ export default function AdminLayout({
 
     return (
         <AuthProvider>
-            <div className="min-h-screen bg-[#F5F6FA]">
+            <div className="min-h-screen bg-gray-50">
                 {!isLoginPage && (
                     <>
                         {/* Mobile Header */}

@@ -37,14 +37,13 @@ export function EmployeeTable({ employees, onEdit, onDelete, onView, canManage =
                             <th className="py-4 px-6 text-xs font-medium text-gray-400 uppercase tracking-wider">แผนก/ตำแหน่ง</th>
                             <th className="py-4 px-6 text-xs font-medium text-gray-400 uppercase tracking-wider">ข้อมูลการลา</th>
                             <th className="py-4 px-6 text-xs font-medium text-gray-400 uppercase tracking-wider">พนักงาน</th>
-                            <th className="py-4 px-6 text-xs font-medium text-gray-400 uppercase tracking-wider">ลงทะเบียน</th>
                             <th className="py-4 px-6 text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                         {employees.length === 0 ? (
                             <tr>
-                                <td colSpan={8} className="py-12 text-center text-gray-500">
+                                <td colSpan={7} className="py-12 text-center text-gray-500">
                                     ไม่มีข้อมูลพนักงาน
                                 </td>
                             </tr>
@@ -66,27 +65,21 @@ export function EmployeeTable({ employees, onEdit, onDelete, onView, canManage =
                                     </td>
                                     <td className="py-4 px-6">
                                         {employee.lineUserId ? (
-                                            <div className="flex items-center gap-2">
-                                                <div className="flex items-center gap-1.5 bg-green-50 text-green-700 px-2.5 py-1.5 rounded-lg border border-green-200">
-                                                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                                            <button
+                                                onClick={() => handleCopyLineId(employee.lineUserId!)}
+                                                className="p-2 bg-green-50 hover:bg-green-100 rounded-lg transition-colors border border-green-200"
+                                                title={`คัดลอก: ${employee.lineUserId}`}
+                                            >
+                                                {copiedId === employee.lineUserId ? (
+                                                    <Check className="w-4 h-4 text-green-600" />
+                                                ) : (
+                                                    <svg className="w-4 h-4 text-green-600" viewBox="0 0 24 24" fill="currentColor">
                                                         <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.346 0 .627.285.627.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.282.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314" />
                                                     </svg>
-                                                    <span className="text-xs font-mono">{employee.lineUserId.substring(0, 8)}...</span>
-                                                </div>
-                                                <button
-                                                    onClick={() => handleCopyLineId(employee.lineUserId!)}
-                                                    className="p-1.5 hover:bg-gray-100 rounded-md transition-colors"
-                                                    title="คัดลอก LINE User ID"
-                                                >
-                                                    {copiedId === employee.lineUserId ? (
-                                                        <Check className="w-4 h-4 text-green-600" />
-                                                    ) : (
-                                                        <Copy className="w-4 h-4 text-gray-400" />
-                                                    )}
-                                                </button>
-                                            </div>
+                                                )}
+                                            </button>
                                         ) : (
-                                            <span className="text-xs text-gray-400">ไม่ได้เชื่อมต่อ</span>
+                                            <span className="text-xs text-gray-400">-</span>
                                         )}
                                     </td>
                                     <td className="py-4 px-6">
@@ -119,18 +112,6 @@ export function EmployeeTable({ employees, onEdit, onDelete, onView, canManage =
                                                         "bg-gray-100 text-gray-700"
                                                 )}>
                                                     {employee.status}
-                                                </span>
-                                            )}
-                                        </div>
-                                    </td>
-                                    <td className="py-4 px-6">
-                                        <div className="flex flex-col gap-1">
-                                            <span className="text-sm text-blue-500">
-                                                {employee.registeredDate ? format(employee.registeredDate, "dd/MM/yyyy") : "-"}
-                                            </span>
-                                            {employee.endDate && (
-                                                <span className="text-xs text-gray-400">
-                                                    ถึง {format(employee.endDate, "dd/MM/yyyy")}
                                                 </span>
                                             )}
                                         </div>

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Pencil, Plus } from "lucide-react";
 import { employeeService, type Employee } from "@/lib/firestore";
 import { useAdmin } from "@/components/auth/AuthProvider";
+import { CustomAlert } from "@/components/ui/custom-alert";
 
 export default function EmployeePage() {
     const { isSuperAdmin } = useAdmin();
@@ -20,6 +21,17 @@ export default function EmployeePage() {
     const [filterType, setFilterType] = useState<"all" | "รายเดือน" | "รายวัน" | "ชั่วคราว">("all");
     const [statusFilter, setStatusFilter] = useState<"active" | "inactive" | "all">("active");
     const [searchQuery, setSearchQuery] = useState("");
+    const [alertState, setAlertState] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        type: "success" | "error" | "warning" | "info";
+    }>({
+        isOpen: false,
+        title: "",
+        message: "",
+        type: "info"
+    });
 
     const loadEmployees = async () => {
         try {
@@ -101,7 +113,12 @@ export default function EmployeePage() {
             }
         } catch (error) {
             console.error("Error deleting employee:", error);
-            alert("เกิดข้อผิดพลาดในการลบพนักงาน");
+            setAlertState({
+                isOpen: true,
+                title: "ผิดพลาด",
+                message: "เกิดข้อผิดพลาดในการลบพนักงาน",
+                type: "error"
+            });
         }
     };
 
@@ -130,10 +147,10 @@ export default function EmployeePage() {
                         <div className="flex gap-2">
                             <Button
                                 onClick={handleAddEmployee}
-                                className="bg-[#5C6BC0] hover:bg-[#5C6BC0]/90 text-white rounded-xl px-6 gap-2"
+                                className="bg-primary-dark hover:bg-primary-dark/90 text-white rounded-xl px-6 gap-2"
                             >
                                 <Plus className="w-4 h-4" />
-                                Add Employee
+                                เพิ่มพนักงาน
                             </Button>
 
                         </div>
@@ -182,7 +199,7 @@ export default function EmployeePage() {
 
             {loading ? (
                 <div className="text-center py-12">
-                    <div className="w-12 h-12 border-4 border-[#EBDACA] border-t-[#553734] rounded-full animate-spin mx-auto"></div>
+                    <div className="w-12 h-12 border-4 border-gray-100 border-t-primary rounded-full animate-spin mx-auto"></div>
                     <p className="text-gray-600 mt-4">กำลังโหลดข้อมูล...</p>
                 </div>
             ) : (
@@ -201,6 +218,14 @@ export default function EmployeePage() {
                 employee={selectedEmployee}
                 onSuccess={handleSuccess}
                 readOnly={isReadOnly}
+            />
+
+            <CustomAlert
+                isOpen={alertState.isOpen}
+                onClose={() => setAlertState(prev => ({ ...prev, isOpen: false }))}
+                title={alertState.title}
+                message={alertState.message}
+                type={alertState.type}
             />
         </div>
     );

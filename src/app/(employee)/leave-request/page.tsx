@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { leaveService } from "@/lib/firestore";
 import { EmployeeHeader } from "@/components/mobile/EmployeeHeader";
 import { useEmployee } from "@/contexts/EmployeeContext";
-import { FileText, Send, CheckCircle, AlertCircle } from "lucide-react";
+import { FileText, Send, CheckCircle, AlertCircle, Camera, X } from "lucide-react";
+import { compressBase64Image } from "@/lib/storage";
 
 export default function LeaveRequestPage() {
     const { employee } = useEmployee();
@@ -19,6 +20,10 @@ export default function LeaveRequestPage() {
     const [reason, setReason] = useState("");
     const [loading, setLoading] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
+
+    // Attachment (รูปหลักฐาน)
+    const [attachment, setAttachment] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const [quotas, setQuotas] = useState({
         personal: { total: 0, used: 0, remaining: 0 },
@@ -239,6 +244,17 @@ export default function LeaveRequestPage() {
 
         setLoading(true);
         try {
+            // Compress attachment if present
+            let attachmentBase64: string | undefined = undefined;
+            if (attachment) {
+                try {
+                    attachmentBase64 = await compressBase64Image(attachment, 640, 480, 0.6);
+                } catch (e) {
+                    console.error("Error compressing attachment:", e);
+                    attachmentBase64 = attachment;
+                }
+            }
+
             await leaveService.create({
                 employeeId: employee.id || "unknown",
                 employeeName: employee.name,
@@ -248,6 +264,7 @@ export default function LeaveRequestPage() {
                 reason,
                 status: "รออนุมัติ",
                 createdAt: new Date(),
+                ...(attachmentBase64 && { attachment: attachmentBase64 }),
             });
 
             // Send Flex Message (to user)
@@ -273,6 +290,7 @@ export default function LeaveRequestPage() {
             setStartDate("");
             setEndDate("");
             setReason("");
+            setAttachment(null);
 
             // Hide success message after 3 seconds
             setTimeout(() => setShowSuccess(false), 3000);
@@ -307,7 +325,6 @@ export default function LeaveRequestPage() {
                 <div className="bg-white rounded-3xl p-6 shadow-lg border border-gray-100">
                     <h2 className="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
                         <FileText className="w-5 h-5 text-blue-500" />
-                        แบบฟอร์มขอลางาน
                         แบบฟอร์มขอลางาน
                     </h2>
 
@@ -381,10 +398,52 @@ export default function LeaveRequestPage() {
                             />
                         </div>
 
+                        {/* Attachment (รูปหลักฐาน) */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700">แนบหลักฐาน (ไม่บังคับ)</label>
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                        const reader = new FileReader();
+                                        reader.onload = (ev) => {
+                                            setAttachment(ev.target?.result as string);
+                                        };
+                                        reader.readAsDataURL(file);
+                                    }
+                                }}
+                            />
+                            {attachment ? (
+                                <div className="relative w-full aspect-video bg-gray-100 rounded-xl overflow-hidden">
+                                    <img src={attachment} alt="หลักฐาน" className="w-full h-full object-cover" />
+                                    <button
+                                        type="button"
+                                        onClick={() => setAttachment(null)}
+                                        className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="w-full p-4 border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center gap-2 text-gray-500 hover:border-gray-400 hover:bg-gray-50 transition-colors"
+                                >
+                                    <Camera className="w-8 h-8" />
+                                    <span className="text-sm">แตะเพื่อเลือกรูปภาพ</span>
+                                </button>
+                            )}
+                        </div>
+
                         <Button
                             type="submit"
                             disabled={loading}
-                            className="w-full h-14 text-lg rounded-2xl bg-[#0047BA] hover:bg-[#00338D] shadow-lg shadow-blue-900/20 mt-4"
+                            className="w-full h-14 text-lg rounded-2xl bg-primary hover:bg-primary/80 shadow-lg shadow-blue-900/20 mt-4"
                         >
                             {loading ? "กำลังส่งข้อมูล..." : (
                                 <span className="flex items-center gap-2">

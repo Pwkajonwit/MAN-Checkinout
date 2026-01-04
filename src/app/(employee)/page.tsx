@@ -50,16 +50,14 @@ export default function MobileHomePage() {
             <main className="px-6 -mt-6 relative z-10 space-y-6">
                 {/* Main Action: Check In/Out */}
                 <Link href="/check-in" className="block group">
-                    <div className="bg-white rounded-3xl p-6 shadow-xl shadow-blue-900/5 border border-blue-50 relative overflow-hidden transition-transform active:scale-95">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-500/10 to-transparent rounded-bl-full -mr-8 -mt-8" />
+                    <div className="bg-white rounded-3xl p-6 shadow-xl shadow-green-900/5 border border-green-50 relative overflow-hidden transition-transform active:scale-95">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-green-500/10 to-transparent rounded-bl-full -mr-8 -mt-8" />
 
                         <div className="flex items-center justify-between mb-4">
-                            <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-600/30">
+                            <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center text-white shadow-lg shadow-blue-600/30">
                                 <MapPin className="w-6 h-6" />
                             </div>
-                            <span className="flex items-center text-xs font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
-                                แนะนำ
-                            </span>
+
                         </div>
 
                         <div>
@@ -67,7 +65,7 @@ export default function MobileHomePage() {
                             <p className="text-sm text-gray-500">บันทึกเวลาทำงานผ่าน GPS และรูปถ่าย</p>
                         </div>
 
-                        <div className="mt-4 flex items-center text-sm font-semibold text-blue-600 group-hover:translate-x-1 transition-transform">
+                        <div className="mt-4 flex items-center text-sm font-semibold text-green-600 group-hover:translate-x-1 transition-transform">
                             เข้าสู่เมนู <ChevronRight className="w-4 h-4 ml-1" />
                         </div>
                     </div>

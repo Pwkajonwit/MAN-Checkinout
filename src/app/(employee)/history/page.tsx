@@ -74,8 +74,8 @@ export default function HistoryPage() {
                     <button
                         onClick={() => setActiveTab("attendance")}
                         className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition-all ${activeTab === "attendance"
-                                ? "bg-[#0047BA] text-white shadow-md"
-                                : "text-gray-500 hover:bg-gray-50"
+                            ? "bg-primary text-white shadow-md"
+                            : "text-gray-500 hover:bg-gray-50"
                             }`}
                     >
                         ลงเวลา
@@ -83,8 +83,8 @@ export default function HistoryPage() {
                     <button
                         onClick={() => setActiveTab("leave")}
                         className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition-all ${activeTab === "leave"
-                                ? "bg-[#0047BA] text-white shadow-md"
-                                : "text-gray-500 hover:bg-gray-50"
+                            ? "bg-primary text-white shadow-md"
+                            : "text-gray-500 hover:bg-gray-50"
                             }`}
                     >
                         การลา
@@ -92,8 +92,8 @@ export default function HistoryPage() {
                     <button
                         onClick={() => setActiveTab("ot")}
                         className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition-all ${activeTab === "ot"
-                                ? "bg-[#0047BA] text-white shadow-md"
-                                : "text-gray-500 hover:bg-gray-50"
+                            ? "bg-primary text-white shadow-md"
+                            : "text-gray-500 hover:bg-gray-50"
                             }`}
                     >
                         โอที
@@ -131,13 +131,13 @@ export default function HistoryPage() {
                                             className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden"
                                         >
                                             <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${record.status === 'เข้างาน' ? 'bg-green-500' :
-                                                    record.status === 'ออกงาน' ? 'bg-red-500' : 'bg-orange-500'
+                                                record.status === 'ออกงาน' ? 'bg-red-500' : 'bg-orange-500'
                                                 }`} />
 
                                             <div className="flex justify-between items-start mb-2 pl-2">
                                                 <div>
                                                     <span className={`inline-block px-2 py-0.5 rounded-md text-xs font-bold mb-1 ${record.status === 'เข้างาน' ? 'bg-green-100 text-green-700' :
-                                                            record.status === 'ออกงาน' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'
+                                                        record.status === 'ออกงาน' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'
                                                         }`}>
                                                         {record.status}
                                                     </span>
@@ -245,6 +245,7 @@ export default function HistoryPage() {
                                     ))
                                 )
                             )}
+
                         </div>
                     )}
                 </div>

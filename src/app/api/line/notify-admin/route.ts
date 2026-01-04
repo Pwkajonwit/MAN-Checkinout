@@ -13,8 +13,26 @@ export async function POST(request: Request) {
         }
 
         // 2. Construct Flex Message
-        const title = type === "leave" ? "คำขอลา (Leave Request)" : "คำขอ OT (OT Request)";
-        const color = type === "leave" ? "#f59e0b" : "#3b82f6"; // Amber for Leave, Blue for OT
+        let title = "";
+        let color = "";
+
+        switch (type) {
+            case "leave":
+                title = "คำขอลา (Leave Request)";
+                color = "#f59e0b"; // Amber
+                break;
+            case "ot":
+                title = "คำขอ OT (OT Request)";
+                color = "#3b82f6"; // Blue
+                break;
+            case "swap":
+                title = "คำขอสลับวันหยุด (Swap Request)";
+                color = "#9333ea"; // Purple
+                break;
+            default:
+                title = "คำขออนุมัติ (Request)";
+                color = "#64748b"; // Slate
+        }
         const liffId = process.env.NEXT_PUBLIC_LIFF_APPROVE_ID;
         const approvalLink = `https://liff.line.me/${liffId}`;
 

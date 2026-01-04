@@ -291,7 +291,7 @@ export default function OTRequestPage() {
                         <Button
                             type="submit"
                             disabled={loading}
-                            className="w-full h-14 text-lg rounded-2xl bg-[#0047BA] hover:bg-[#00338D] shadow-lg shadow-blue-900/20 mt-4"
+                            className="w-full h-14 text-lg rounded-2xl bg-primary hover:bg-primary/80 shadow-lg shadow-blue-900/20 mt-4"
                         >
                             {loading ? "กำลังส่งข้อมูล..." : (
                                 <span className="flex items-center gap-2">

@@ -11,9 +11,11 @@ interface AttendanceTableProps {
     onEdit?: (attendance: Attendance) => void;
     onDelete?: (id: string) => void;
     isSuperAdmin?: boolean;
+    locationEnabled?: boolean;
+    workTimeEnabled?: boolean;
 }
 
-export function AttendanceTable({ attendances, onEdit, onDelete, isSuperAdmin = false }: AttendanceTableProps) {
+export function AttendanceTable({ attendances, onEdit, onDelete, isSuperAdmin = false, locationEnabled = false, workTimeEnabled = true }: AttendanceTableProps) {
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
     const openMap = (lat: number, lng: number) => {
@@ -88,13 +90,8 @@ export function AttendanceTable({ attendances, onEdit, onDelete, isSuperAdmin = 
                                         </td>
                                         <td className="py-4 px-6">
                                             <span className="text-sm text-gray-600">
-                                                {attendance.status === "เข้างาน" || attendance.status === "สาย" || attendance.status === "ระหว่างวัน" ? (
-                                                    attendance.checkIn ? format(attendance.checkIn, "HH:mm") : "-"
-                                                ) : attendance.status === "ออกงาน" ? (
-                                                    attendance.checkOut ? format(attendance.checkOut, "HH:mm") : "-"
-                                                ) : (
-                                                    "-"
-                                                )}
+                                                {attendance.checkIn ? format(attendance.checkIn, "HH:mm") :
+                                                    attendance.checkOut ? format(attendance.checkOut, "HH:mm") : "-"}
                                             </span>
                                         </td>
                                         <td className="py-4 px-6">
@@ -118,7 +115,7 @@ export function AttendanceTable({ attendances, onEdit, onDelete, isSuperAdmin = 
                                                         <MapPin className="w-3.5 h-3.5" />
                                                         แผนที่
                                                     </button>
-                                                    {attendance.distance !== undefined && (
+                                                    {locationEnabled && attendance.distance !== undefined && (
                                                         <span className="text-xs text-gray-500 ml-1">
                                                             ห่าง {attendance.distance < 1000 ? `${Math.round(attendance.distance)} ม.` : `${(attendance.distance / 1000).toFixed(2)} กม.`}
                                                         </span>
@@ -132,9 +129,11 @@ export function AttendanceTable({ attendances, onEdit, onDelete, isSuperAdmin = 
                                             {(() => {
                                                 const notes = [];
 
-                                                if ((attendance.status === "เข้างาน" || attendance.status === "สาย") && attendance.checkIn) {
-                                                    if (isLate(attendance.checkIn)) {
-                                                        const lateMinutes = getLateMinutes(attendance.checkIn);
+                                                // Only show late if workTimeEnabled
+                                                if (workTimeEnabled && (attendance.status === "เข้างาน" || attendance.status === "สาย") && attendance.checkIn) {
+                                                    // ใช้ค่า lateMinutes ที่บันทึกไว้ในฐานข้อมูล แทนการคำนวณใหม่
+                                                    const lateMinutes = attendance.lateMinutes || 0;
+                                                    if (lateMinutes > 0) {
                                                         notes.push(
                                                             <span key="late" className="inline-flex items-center px-2 py-1 rounded-md bg-red-50 text-red-700 text-xs font-medium">
                                                                 สาย {formatMinutesToHours(lateMinutes)}
@@ -143,16 +142,8 @@ export function AttendanceTable({ attendances, onEdit, onDelete, isSuperAdmin = 
                                                     }
                                                 }
 
-                                                if (attendance.status === "ออกงาน" && attendance.checkOut) {
-                                                    if (isEligibleForOT(attendance.checkOut)) {
-                                                        const otMinutes = getOTMinutes(attendance.checkOut);
-                                                        notes.push(
-                                                            <span key="ot" className="inline-flex items-center px-2 py-1 rounded-md bg-purple-50 text-purple-700 text-xs font-medium">
-                                                                ล่วงเวลา {formatMinutesToHours(otMinutes)}
-                                                            </span>
-                                                        );
-                                                    }
-                                                }
+                                                // หมายเหตุ: ไม่แสดง OT อัตโนมัติแล้ว จะแสดงเฉพาะเมื่อมี OT Request ที่อนุมัติ
+                                                // ลบโค้ดแสดง OT อัตโนมัติออก เพื่อให้สอดคล้องกับ Feature Request
 
                                                 if (attendance.locationNote) {
                                                     notes.push(

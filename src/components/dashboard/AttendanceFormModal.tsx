@@ -21,7 +21,7 @@ export function AttendanceFormModal({ isOpen, onClose, attendance, onSuccess }: 
         date: "",
         checkInTime: "",
         checkOutTime: "",
-        status: "เข้างาน" as "เข้างาน" | "ออกงาน" | "ลางาน" | "สาย" | "ระหว่างวัน",
+        status: "เข้างาน" as "เข้างาน" | "ออกงาน" | "ลางาน" | "สาย" | "ก่อนพัก" | "หลังพัก" | "ออกนอกพื้นที่ขาไป" | "ออกนอกพื้นที่ขากลับ",
         location: "",
     });
 
@@ -84,10 +84,10 @@ export function AttendanceFormModal({ isOpen, onClose, attendance, onSuccess }: 
             const dateStr = formData.date;
             const checkInDateTime = formData.checkInTime
                 ? new Date(`${dateStr}T${formData.checkInTime}:00`)
-                : undefined;
+                : null;
             const checkOutDateTime = formData.checkOutTime
                 ? new Date(`${dateStr}T${formData.checkOutTime}:00`)
-                : undefined;
+                : null;
 
             const attendanceData = {
                 employeeId: formData.employeeId,
@@ -216,6 +216,10 @@ export function AttendanceFormModal({ isOpen, onClose, attendance, onSuccess }: 
                             <option value="ออกงาน">ออกงาน</option>
                             <option value="ลางาน">ลางาน</option>
                             <option value="สาย">สาย</option>
+                            <option value="ก่อนพัก">ก่อนพัก</option>
+                            <option value="หลังพัก">หลังพัก</option>
+                            <option value="ออกนอกพื้นที่ขาไป">ออกนอกพื้นที่ขาไป</option>
+                            <option value="ออกนอกพื้นที่ขากลับ">ออกนอกพื้นที่ขากลับ</option>
                         </select>
                     </div>
 
@@ -246,7 +250,7 @@ export function AttendanceFormModal({ isOpen, onClose, attendance, onSuccess }: 
                         </Button>
                         <Button
                             type="submit"
-                            className="flex-1 h-12 bg-[#553734] hover:bg-[#553734]/90 text-white rounded-xl"
+                            className="flex-1 h-12 bg-primary-dark hover:bg-primary-dark/90 text-white rounded-xl"
                             disabled={loading}
                         >
                             {loading ? "กำลังบันทึก..." : attendance ? "บันทึกการแก้ไข" : "บันทึกการลงเวลา"}

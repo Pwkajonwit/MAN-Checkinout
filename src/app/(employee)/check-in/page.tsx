@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { MapPin, Camera, RotateCcw, CheckCircle, Clock, AlertTriangle } from "lucide-react";
@@ -8,18 +8,19 @@ import { attendanceService, systemConfigService } from "@/lib/firestore";
 import { isLate, getLateMinutes, isEligibleForOT, getOTMinutes, formatMinutesToHours } from "@/lib/workTime";
 import { useEmployee } from "@/contexts/EmployeeContext";
 import { EmployeeHeader } from "@/components/mobile/EmployeeHeader";
-import { uploadAttendancePhoto } from "@/lib/storage";
+import { compressBase64Image, canUploadPhoto } from "@/lib/storage";
 import { calculateDistance } from "@/lib/location";
 
 import { CustomAlert } from "@/components/ui/custom-alert";
 
 export default function CheckInPage() {
     const router = useRouter();
-    const { employee } = useEmployee();
+    const { employee, refreshEmployee } = useEmployee();
     const [step, setStep] = useState(1);
     const [currentTime, setCurrentTime] = useState(new Date());
     const [loading, setLoading] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
+
 
     // Alert State
     const [alertState, setAlertState] = useState<{
@@ -48,10 +49,11 @@ export default function CheckInPage() {
     };
 
     // Step 1 Data
-    const [checkInType, setCheckInType] = useState<"เข้างาน" | "ออกงาน" | "ระหว่างวัน">("เข้างาน");
+    const [checkInType, setCheckInType] = useState<"เข้างาน" | "ออกงาน" | "ออกนอกพื้นที่">("เข้างาน");
     const [canCheckIn, setCanCheckIn] = useState(true);
     const [canCheckOut, setCanCheckOut] = useState(false);
-    const [canCheckMidDay, setCanCheckMidDay] = useState(false);
+    const [canCheckOffsite, setCanCheckOffsite] = useState(false);
+
 
     // Step 2 Data (Camera)
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -70,6 +72,9 @@ export default function CheckInPage() {
 
     // Settings
     const [requirePhoto, setRequirePhoto] = useState(true);
+    const [workTimeEnabled, setWorkTimeEnabled] = useState(true);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [systemConfig, setSystemConfig] = useState<any>(null);
     const [locationConfig, setLocationConfig] = useState<{
         enabled: boolean;
         latitude: number;
@@ -84,29 +89,28 @@ export default function CheckInPage() {
         return () => clearInterval(timer);
     }, []);
 
-    // Check status on load
+    // Force Refresh Employee Data on Load (to get latest shift)
+    useEffect(() => {
+        refreshEmployee();
+    }, []);
+
+    // Load Shift and Status when Employee is ready
     useEffect(() => {
         if (employee?.id) {
+            console.log("=== Employee Changed ===", employee.name);
             checkTodayStatus();
         }
     }, [employee]);
 
-    // Cleanup camera on unmount
-    useEffect(() => {
-        return () => {
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-            }
-        };
-    }, [stream]);
-
-    // Load settings
+    // Check status on load
     useEffect(() => {
         const loadSettings = async () => {
             try {
                 const config = await systemConfigService.get();
                 if (config) {
+                    setSystemConfig(config);
                     setRequirePhoto(config.requirePhoto ?? true);
+                    setWorkTimeEnabled(config.workTimeEnabled ?? true);
                     if (config.locationConfig) {
                         setLocationConfig(config.locationConfig);
                     }
@@ -117,6 +121,8 @@ export default function CheckInPage() {
         };
         loadSettings();
     }, []);
+
+
 
     const checkTodayStatus = async () => {
         if (!employee?.id) return;
@@ -130,26 +136,26 @@ export default function CheckInPage() {
             const history = await attendanceService.getHistory(employee.id, todayStart, todayEnd);
 
             const mainActions = history
-                .filter(h => h.status === "เข้างาน" || h.status === "ออกงาน")
+                .filter(h => h.status === "เข้างาน" || h.status === "ออกงาน" || h.status === "สาย")
                 .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
             if (mainActions.length > 0) {
                 const lastAction = mainActions[0];
-                if (lastAction.status === "เข้างาน") {
+                if (lastAction.status === "เข้างาน" || lastAction.status === "สาย") {
                     setCanCheckIn(false);
                     setCanCheckOut(true);
-                    setCanCheckMidDay(true);
+                    setCanCheckOffsite(true);
                     setCheckInType("ออกงาน");
                 } else {
                     setCanCheckIn(true);
                     setCanCheckOut(false);
-                    setCanCheckMidDay(false);
+                    setCanCheckOffsite(false);
                     setCheckInType("เข้างาน");
                 }
             } else {
                 setCanCheckIn(true);
                 setCanCheckOut(false);
-                setCanCheckMidDay(false);
+                setCanCheckOffsite(false);
                 setCheckInType("เข้างาน");
             }
         } catch (error) {
@@ -229,8 +235,8 @@ export default function CheckInPage() {
                     const lat = position.coords.latitude;
                     const lng = position.coords.longitude;
 
-                    // Calculate distance if config exists
-                    if (locationConfig) {
+                    // Calculate distance only if location check is enabled
+                    if (locationConfig && locationConfig.enabled) {
                         const dist = calculateDistance(
                             lat,
                             lng,
@@ -238,14 +244,9 @@ export default function CheckInPage() {
                             locationConfig.longitude
                         );
                         setDistance(dist);
-
-                        // Validate only if enabled
-                        if (locationConfig.enabled) {
-                            setIsLocationValid(dist <= locationConfig.radius);
-                        } else {
-                            setIsLocationValid(true);
-                        }
+                        setIsLocationValid(dist <= locationConfig.radius);
                     } else {
+                        // Location check disabled - no distance calculation
                         setDistance(null);
                         setIsLocationValid(true);
                     }
@@ -278,26 +279,66 @@ export default function CheckInPage() {
         }
     };
 
+    const getEffectiveWorkTimeConfig = () => {
+        if (systemConfig) {
+            return {
+                checkInHour: systemConfig.checkInHour ?? 9,
+                checkInMinute: systemConfig.checkInMinute ?? 0,
+                checkOutHour: systemConfig.checkOutHour ?? 18,
+                checkOutMinute: systemConfig.checkOutMinute ?? 0,
+                lateGracePeriod: systemConfig.lateGracePeriod ?? 0
+            };
+        }
+
+        // 3. Fallback: Hardcoded Default
+        return {
+            checkInHour: 9,
+            checkInMinute: 0,
+            checkOutHour: 18,
+            checkOutMinute: 0,
+            lateGracePeriod: 0
+        };
+    };
+
     const sendFlexMessage = async (type: string, time: Date, location: string, dist: number | null) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const liff = (window as any).liff;
         if (liff && liff.isInClient()) {
             try {
-                // Calculate Late or OT status
+                // Calculate Late or OT status (only if workTimeEnabled)
                 let statusText = "";
                 let statusColor = "#666666";
 
-                if (type === "เข้างาน" && isLate(time)) {
-                    const lateMinutes = getLateMinutes(time);
-                    statusText = `สาย ${formatMinutesToHours(lateMinutes)}`;
-                    statusColor = "#ef4444"; // Red
-                } else if (type === "ออกงาน" && isEligibleForOT(time)) {
-                    const otMinutes = getOTMinutes(time);
-                    statusText = `ล่วงเวลา ${formatMinutesToHours(otMinutes)}`;
-                    statusColor = "#a855f7"; // Purple
-                } else if (type === "เข้างาน") {
-                    statusText = "ปกติ";
-                    statusColor = "#22c55e"; // Green
+                if (workTimeEnabled) {
+                    const config = getEffectiveWorkTimeConfig();
+
+                    if (type === "เข้างาน") {
+                        // Custom isLate logic for SECONDS precision (Requested: > 09:00:59 is Late)
+                        const standardTime = new Date(time);
+                        standardTime.setHours(config.checkInHour, config.checkInMinute, 0, 0);
+
+                        // Add grace period (minutes)
+                        standardTime.setMinutes(standardTime.getMinutes() + config.lateGracePeriod);
+                        // Ensure we cover up to 59 seconds of the grace minute
+                        standardTime.setSeconds(59);
+                        standardTime.setMilliseconds(999);
+
+                        if (time > standardTime) {
+                            // Calculate late minutes
+                            const baseTime = new Date(time);
+                            baseTime.setHours(config.checkInHour, config.checkInMinute, 0, 0);
+
+                            const diffMs = time.getTime() - baseTime.getTime();
+                            const lateMinutes = Math.floor(diffMs / (1000 * 60));
+
+                            statusText = `สาย ${formatMinutesToHours(lateMinutes)}`;
+                            statusColor = "#ef4444"; // Red
+                        } else {
+                            statusText = "ปกติ";
+                            statusColor = "#22c55e"; // Green
+                        }
+                    }
+                    // หมายเหตุ: ไม่แสดง OT อัตโนมัติแล้ว จะแสดงเฉพาะเมื่อมี OT Request ที่อนุมัติ
                 }
 
                 const contents: any[] = [
@@ -502,29 +543,87 @@ export default function CheckInPage() {
         try {
             const now = new Date();
 
-            // Upload photo to Firebase Storage logic
-            let photoURL: string | null = null;
+            // ตรวจสอบซ้ำก่อนบันทึก (ป้องกัน double submit หรือ race condition)
+            const todayStart = new Date();
+            todayStart.setHours(0, 0, 0, 0);
+            const todayEnd = new Date();
+            todayEnd.setHours(23, 59, 59, 999);
 
-            if (requirePhoto) {
+            const history = await attendanceService.getHistory(employee.id || "", todayStart, todayEnd);
+            const mainActions = history.filter(h => h.status === "เข้างาน" || h.status === "ออกงาน");
+
+            // ป้องกันเข้างานซ้ำ
+            if (checkInType === "เข้างาน") {
+                const hasCheckedIn = mainActions.some(a => a.status === "เข้างาน");
+                if (hasCheckedIn) {
+                    showAlert("ลงเวลาซ้ำไม่ได้", "คุณได้ลงเวลาเข้างานวันนี้แล้ว", "warning");
+                    setLoading(false);
+                    await checkTodayStatus(); // รีเฟรชสถานะ
+                    return;
+                }
+            }
+
+            // ป้องกันออกงานซ้ำ
+            if (checkInType === "ออกงาน") {
+                const checkInRecord = mainActions.find(a => a.status === "เข้างาน" || a.status === "สาย");
+                const hasCheckedOut = mainActions.some(a => a.status === "ออกงาน");
+                if (!checkInRecord) {
+                    showAlert("ยังไม่ได้เข้างาน", "กรุณาลงเวลาเข้างานก่อน", "warning");
+                    setLoading(false);
+                    await checkTodayStatus();
+                    return;
+                }
+                if (hasCheckedOut) {
+                    showAlert("ลงเวลาซ้ำไม่ได้", "คุณได้ลงเวลาออกงานวันนี้แล้ว", "warning");
+                    setLoading(false);
+                    await checkTodayStatus();
+                    return;
+                }
+            }
+
+            // Process photo as Base64 (stored directly in Firestore)
+            let photoBase64: string | null = null;
+
+            // บังคับรูปสำหรับออกนอกพื้นที่ หรือตาม requirePhoto setting
+            const isOffsiteType = checkInType === "ออกนอกพื้นที่";
+            const needsPhoto = requirePhoto || isOffsiteType;
+
+            if (needsPhoto) {
                 if (photo && employee?.id) {
                     try {
-                        photoURL = await uploadAttendancePhoto(employee.id, photo);
-                    } catch (uploadError) {
-                        console.error("Error uploading photo:", uploadError);
-                        showAlert("อัปโหลดรูปภาพไม่สำเร็จ", "เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ กรุณาลองใหม่อีกครั้ง", "error");
-                        setLoading(false);
-                        return; // Stop if photo is required but failed
+                        // Check storage limit before saving
+                        const uploadCheck = await canUploadPhoto(photo);
+                        if (!uploadCheck.canUpload) {
+                            showAlert("พื้นที่เก็บข้อมูลเต็ม", uploadCheck.message, "error");
+                            setLoading(false);
+                            return;
+                        }
+
+                        // Show warning if near limit
+                        if (uploadCheck.message) {
+                            console.warn(uploadCheck.message);
+                        }
+
+                        // Compress the photo before saving
+                        photoBase64 = await compressBase64Image(photo, 640, 480, 0.6);
+                    } catch (compressError) {
+                        console.error("Error compressing photo:", compressError);
+                        // Use original photo if compression fails
+                        photoBase64 = photo;
                     }
                 } else {
-                    // requirePhoto is true but no photo data
-                    showAlert("กรุณาถ่ายรูป", "ระบบต้องการรูปถ่ายเพื่อยืนยันตัวตน", "warning");
+                    // needsPhoto is true but no photo data
+                    const message = isOffsiteType
+                        ? "การออกนอกพื้นที่ต้องมีรูปถ่ายประกอบ"
+                        : "ระบบต้องการรูปถ่ายเพื่อยืนยันตัวตน";
+                    showAlert("กรุณาถ่ายรูป", message, "warning");
                     setLoading(false);
                     return;
                 }
             } else {
-                // requirePhoto is false
-                console.log("Photo upload skipped (requirePhoto is false)");
-                // photoURL remains null
+                // requirePhoto is false and not offsite type
+                console.log("Photo saving skipped (requirePhoto is false)");
+                // photoBase64 remains null
             }
 
             try {
@@ -541,17 +640,56 @@ export default function CheckInPage() {
                     distance: distance || 0
                 };
 
+                // Calculate Late Logic for Database
+                if (checkInType === "เข้างาน" && workTimeEnabled) {
+                    // ถ้าไม่ได้ shift ให้ใช้ค่าจาก state หรือ system config
+                    const config = getEffectiveWorkTimeConfig();
+
+                    // Custom isLate logic for SECONDS precision
+                    const standardTime = new Date(now);
+                    standardTime.setHours(config.checkInHour, config.checkInMinute, 0, 0);
+                    standardTime.setMinutes(standardTime.getMinutes() + config.lateGracePeriod);
+                    standardTime.setSeconds(59);
+                    standardTime.setMilliseconds(999);
+
+                    if (now > standardTime) {
+                        // status remains "เข้างาน" even if late, as per requirement
+                        // attendanceData.status = "สาย"; 
+
+                        // Calculate late minutes
+                        const baseTime = new Date(now);
+                        baseTime.setHours(config.checkInHour, config.checkInMinute, 0, 0);
+                        const diffMs = now.getTime() - baseTime.getTime();
+                        attendanceData.lateMinutes = Math.floor(diffMs / (1000 * 60));
+                        console.log("handleSubmit: Calculated lateMinutes:", attendanceData.lateMinutes);
+                    }
+                }
+
                 // Conditionally add optional fields
-                if (checkInType === "เข้างาน" || checkInType === "ระหว่างวัน") {
+                if (checkInType === "เข้างาน" || checkInType === "ออกนอกพื้นที่") {
                     attendanceData.checkIn = now;
                 }
 
                 if (checkInType === "ออกงาน") {
                     attendanceData.checkOut = now;
+
+                    // Calculate OT if enabled
+                    if (workTimeEnabled) {
+                        const config = getEffectiveWorkTimeConfig();
+                        const checkOutConfig = {
+                            hour: config.checkOutHour,
+                            minute: config.checkOutMinute,
+                            minOTMinutes: 0 // Calculate all OT minutes, let Admin/Approval decide policy
+                        };
+                        const otMins = getOTMinutes(now, checkOutConfig);
+                        if (otMins > 0) {
+                            attendanceData.otMinutes = otMins;
+                        }
+                    }
                 }
 
-                if (photoURL) {
-                    attendanceData.photo = photoURL;
+                if (photoBase64) {
+                    attendanceData.photo = photoBase64;
                 }
 
                 if (locationNote.trim()) {
@@ -601,80 +739,98 @@ export default function CheckInPage() {
 
     const renderStep1 = () => (
         <div className="space-y-6">
-            {/* Clock Card */}
-            <div className="bg-white rounded-3xl p-6 shadow-lg border border-blue-50 text-center">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-50 text-[#00338D] mb-3">
-                    <Clock className="w-6 h-6" />
+            {/* Clock Card - Green/White Theme */}
+            <div className="bg-white rounded-2xl p-4 shadow-sm border border-green-100">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-xl bg-green-50 flex items-center justify-center">
+                            <Clock className="w-6 h-6 text-green-600" />
+                        </div>
+                        <div>
+                            <div className="text-3xl font-bold text-gray-800 tracking-tight">
+                                {currentTime.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false })}
+                            </div>
+                            <div className="text-gray-500 text-sm">
+                                {currentTime.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            </div>
+                        </div>
+                    </div>
+                    <div className="text-right">
+                        <div className="text-green-600 font-medium text-sm">{currentTime.toLocaleDateString('th-TH', { weekday: 'long' })}</div>
+                    </div>
                 </div>
-                <h2 className="text-4xl font-bold text-gray-800 tracking-tight">
-                    {currentTime.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false })}
-                </h2>
-                <p className="text-gray-500 mt-1">
-                    {currentTime.toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })}
-                </p>
             </div>
 
-            {/* Type Selection */}
-            <div className="grid grid-cols-1 gap-4">
-                <button
-                    onClick={() => canCheckIn && setCheckInType("เข้างาน")}
-                    disabled={!canCheckIn}
-                    className={`w-full p-5 rounded-2xl border transition-all font-bold text-lg flex items-center justify-between group ${checkInType === "เข้างาน"
-                        ? "border-green-500 bg-green-50 text-green-700 shadow-md ring-1 ring-green-500"
-                        : canCheckIn
-                            ? "border-gray-200 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-300"
-                            : "border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed opacity-60"
-                        }`}
-                >
-                    <div className="flex items-center gap-3">
-                        <div className={`w-4 h-4 rounded-full ${checkInType === "เข้างาน" ? "bg-green-500" : "bg-gray-300"}`} />
-                        <span>เข้างาน</span>
-                    </div>
-                    {checkInType === "เข้างาน" && <CheckCircle className="w-5 h-5 text-green-600" />}
-                </button>
+            {/* Work Time Info */}
+            <div className="bg-blue-50/50 rounded-xl px-4 py-2 border border-blue-100 text-xs text-center">
+                <span className="text-gray-500 mr-2">เวลาทำงาน:</span>
+                <span className="font-mono font-medium text-blue-800">
+                    {(() => {
+                        const conf = getEffectiveWorkTimeConfig();
+                        return `${conf.checkInHour.toString().padStart(2, '0')}:${conf.checkInMinute.toString().padStart(2, '0')} - ${conf.checkOutHour.toString().padStart(2, '0')}:${conf.checkOutMinute.toString().padStart(2, '0')}`;
+                    })()}
+                </span>
+            </div>
 
-                <button
-                    onClick={() => canCheckOut && setCheckInType("ออกงาน")}
-                    disabled={!canCheckOut}
-                    className={`w-full p-5 rounded-2xl border transition-all font-bold text-lg flex items-center justify-between group ${checkInType === "ออกงาน"
-                        ? "border-red-500 bg-red-50 text-red-700 shadow-md ring-1 ring-red-500"
-                        : canCheckOut
-                            ? "border-gray-200 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-300"
-                            : "border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed opacity-60"
-                        }`}
-                >
-                    <div className="flex items-center gap-3">
+            {/* Type Selection - 2 Columns */}
+            <div className="space-y-3">
+                {/* เข้างาน / ออกงาน */}
+                <div className="grid grid-cols-2 gap-3">
+                    <button
+                        onClick={() => canCheckIn && setCheckInType("เข้างาน")}
+                        disabled={!canCheckIn}
+                        className={`p-4 rounded-2xl border transition-all font-bold text-base flex flex-col items-center gap-2 ${checkInType === "เข้างาน"
+                            ? "border-green-500 bg-green-50 text-green-700 shadow-md ring-1 ring-green-500"
+                            : canCheckIn
+                                ? "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                                : "border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed opacity-60"
+                            }`}
+                    >
+                        <div className={`w-4 h-4 rounded-full ${checkInType === "เข้างาน" ? "bg-green-600" : "bg-gray-300"}`} />
+                        <span>เข้างาน</span>
+                    </button>
+
+                    <button
+                        onClick={() => canCheckOut && setCheckInType("ออกงาน")}
+                        disabled={!canCheckOut}
+                        className={`p-4 rounded-2xl border transition-all font-bold text-base flex flex-col items-center gap-2 ${checkInType === "ออกงาน"
+                            ? "border-red-500 bg-red-50 text-red-700 shadow-md ring-1 ring-red-500"
+                            : canCheckOut
+                                ? "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                                : "border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed opacity-60"
+                            }`}
+                    >
                         <div className={`w-4 h-4 rounded-full ${checkInType === "ออกงาน" ? "bg-red-500" : "bg-gray-300"}`} />
                         <span>ออกงาน</span>
-                    </div>
-                    {checkInType === "ออกงาน" && <CheckCircle className="w-5 h-5 text-red-600" />}
-                </button>
+                    </button>
+                </div>
 
-                <button
-                    onClick={() => canCheckMidDay && setCheckInType("ระหว่างวัน")}
-                    disabled={!canCheckMidDay}
-                    className={`w-full p-5 rounded-2xl border transition-all font-bold text-lg flex items-center justify-between group ${checkInType === "ระหว่างวัน"
-                        ? "border-orange-500 bg-orange-50 text-orange-700 shadow-md ring-1 ring-orange-500"
-                        : canCheckMidDay
-                            ? "border-gray-200 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-300"
-                            : "border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed opacity-60"
-                        }`}
-                >
-                    <div className="flex items-center gap-3">
-                        <div className={`w-4 h-4 rounded-full ${checkInType === "ระหว่างวัน" ? "bg-orange-500" : "bg-gray-300"}`} />
-                        <span>ระหว่างวัน</span>
-                    </div>
-                    {checkInType === "ระหว่างวัน" && <CheckCircle className="w-5 h-5 text-orange-600" />}
-                </button>
+
+                {/* ออกนอกพื้นที่ */}
+                <div className="mt-3">
+                    <button
+                        onClick={() => canCheckOffsite && setCheckInType("ออกนอกพื้นที่")}
+                        disabled={!canCheckOffsite}
+                        className={`w-full p-4 rounded-2xl border transition-all font-bold text-base flex items-center justify-center gap-2 ${checkInType === "ออกนอกพื้นที่"
+                            ? "border-purple-500 bg-purple-50 text-purple-700 shadow-md ring-1 ring-purple-500"
+                            : canCheckOffsite
+                                ? "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                                : "border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed opacity-60"
+                            }`}
+                    >
+                        <div className={`w-4 h-4 rounded-full ${checkInType === "ออกนอกพื้นที่" ? "bg-purple-500" : "bg-gray-300"}`} />
+                        <span>บันทึกนอกสถานที่</span>
+                    </button>
+                </div>
             </div>
 
             <Button
                 onClick={() => setStep(2)}
-                className="w-full h-14 text-lg rounded-2xl bg-[#0047BA] hover:bg-[#00338D] shadow-lg shadow-blue-900/20 mt-4"
+                className="w-full h-14 text-lg rounded-2xl bg-primary hover:bg-primary/80 shadow-lg shadow-blue-900/20 mt-4"
             >
                 ถัดไป
             </Button>
-        </div>
+        </div >
     );
 
     const renderStep2 = () => (
@@ -713,7 +869,7 @@ export default function CheckInPage() {
                     <Button
                         onClick={capturePhoto}
                         disabled={!cameraActive}
-                        className="h-12 bg-green-600 hover:bg-green-700 text-white rounded-xl"
+                        className="h-12 bg-primary hover:bg-primary/80 text-white rounded-xl"
                     >
                         ถ่าย
                     </Button>
@@ -739,7 +895,7 @@ export default function CheckInPage() {
                 <Button
                     onClick={() => setStep(3)}
                     disabled={!photo}
-                    className="flex-1 h-14 text-lg rounded-2xl bg-[#0047BA] hover:bg-[#00338D] shadow-lg shadow-blue-900/20"
+                    className="flex-1 h-14 text-lg rounded-2xl bg-primary hover:bg-primary/80 shadow-lg shadow-blue-900/20"
                 >
                     ถัดไป
                 </Button>
@@ -832,7 +988,7 @@ export default function CheckInPage() {
                 <Button
                     onClick={handleSubmit}
                     disabled={loading || !location || showSuccess || (!isLocationValid && !locationNote.trim())}
-                    className="w-2/3 h-14 text-lg rounded-2xl bg-[#0047BA] hover:bg-[#00338D] shadow-lg shadow-blue-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-2/3 h-14 text-lg rounded-2xl bg-primary hover:bg-primary/80 shadow-lg shadow-blue-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     {loading ? "กำลังบันทึก..." : showSuccess ? "สำเร็จ!" : "ยืนยัน"}
                 </Button>
@@ -847,7 +1003,7 @@ export default function CheckInPage() {
                 {/* Success Notification */}
                 {showSuccess && (
                     <div className="fixed top-0 left-0 right-0 z-50 p-4 animate-in slide-in-from-top-10 fade-in duration-300">
-                        <div className="bg-[#1DB446] text-white px-6 py-4 rounded-2xl shadow-xl flex items-center gap-3 mx-auto max-w-sm">
+                        <div className="bg-primary text-white border border-primary px-6 py-4 rounded-2xl shadow-xl flex items-center gap-3 mx-auto max-w-sm">
                             <div className="p-2 bg-white/20 rounded-full">
                                 <CheckCircle className="w-5 h-5 text-white" />
                             </div>

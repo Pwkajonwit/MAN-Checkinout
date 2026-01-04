@@ -17,6 +17,7 @@ export default function OTPage() {
     const [otRequests, setOTRequests] = useState<OTRequest[]>([]);
     const [loading, setLoading] = useState(true);
     const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+    const [statusFilter, setStatusFilter] = useState<"all" | "รออนุมัติ" | "อนุมัติ" | "ไม่อนุมัติ">("all");
 
     const loadOTRequests = async () => {
         try {
@@ -228,7 +229,7 @@ export default function OTPage() {
                     <div className="flex gap-2">
                         <Button
                             onClick={handleAddOT}
-                            className="bg-[#5C6BC0] hover:bg-[#5C6BC0]/90 text-white rounded-xl px-6 gap-2"
+                            className="bg-primary-dark hover:bg-primary-dark/90 text-white rounded-xl px-6 gap-2"
                         >
                             <Plus className="w-4 h-4" />
                             เพิ่มข้อมูลโอที
@@ -242,18 +243,26 @@ export default function OTPage() {
                 <StatsCard
                     title="รอการอนุมัติ"
                     value={stats.pending}
+                    onClick={() => setStatusFilter(statusFilter === "รออนุมัติ" ? "all" : "รออนุมัติ")}
+                    isActive={statusFilter === "รออนุมัติ"}
                 />
                 <StatsCard
                     title="อนุมัติ"
                     value={stats.approved}
+                    onClick={() => setStatusFilter(statusFilter === "อนุมัติ" ? "all" : "อนุมัติ")}
+                    isActive={statusFilter === "อนุมัติ"}
                 />
                 <StatsCard
                     title="ไม่อนุมัติ"
                     value={stats.rejected}
+                    onClick={() => setStatusFilter(statusFilter === "ไม่อนุมัติ" ? "all" : "ไม่อนุมัติ")}
+                    isActive={statusFilter === "ไม่อนุมัติ"}
                 />
                 <StatsCard
                     title="ชั่วโมง OT ทั้งหมด"
-                    value={`${stats.totalHours} ชม.`}
+                    value={`${stats.totalHours.toFixed(1)} ชม.`}
+                    onClick={() => setStatusFilter("all")}
+                    isActive={statusFilter === "all"}
                 />
             </div>
 
@@ -264,7 +273,7 @@ export default function OTPage() {
                 </div>
             ) : (
                 <OTTable
-                    otRequests={otRequests}
+                    otRequests={statusFilter === "all" ? otRequests : otRequests.filter(ot => ot.status === statusFilter)}
                     onStatusUpdate={handleStatusUpdate}
                     onEdit={handleEditOT}
                     onDelete={handleDeleteOT}

@@ -364,6 +364,12 @@ export default function PayrollPage() {
             for (const emp of targetEmployees) {
                 if (!emp.id) continue;
 
+                const checkInConfig = {
+                    hour: config?.checkInHour ?? 9,
+                    minute: config?.checkInMinute ?? 0,
+                    gracePeriod: config?.lateGracePeriod ?? 0
+                };
+
                 // Fetch Attendance & OT
                 const [attendance, otRequests] = await Promise.all([
                     attendanceService.getHistory(emp.id, startDate, endDate),
@@ -405,7 +411,7 @@ export default function PayrollPage() {
                     });
 
                     if (earliestCheckIn) {
-                        totalLateMinutes += getLateMinutes(earliestCheckIn);
+                        totalLateMinutes += getLateMinutes(earliestCheckIn, checkInConfig);
                     }
                 });
 

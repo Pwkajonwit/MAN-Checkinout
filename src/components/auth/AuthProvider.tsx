@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { adminService, type Admin } from "@/lib/firestore";
+import { Loader2 } from "lucide-react";
 
 interface AdminContextType {
     user: User | null;
@@ -64,10 +65,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-[#F5F6FA] flex items-center justify-center">
+            <div className="min-h-screen bg-primary flex items-center justify-center">
                 <div className="text-center">
-                    <div className="w-16 h-16 border-4 border-[#EBDACA] border-t-[#553734] rounded-full animate-spin mx-auto mb-4"></div>
-                    <p className="text-gray-600 font-medium">กำลังโหลด...</p>
+                    <Loader2 className="w-16 h-16 text-primary animate-spin mx-auto mb-4" />
+                    <p className="text-primary font-medium">กำลังโหลด...</p>
                 </div>
             </div>
         );

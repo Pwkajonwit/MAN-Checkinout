@@ -15,7 +15,7 @@ export function MenuButton({ label, href, className, icon }: MenuButtonProps) {
             <Button
                 className={cn(
                     "w-full aspect-square flex flex-col items-center justify-center text-xl font-semibold rounded-2xl shadow-lg transition-all duration-200 active:scale-95 hover:shadow-xl",
-                    "bg-gradient-to-br from-[#0047BA] to-[#00338D] hover:from-[#003A9A] hover:to-[#002870] text-white",
+                    "bg-primary text-white",
                     className
                 )}
             >

@@ -30,7 +30,7 @@ export function EmployeeHeader() {
     const displayInitial = displayName?.charAt(0) || "G";
 
     return (
-        <header className="bg-gradient-to-br from-[#00338D] to-[#0055D4] text-white pt-4 pb-8 px-5 rounded-b-[2rem] shadow-lg relative overflow-hidden">
+        <header className="bg-primary text-white pt-4 pb-8 px-5 rounded-b-[2rem] shadow-lg relative overflow-hidden">
             {/* Decorative Circles */}
             <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -mr-12 -mt-12 blur-2xl pointer-events-none" />
             <div className="absolute bottom-0 left-0 w-32 h-32 bg-black/10 rounded-full -ml-8 -mb-8 blur-xl pointer-events-none" />
@@ -50,7 +50,7 @@ export function EmployeeHeader() {
 
                         {/* Employee Info (Compact) */}
                         <div className="flex items-center gap-3">
-                            <Avatar className="w-10 h-10 border border-white/30 shadow-md">
+                            <Avatar className="w-10 h-10 border border-white/30 shadow-md bg-black/10">
                                 <AvatarImage src={displayAvatar} className="object-cover" />
                                 <AvatarFallback className="bg-white/10 text-white backdrop-blur-sm text-sm font-bold">
                                     {loading ? "" : displayInitial}

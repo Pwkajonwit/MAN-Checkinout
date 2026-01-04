@@ -13,7 +13,10 @@ export async function POST(request: Request) {
         }
 
         // 2. Construct Flex Message
-        const title = type === "leave" ? "ผลการขอลา (Leave Result)" : "ผลการขอ OT (OT Result)";
+        let title = "ผลการอนุมัติ (Approval Result)";
+        if (type === "leave") title = "ผลการขอลา (Leave Result)";
+        else if (type === "ot") title = "ผลการขอ OT (OT Result)";
+        else if (type === "swap") title = "ผลขอสลับวันหยุด (Swap Result)";
         const color = status === "อนุมัติ" ? "#1DB446" : "#ef4444"; // Green for Approve, Red for Reject
         const statusText = status === "อนุมัติ" ? "อนุมัติแล้ว (Approved)" : "ไม่อนุมัติ (Rejected)";
 

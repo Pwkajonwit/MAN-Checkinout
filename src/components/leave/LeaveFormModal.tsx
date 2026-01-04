@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { X } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { X, Camera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { leaveService, employeeService, type LeaveRequest, type Employee } from "@/lib/firestore";
+import { compressBase64Image } from "@/lib/storage";
 
 interface LeaveFormModalProps {
     isOpen: boolean;
@@ -15,6 +16,7 @@ interface LeaveFormModalProps {
 export function LeaveFormModal({ isOpen, onClose, leave, onSuccess }: LeaveFormModalProps) {
     const [loading, setLoading] = useState(false);
     const [employees, setEmployees] = useState<Employee[]>([]);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const [formData, setFormData] = useState({
         employeeId: "",
         employeeName: "",
@@ -23,6 +25,7 @@ export function LeaveFormModal({ isOpen, onClose, leave, onSuccess }: LeaveFormM
         endDate: "",
         reason: "",
         status: "รออนุมัติ" as "รออนุมัติ" | "อนุมัติ" | "ไม่อนุมัติ",
+        attachment: null as string | null,
     });
 
     // Load employees
@@ -49,6 +52,7 @@ export function LeaveFormModal({ isOpen, onClose, leave, onSuccess }: LeaveFormM
                 endDate: leave.endDate ? new Date(leave.endDate).toISOString().split('T')[0] : "",
                 reason: leave.reason || "",
                 status: leave.status || "รออนุมัติ",
+                attachment: leave.attachment || null,
             });
         } else {
             setFormData({
@@ -59,6 +63,7 @@ export function LeaveFormModal({ isOpen, onClose, leave, onSuccess }: LeaveFormM
                 endDate: "",
                 reason: "",
                 status: "รออนุมัติ",
+                attachment: null,
             });
         }
     }, [leave]);
@@ -85,6 +90,36 @@ export function LeaveFormModal({ isOpen, onClose, leave, onSuccess }: LeaveFormM
         });
     };
 
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Validations
+        if (!file.type.startsWith('image/')) {
+            alert('กรุณาอัพโหลดไฟล์รูปภาพเท่านั้น');
+            return;
+        }
+
+        if (file.size > 5 * 1024 * 1024) { // 5MB
+            alert('ขนาดไฟล์ต้องไม่เกิน 5MB');
+            return;
+        }
+
+        try {
+            const reader = new FileReader();
+            reader.onload = async (event) => {
+                const base64 = event.target?.result as string;
+                // Compress image
+                const compressed = await compressBase64Image(base64);
+                setFormData({ ...formData, attachment: compressed });
+            };
+            reader.readAsDataURL(file);
+        } catch (error) {
+            console.error('Error processing image:', error);
+            alert('เกิดข้อผิดพลาดในการประมวลผลรูปภาพ');
+        }
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
@@ -98,6 +133,7 @@ export function LeaveFormModal({ isOpen, onClose, leave, onSuccess }: LeaveFormM
                 endDate: new Date(formData.endDate),
                 reason: formData.reason,
                 status: formData.status,
+                attachment: formData.attachment || undefined,
             };
 
             if (leave?.id) {
@@ -230,6 +266,59 @@ export function LeaveFormModal({ isOpen, onClose, leave, onSuccess }: LeaveFormM
                         />
                     </div>
 
+                    {/* Attachment */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            หลักฐานประกอบ (ถ้ามี)
+                        </label>
+                        <div className="flex items-start gap-4">
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                onChange={handleFileChange}
+                                accept="image/*"
+                                className="hidden"
+                            />
+
+                            {formData.attachment ? (
+                                <div className="relative group">
+                                    <div className="relative w-24 h-24 rounded-lg overflow-hidden border border-gray-200">
+                                        <img
+                                            src={formData.attachment}
+                                            alt="Evidence"
+                                            className="w-full h-full object-cover"
+                                        />
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className="mt-2 text-xs text-blue-600 hover:underline flex items-center gap-1"
+                                    >
+                                        <Camera className="w-3 h-3" />
+                                        เปลี่ยนรูป
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setFormData({ ...formData, attachment: null })}
+                                        className="mt-1 text-xs text-red-600 hover:underline"
+                                    >
+                                        ลบรูป
+                                    </button>
+                                </div>
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="w-full h-32 border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center text-gray-500 hover:border-gray-400 hover:bg-gray-50 transition-colors"
+                                >
+                                    <Camera className="w-8 h-8 mb-2 text-gray-400" />
+                                    <span className="text-sm">คลิกเพื่อแนบรูปภาพ</span>
+                                    <span className="text-xs text-gray-400 mt-1">สูงสุด 5MB</span>
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
                     {/* Status */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -259,7 +348,7 @@ export function LeaveFormModal({ isOpen, onClose, leave, onSuccess }: LeaveFormM
                         </Button>
                         <Button
                             type="submit"
-                            className="flex-1 h-12 bg-[#553734] hover:bg-[#553734]/90 text-white rounded-xl"
+                            className="flex-1 h-12 bg-primary-dark hover:bg-primary-dark/90 text-white rounded-xl"
                             disabled={loading}
                         >
                             {loading ? "กำลังบันทึก..." : leave ? "บันทึกการแก้ไข" : "เพิ่มการลางาน"}

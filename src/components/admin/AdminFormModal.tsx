@@ -23,6 +23,7 @@ export function AdminFormModal({ isOpen, onClose, admin, onSuccess }: AdminFormM
         email: "",
         password: "",
         role: "admin" as "admin" | "super_admin",
+        lineUserId: "",
     });
 
     useEffect(() => {
@@ -32,6 +33,7 @@ export function AdminFormModal({ isOpen, onClose, admin, onSuccess }: AdminFormM
                 email: admin.email || "",
                 password: "", // Password not shown for edit
                 role: admin.role || "admin",
+                lineUserId: admin.lineUserId || "",
             });
         } else {
             setFormData({
@@ -39,6 +41,7 @@ export function AdminFormModal({ isOpen, onClose, admin, onSuccess }: AdminFormM
                 email: "",
                 password: "",
                 role: "admin",
+                lineUserId: "",
             });
         }
     }, [admin]);
@@ -51,11 +54,17 @@ export function AdminFormModal({ isOpen, onClose, admin, onSuccess }: AdminFormM
 
         try {
             if (admin?.id) {
-                await adminService.update(admin.id, {
+                // Build update data - only include lineUserId if it has a value
+                const updateData: any = {
                     name: formData.name,
                     email: formData.email,
-                    role: formData.role
-                });
+                    role: formData.role,
+                };
+                // Only include lineUserId if it's not empty
+                if (formData.lineUserId && formData.lineUserId.trim()) {
+                    updateData.lineUserId = formData.lineUserId.trim();
+                }
+                await adminService.update(admin.id, updateData);
             } else {
                 // Create new admin
                 // 1. Create in Firebase Auth using secondary app to avoid logging out current user
@@ -65,13 +74,17 @@ export function AdminFormModal({ isOpen, onClose, admin, onSuccess }: AdminFormM
                 try {
                     await createUserWithEmailAndPassword(secondaryAuth, formData.email, formData.password);
 
-                    // 2. Create in Firestore
-                    await adminService.create({
+                    // 2. Create in Firestore - only include lineUserId if it has a value
+                    const createData: any = {
                         name: formData.name,
                         email: formData.email,
                         role: formData.role,
                         createdAt: new Date(),
-                    });
+                    };
+                    if (formData.lineUserId && formData.lineUserId.trim()) {
+                        createData.lineUserId = formData.lineUserId.trim();
+                    }
+                    await adminService.create(createData);
                 } catch (authError: any) {
                     if (authError.code === 'auth/email-already-in-use') {
                         alert("อีเมลนี้มีผู้ใช้งานแล้วในระบบ");
@@ -178,6 +191,21 @@ export function AdminFormModal({ isOpen, onClose, admin, onSuccess }: AdminFormM
                                 <option value="super_admin">Super Admin</option>
                             </select>
                         </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                LINE User ID
+                                <span className="text-gray-400 text-xs ml-2">(สำหรับ Auto Login ผ่าน LINE)</span>
+                            </label>
+                            <input
+                                type="text"
+                                value={formData.lineUserId}
+                                onChange={(e) => setFormData({ ...formData, lineUserId: e.target.value })}
+                                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#EBDACA] focus:border-transparent"
+                                placeholder="U1234567890abcdef..."
+                            />
+                            <p className="text-xs text-gray-400 mt-1">ใส่ LINE User ID เพื่อให้ Admin สามารถ Login อัตโนมัติเมื่อเปิดผ่าน LINE</p>
+                        </div>
                     </div>
 
                     <div className="flex gap-3 pt-4">
@@ -192,7 +220,7 @@ export function AdminFormModal({ isOpen, onClose, admin, onSuccess }: AdminFormM
                         </Button>
                         <Button
                             type="submit"
-                            className="flex-1 h-12 bg-[#553734] hover:bg-[#553734]/90 text-white rounded-xl"
+                            className="flex-1 h-12 bg-primary-dark hover:bg-primary-dark/90 text-white rounded-xl"
                             disabled={loading}
                         >
                             {loading ? "กำลังบันทึก..." : admin ? "บันทึกการแก้ไข" : "เพิ่มผู้ดูแลระบบ"}

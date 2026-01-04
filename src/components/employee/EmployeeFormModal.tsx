@@ -15,6 +15,8 @@ interface EmployeeFormModalProps {
 
 export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOnly = false }: EmployeeFormModalProps) {
     const [loading, setLoading] = useState(false);
+
+
     const [formData, setFormData] = useState({
         employeeId: "",
         name: "",
@@ -32,6 +34,7 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
             sick: 30,
             vacation: 5,
         },
+        // weeklyHolidays removed
     });
 
     // Update form when employee prop changes
@@ -70,13 +73,13 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
                 status: "ทำงาน",
                 endDate: undefined,
                 leaveQuota: {
-                    personal: 3,
+                    personal: 6,
                     sick: 30,
-                    vacation: 5,
+                    vacation: 10,
                 },
             });
         }
-    }, [employee, isOpen]); // Added isOpen to reset when opening empty
+    }, [employee, isOpen]);
 
     if (!isOpen) return null;
 
@@ -111,9 +114,9 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
                 status: "ทำงาน",
                 endDate: undefined,
                 leaveQuota: {
-                    personal:3,
+                    personal: 6,
                     sick: 30,
-                    vacation: 5,
+                    vacation: 10,
                 },
             });
 
@@ -319,6 +322,8 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
                         </div>
                     </div>
 
+
+
                     {/* Leave Quota */}
                     <div className="space-y-4">
                         <h3 className="text-lg font-semibold text-gray-700">สิทธิ์การลา</h3>
@@ -377,6 +382,8 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
                         </div>
                     </div>
 
+
+
                     {/* Actions */}
                     <div className="flex gap-3 pt-4">
                         <Button
@@ -391,7 +398,7 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
                         {!readOnly && (
                             <Button
                                 type="submit"
-                                className="flex-1 h-12 bg-[#553734] hover:bg-[#553734]/90 text-white rounded-xl"
+                                className="flex-1 h-12 bg-primary-dark hover:bg-primary-dark/90 text-white rounded-xl"
                                 disabled={loading}
                             >
                                 {loading ? "กำลังบันทึก..." : employee ? "บันทึกการแก้ไข" : "เพิ่มพนักงาน"}
@@ -403,4 +410,3 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
         </div>
     );
 }
-

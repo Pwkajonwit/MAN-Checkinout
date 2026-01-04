@@ -74,10 +74,10 @@ export default function AdminsPage() {
                     isSuperAdmin ? (
                         <Button
                             onClick={handleAddAdmin}
-                            className="bg-[#5C6BC0] hover:bg-[#5C6BC0]/90 text-white rounded-xl px-6 gap-2"
+                            className="bg-primary-dark hover:bg-primary-dark/90 text-white rounded-xl px-6 gap-2"
                         >
                             <Plus className="w-4 h-4" />
-                            Add Admin
+                            เพิ่มผู้ดูแลระบบ
                         </Button>
                     ) : null
                 }
@@ -87,17 +87,17 @@ export default function AdminsPage() {
                 <StatsCard
                     title="ทั้งหมด"
                     value={stats.total}
-                    className="ring-2 ring-gray-500 bg-gray-50"
+                    className="ring ring-gray-500 bg-gray-50"
                 />
                 <StatsCard
                     title="Super Admin"
                     value={stats.superAdmin}
-                    className="ring-2 ring-purple-500 bg-purple-50"
+                    className="ring ring-purple-500 bg-purple-50"
                 />
                 <StatsCard
                     title="Admin"
                     value={stats.admin}
-                    className="ring-2 ring-blue-500 bg-blue-50"
+                    className="ring ring-blue-500 bg-blue-50"
                 />
             </div>
 

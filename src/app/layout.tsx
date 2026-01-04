@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Barlow, Noto_Sans_Thai } from "next/font/google";
 import "./globals.css";
 
@@ -13,20 +13,17 @@ const notoSansThai = Noto_Sans_Thai({
   subsets: ["thai", "latin"],
   variable: "--font-noto-sans-thai",
 });
-
 export const metadata: Metadata = {
-  title: "CHECKINOUT - Admin Dashboard",
-  description: "Employee attendance management system",
+  title: "Check In Out",
+  description: "เชคชื่อ ลงเวลา สถานที่",
 };
 
-export function generateViewport() {
-  return {
-    width: "device-width",
-    initialScale: 1,
-    maximumScale: 1,
-    userScalable: false,
-  };
-}
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
 
 export default function RootLayout({
   children,

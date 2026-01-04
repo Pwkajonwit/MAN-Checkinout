@@ -3,12 +3,14 @@
 import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
-import { Save, Clock, AlertCircle, CheckCircle2, DollarSign, HardDrive, Calendar, Plus, Trash2, MapPin, Crosshair } from "lucide-react";
+import { Save, Clock, AlertCircle, CheckCircle2, DollarSign, HardDrive, Calendar, Plus, Trash2, MapPin, Crosshair, Database, ExternalLink, RefreshCw, Copy, FileJson, Briefcase, ArrowLeftRight, Users } from "lucide-react";
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
 import { WORK_TIME_CONFIG } from "@/lib/workTime";
-import { systemConfigService, type SystemConfig } from "@/lib/firestore";
-import { getStorageUsage, deleteOldPhotos } from "@/lib/storage";
+import { systemConfigService, type SystemConfig, employeeService } from "@/lib/firestore";
+import { getStorageUsage, deleteOldPhotos, type StorageStats, PHOTO_STORAGE_LIMIT } from "@/lib/storage";
+import { checkAllIndexes, type IndexCheckResult } from "@/lib/indexChecker";
+import { CustomAlert } from "@/components/ui/custom-alert";
 
 export default function SettingsPage() {
     const [settings, setSettings] = useState<SystemConfig>({
@@ -27,12 +29,15 @@ export default function SettingsPage() {
         adminLineGroupId: "",
         enableDailyReport: false,
         customHolidays: [],
+        allowNewRegistration: true,
+        workTimeEnabled: true, // Enable work time tracking by default
         locationConfig: {
             enabled: false,
             latitude: 0,
             longitude: 0,
             radius: 100
-        }
+        },
+        swapAdvanceDays: 3
     });
 
     const [newHoliday, setNewHoliday] = useState({
@@ -45,10 +50,69 @@ export default function SettingsPage() {
     const [saved, setSaved] = useState(false);
     const [loading, setLoading] = useState(false);
     const [initialLoading, setInitialLoading] = useState(true);
-    const [storageUsage, setStorageUsage] = useState({ totalBytes: 0, fileCount: 0 });
+    const [storageUsage, setStorageUsage] = useState<StorageStats>({
+        totalBytes: 0,
+        fileCount: 0,
+        limitBytes: PHOTO_STORAGE_LIMIT,
+        usagePercent: 0,
+        isNearLimit: false,
+        canUpload: true
+    });
     const [loadingStorage, setLoadingStorage] = useState(true);
     const [cleanupLoading, setCleanupLoading] = useState(false);
     const [gettingLocation, setGettingLocation] = useState(false);
+    const [updatingAllHolidays, setUpdatingAllHolidays] = useState(false);
+
+    // Index Checker State
+    const [indexResults, setIndexResults] = useState<IndexCheckResult[]>([]);
+    const [checkingIndexes, setCheckingIndexes] = useState(false);
+    const [alertState, setAlertState] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        type: "success" | "error" | "warning" | "info";
+    }>({
+        isOpen: false,
+        title: "",
+        message: "",
+        type: "info"
+    });
+    const [showIndexModal, setShowIndexModal] = useState(false);
+
+    const [departments, setDepartments] = useState<string[]>([]);
+    const [positions, setPositions] = useState<string[]>([]);
+    const [loadingDepartments, setLoadingDepartments] = useState(true);
+
+    // Bulk Department Config State
+    const [selectedDepartmentsBulk, setSelectedDepartmentsBulk] = useState<string[]>([]);
+    const [bulkTimeConfig, setBulkTimeConfig] = useState({
+        checkInHour: 9,
+        checkInMinute: 0,
+        checkOutHour: 18,
+        checkOutMinute: 0
+    });
+
+    useEffect(() => {
+        const loadEmployeeData = async () => {
+            try {
+                const employees = await employeeService.getAll();
+
+                // Departments
+                const uniqueDepts = Array.from(new Set(employees.map(e => e.department).filter(Boolean))) as string[];
+                setDepartments(uniqueDepts.sort());
+
+                // Positions
+                const uniquePositions = Array.from(new Set(employees.map(e => e.position).filter(Boolean))) as string[];
+                setPositions(uniquePositions.sort());
+
+            } catch (error) {
+                console.error("Error loading employee data:", error);
+            } finally {
+                setLoadingDepartments(false);
+            }
+        };
+        loadEmployeeData();
+    }, []);
 
     useEffect(() => {
         const fetchSettings = async () => {
@@ -71,12 +135,15 @@ export default function SettingsPage() {
                         adminLineGroupId: config.adminLineGroupId ?? "",
                         enableDailyReport: config.enableDailyReport ?? false,
                         customHolidays: config.customHolidays ?? [],
+                        allowNewRegistration: config.allowNewRegistration ?? true,
+                        workTimeEnabled: config.workTimeEnabled ?? true,
                         locationConfig: config.locationConfig ?? {
                             enabled: false,
                             latitude: 0,
                             longitude: 0,
                             radius: 100
-                        }
+                        },
+                        swapAdvanceDays: config.swapAdvanceDays ?? 3
                     });
                 }
             } catch (error) {
@@ -139,14 +206,24 @@ export default function SettingsPage() {
         setCleanupLoading(true);
         try {
             const result = await deleteOldPhotos(months);
-            alert(`ลบรูปภาพเรียบร้อยแล้ว ${result.deletedCount} รูป (${(result.freedBytes / (1024 * 1024)).toFixed(2)} MB)`);
+            setAlertState({
+                isOpen: true,
+                title: "สำเร็จ",
+                message: `ลบรูปภาพเรียบร้อยแล้ว ${result.deletedCount} รูป (${(result.freedBytes / (1024 * 1024)).toFixed(2)} MB)`,
+                type: "success"
+            });
 
             // Refresh storage usage
             const usage = await getStorageUsage();
             setStorageUsage(usage);
         } catch (error) {
             console.error("Error cleaning up:", error);
-            alert("เกิดข้อผิดพลาดในการลบรูปภาพ");
+            setAlertState({
+                isOpen: true,
+                title: "ผิดพลาด",
+                message: "เกิดข้อผิดพลาดในการลบรูปภาพ",
+                type: "error"
+            });
         } finally {
             setCleanupLoading(false);
         }
@@ -169,16 +246,28 @@ export default function SettingsPage() {
                 },
                 (error) => {
                     console.error("Error getting location:", error);
-                    alert("ไม่สามารถดึงตำแหน่งปัจจุบันได้ กรุณาตรวจสอบการอนุญาตเข้าถึงตำแหน่ง");
+                    setAlertState({
+                        isOpen: true,
+                        title: "ผิดพลาด",
+                        message: "ไม่สามารถดึงตำแหน่งปัจจุบันได้ กรุณาตรวจสอบการอนุญาตเข้าถึงตำแหน่ง",
+                        type: "error"
+                    });
                     setGettingLocation(false);
                 },
                 { enableHighAccuracy: true }
             );
         } else {
-            alert("เบราว์เซอร์ของคุณไม่รองรับการระบุตำแหน่ง");
+            setAlertState({
+                isOpen: true,
+                title: "ผิดพลาด",
+                message: "เบราว์เซอร์ของคุณไม่รองรับการระบุตำแหน่ง",
+                type: "error"
+            });
             setGettingLocation(false);
         }
     };
+
+
 
     const handleSave = async () => {
         setLoading(true);
@@ -191,7 +280,12 @@ export default function SettingsPage() {
             setTimeout(() => setSaved(false), 3000);
         } catch (error) {
             console.error("Error saving settings:", error);
-            alert("เกิดข้อผิดพลาดในการบันทึกการตั้งค่า");
+            setAlertState({
+                isOpen: true,
+                title: "ผิดพลาด",
+                message: "เกิดข้อผิดพลาดในการบันทึกการตั้งค่า",
+                type: "error"
+            });
         } finally {
             setLoading(false);
         }
@@ -212,12 +306,15 @@ export default function SettingsPage() {
             lateDeductionRate: 0,
             requirePhoto: true,
             customHolidays: [],
+            allowNewRegistration: true,
+            workTimeEnabled: true,
             locationConfig: {
                 enabled: false,
                 latitude: 0,
                 longitude: 0,
                 radius: 100
-            }
+            },
+            swapAdvanceDays: 3
         });
     };
 
@@ -229,7 +326,7 @@ export default function SettingsPage() {
                     subtitle="จัดการการตั้งค่าเวลาทำงานและนโยบายต่างๆ"
                 />
                 <div className="flex justify-center items-center h-64">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                    <div className="w-12 h-12 border-4 border-gray-100 border-t-primary rounded-full animate-spin mx-auto"></div>
                 </div>
             </div>
         );
@@ -328,13 +425,13 @@ export default function SettingsPage() {
                             <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center gap-2 text-sm text-gray-600">
                                     <HardDrive className="w-4 h-4" />
-                                    <span>พื้นที่จัดเก็บรูปภาพ</span>
+                                    <span>พื้นที่จัดเก็บรูปภาพ (Firestore)</span>
                                 </div>
                                 {loadingStorage ? (
                                     <span className="text-xs text-gray-400">กำลังโหลด...</span>
                                 ) : (
                                     <span className="text-sm font-medium text-gray-700">
-                                        {(storageUsage.totalBytes / (1024 * 1024 * 1024)).toFixed(2)} / 5.00 GB
+                                        {(storageUsage.totalBytes / (1024 * 1024)).toFixed(2)} / {(storageUsage.limitBytes / (1024 * 1024)).toFixed(0)} MB
                                     </span>
                                 )}
                             </div>
@@ -342,30 +439,48 @@ export default function SettingsPage() {
                             {/* Progress Bar */}
                             <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
                                 <div
-                                    className={`h-full transition-all duration-500 ${(storageUsage.totalBytes / (5 * 1024 * 1024 * 1024)) > 0.9
+                                    className={`h-full transition-all duration-500 ${storageUsage.usagePercent > 90
                                         ? 'bg-red-500'
-                                        : (storageUsage.totalBytes / (5 * 1024 * 1024 * 1024)) > 0.7
+                                        : storageUsage.usagePercent > 70
                                             ? 'bg-yellow-500'
                                             : 'bg-blue-500'
                                         }`}
                                     style={{
-                                        width: `${Math.min((storageUsage.totalBytes / (5 * 1024 * 1024 * 1024)) * 100, 100)}%`
+                                        width: `${Math.min(storageUsage.usagePercent, 100)}%`
                                     }}
                                 />
                             </div>
 
                             <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
-                                <span>{storageUsage.fileCount.toLocaleString()} ไฟล์</span>
-                                <span>{((storageUsage.totalBytes / (5 * 1024 * 1024 * 1024)) * 100).toFixed(1)}% ที่ใช้</span>
+                                <span>{storageUsage.fileCount.toLocaleString()} รูป</span>
+                                <span>{storageUsage.usagePercent.toFixed(1)}% ที่ใช้</span>
+                            </div>
+
+                            {/* Info about Firestore storage */}
+                            <div className="mt-2 p-2 bg-blue-50 border border-blue-100 rounded-lg">
+                                <p className="text-xs text-blue-700">
+                                    💡 รูปถ่ายถูกเก็บใน Firestore เป็น Base64 (ลิมิต 800MB เพื่อไม่ให้เกิน Free tier 1GB)
+                                </p>
                             </div>
 
                             {/* Warning if near limit */}
-                            {(storageUsage.totalBytes / (5 * 1024 * 1024 * 1024)) > 0.9 && (
+                            {storageUsage.isNearLimit && (
                                 <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
                                     <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
                                     <div className="text-xs text-red-700">
                                         <p className="font-medium">พื้นที่ใกล้เต็ม!</p>
-                                        <p className="mt-1">กรุณาลบรูปภาพเก่าที่ไม่จำเป็นหรือติดต่อผู้ดูแลระบบ</p>
+                                        <p className="mt-1">กรุณาลบรูปภาพเก่าที่ไม่จำเป็น มิฉะนั้นจะไม่สามารถบันทึกรูปใหม่ได้</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Cannot upload warning */}
+                            {!storageUsage.canUpload && (
+                                <div className="mt-3 p-3 bg-red-100 border border-red-300 rounded-lg flex items-start gap-2">
+                                    <AlertCircle className="w-4 h-4 text-red-700 mt-0.5 flex-shrink-0" />
+                                    <div className="text-xs text-red-800">
+                                        <p className="font-bold">⚠️ พื้นที่เต็ม!</p>
+                                        <p className="mt-1">ไม่สามารถบันทึกรูปภาพใหม่ได้ กรุณาลบรูปเก่าก่อน</p>
                                     </div>
                                 </div>
                             )}
@@ -518,96 +633,120 @@ export default function SettingsPage() {
 
                 {/* Work Time Settings */}
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
-                    <div className="flex items-center gap-3 mb-6">
-                        <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
-                            <Clock className="w-5 h-5 text-blue-600" />
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
+                                <Clock className="w-5 h-5 text-blue-600" />
+                            </div>
+                            <div>
+                                <h2 className="text-lg font-bold text-gray-800">เวลาทำงาน</h2>
+                                <p className="text-sm text-gray-500">กำหนดเวลาเข้า-ออกงานมาตรฐาน (คำนวณสาย/โอที)</p>
+                            </div>
                         </div>
-                        <div>
-                            <h2 className="text-lg font-bold text-gray-800">เวลาทำงาน</h2>
-                            <p className="text-sm text-gray-500">กำหนดเวลาเข้า-ออกงานมาตรฐาน</p>
-                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setSettings({ ...settings, workTimeEnabled: !settings.workTimeEnabled })}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.workTimeEnabled ? 'bg-blue-600' : 'bg-gray-200'
+                                }`}
+                        >
+                            <span
+                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.workTimeEnabled ? 'translate-x-6' : 'translate-x-1'
+                                    }`}
+                            />
+                        </button>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* Check In Time */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                เวลาเข้างานมาตรฐาน
-                            </label>
-                            <div className="flex gap-3">
-                                <div className="flex-1">
-                                    <select
-                                        value={settings.checkInHour}
-                                        onChange={(e) => setSettings({ ...settings, checkInHour: parseInt(e.target.value) })}
-                                        className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    >
-                                        {Array.from({ length: 24 }, (_, i) => (
-                                            <option key={i} value={i}>
-                                                {i.toString().padStart(2, '0')} ชั่วโมง
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div className="flex-1">
-                                    <select
-                                        value={settings.checkInMinute}
-                                        onChange={(e) => setSettings({ ...settings, checkInMinute: parseInt(e.target.value) })}
-                                        className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    >
-                                        {[0, 15, 30, 45].map((minute) => (
-                                            <option key={minute} value={minute}>
-                                                {minute.toString().padStart(2, '0')} นาที
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-                            <p className="text-xs text-gray-500 mt-2">
-                                ปัจจุบัน: {settings.checkInHour.toString().padStart(2, '0')}:{settings.checkInMinute.toString().padStart(2, '0')}
+                    {!settings.workTimeEnabled && (
+                        <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
+                            <p className="text-sm text-yellow-800">
+                                ⚠️ <strong>ปิดการใช้งาน:</strong> ระบบจะไม่คำนวณ/แจ้งเตือนการมาสายและโอที
                             </p>
                         </div>
+                    )}
 
-                        {/* Check Out Time */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                เวลาออกงานมาตรฐาน
-                            </label>
-                            <div className="flex gap-3">
-                                <div className="flex-1">
-                                    <select
-                                        value={settings.checkOutHour}
-                                        onChange={(e) => setSettings({ ...settings, checkOutHour: parseInt(e.target.value) })}
-                                        className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    >
-                                        {Array.from({ length: 24 }, (_, i) => (
-                                            <option key={i} value={i}>
-                                                {i.toString().padStart(2, '0')} ชั่วโมง
-                                            </option>
-                                        ))}
-                                    </select>
+                    <div className={`transition-opacity ${settings.workTimeEnabled ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Check In Time */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    เวลาเข้างานมาตรฐาน
+                                </label>
+                                <div className="flex gap-3">
+                                    <div className="flex-1">
+                                        <select
+                                            value={settings.checkInHour}
+                                            onChange={(e) => setSettings({ ...settings, checkInHour: parseInt(e.target.value) })}
+                                            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        >
+                                            {Array.from({ length: 24 }, (_, i) => (
+                                                <option key={i} value={i}>
+                                                    {i.toString().padStart(2, '0')} ชั่วโมง
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="flex-1">
+                                        <select
+                                            value={settings.checkInMinute}
+                                            onChange={(e) => setSettings({ ...settings, checkInMinute: parseInt(e.target.value) })}
+                                            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        >
+                                            {[0, 15, 30, 45].map((minute) => (
+                                                <option key={minute} value={minute}>
+                                                    {minute.toString().padStart(2, '0')} นาที
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
-                                <div className="flex-1">
-                                    <select
-                                        value={settings.checkOutMinute}
-                                        onChange={(e) => setSettings({ ...settings, checkOutMinute: parseInt(e.target.value) })}
-                                        className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    >
-                                        {[0, 15, 30, 45].map((minute) => (
-                                            <option key={minute} value={minute}>
-                                                {minute.toString().padStart(2, '0')} นาที
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
+                                <p className="text-xs text-gray-500 mt-2">
+                                    ปัจจุบัน: {settings.checkInHour.toString().padStart(2, '0')}:{settings.checkInMinute.toString().padStart(2, '0')}
+                                </p>
                             </div>
-                            <p className="text-xs text-gray-500 mt-2">
-                                ปัจจุบัน: {settings.checkOutHour.toString().padStart(2, '0')}:{settings.checkOutMinute.toString().padStart(2, '0')}
-                            </p>
+
+                            {/* Check Out Time */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    เวลาออกงานมาตรฐาน
+                                </label>
+                                <div className="flex gap-3">
+                                    <div className="flex-1">
+                                        <select
+                                            value={settings.checkOutHour}
+                                            onChange={(e) => setSettings({ ...settings, checkOutHour: parseInt(e.target.value) })}
+                                            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        >
+                                            {Array.from({ length: 24 }, (_, i) => (
+                                                <option key={i} value={i}>
+                                                    {i.toString().padStart(2, '0')} ชั่วโมง
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="flex-1">
+                                        <select
+                                            value={settings.checkOutMinute}
+                                            onChange={(e) => setSettings({ ...settings, checkOutMinute: parseInt(e.target.value) })}
+                                            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        >
+                                            {[0, 15, 30, 45].map((minute) => (
+                                                <option key={minute} value={minute}>
+                                                    {minute.toString().padStart(2, '0')} นาที
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+                                <p className="text-xs text-gray-500 mt-2">
+                                    ปัจจุบัน: {settings.checkOutHour.toString().padStart(2, '0')}:{settings.checkOutMinute.toString().padStart(2, '0')}
+                                </p>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Late & OT Settings */}
+
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
                     <div className="flex items-center gap-3 mb-6">
                         <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
@@ -658,6 +797,39 @@ export default function SettingsPage() {
                             />
                             <p className="text-xs text-gray-500 mt-2">
                                 ต้องทำงานเกินเวลาอย่างน้อย {settings.minOTMinutes} นาที จึงจะนับเป็นโอที
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Swap Holiday Policy */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
+                    <div className="flex items-center gap-3 mb-6">
+                        <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">
+                            <ArrowLeftRight className="w-5 h-5 text-purple-600" />
+                        </div>
+                        <div>
+                            <h2 className="text-lg font-bold text-gray-800">นโยบายสลับวันหยุด</h2>
+                            <p className="text-sm text-gray-500">กำหนดเงื่อนไขการขอสลับวันหยุด</p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                ต้องขอสลับล่วงหน้าอย่างน้อย (วัน)
+                            </label>
+                            <input
+                                type="number"
+                                min="0"
+                                max="30"
+                                value={settings.swapAdvanceDays ?? 3}
+                                onChange={(e) => setSettings({ ...settings, swapAdvanceDays: parseInt(e.target.value) || 0 })}
+                                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="3"
+                            />
+                            <p className="text-xs text-gray-500 mt-2">
+                                หากตั้งเป็น 0 คือสามารถขอสลับวันไหนก็ได้ (ไม่แนะนำ)
                             </p>
                         </div>
                     </div>
@@ -718,9 +890,12 @@ export default function SettingsPage() {
 
                         {/* Weekly Holidays */}
                         <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                วันหยุดประจำสัปดาห์
-                            </label>
+                            <div className="flex items-center justify-between mb-2">
+                                <label className="block text-sm font-medium text-gray-700">
+                                    วันหยุดประจำสัปดาห์
+                                </label>
+
+                            </div>
                             <div className="flex flex-wrap gap-3">
                                 {["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"].map((day, index) => (
                                     <label key={index} className="flex items-center gap-2 cursor-pointer bg-gray-50 px-3 py-2 rounded-lg border border-gray-200 hover:bg-gray-100">
@@ -961,6 +1136,216 @@ export default function SettingsPage() {
                     </div>
                 </div>
 
+                {/* Firestore Index Checker */}
+                <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-6">
+                    <div className="flex items-center gap-3 mb-6">
+                        <div className="p-2 bg-indigo-50 rounded-xl">
+                            <Database className="w-6 h-6 text-indigo-600" />
+                        </div>
+                        <div>
+                            <h2 className="text-lg font-bold text-gray-800">Firestore Indexes</h2>
+                            <p className="text-sm text-gray-500">ตรวจสอบและสร้าง Composite Indexes ที่จำเป็น</p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-4">
+                        <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-xl">
+                            <p className="text-sm text-indigo-700">
+                                💡 เมื่อย้ายไปใช้ Firebase Project ใหม่ ต้องสร้าง Composite Indexes ใหม่ทุกครั้ง
+                                กดปุ่มด้านล่างเพื่อตรวจสอบว่ามี Index ใดที่ยังไม่ได้สร้าง
+                            </p>
+                        </div>
+
+                        <Button
+                            onClick={async () => {
+                                setCheckingIndexes(true);
+                                try {
+                                    const results = await checkAllIndexes();
+                                    setIndexResults(results);
+                                    setShowIndexModal(true);
+                                } catch (error) {
+                                    console.error("Error checking indexes:", error);
+                                    setAlertState({
+                                        isOpen: true,
+                                        title: "ผิดพลาด",
+                                        message: "เกิดข้อผิดพลาดในการตรวจสอบ Indexes",
+                                        type: "error"
+                                    });
+                                } finally {
+                                    setCheckingIndexes(false);
+                                }
+                            }}
+                            disabled={checkingIndexes}
+                            className="w-full h-12 bg-indigo-600 hover:bg-indigo-700 text-white gap-2"
+                        >
+                            {checkingIndexes ? (
+                                <RefreshCw className="w-4 h-4 animate-spin" />
+                            ) : (
+                                <Database className="w-4 h-4" />
+                            )}
+                            {checkingIndexes ? "กำลังตรวจสอบ..." : "ตรวจสอบ Firestore Indexes"}
+                        </Button>
+                    </div>
+                </div>
+
+                {/* Index Check Results Modal */}
+                {showIndexModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                        <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden">
+                            <div className="p-6 border-b border-gray-100">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-xl font-bold text-gray-800">ผลการตรวจสอบ Firestore Indexes</h3>
+                                    <button
+                                        onClick={() => setShowIndexModal(false)}
+                                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="p-6 overflow-y-auto max-h-[60vh]">
+                                {indexResults.filter(r => r.status === "missing").length === 0 ? (
+                                    <div className="text-center py-8">
+                                        <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-4" />
+                                        <h4 className="text-lg font-bold text-gray-800">Indexes พร้อมใช้งานแล้ว!</h4>
+                                        <p className="text-gray-500 mt-2">ไม่พบ Index ที่ต้องสร้างเพิ่ม</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-4">
+                                        <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
+                                            <p className="text-sm text-yellow-800 font-medium">
+                                                ⚠️ พบ {indexResults.filter(r => r.status === "missing").length} Indexes ที่ต้องสร้าง
+                                            </p>
+                                            <p className="text-xs text-yellow-700 mt-1">
+                                                กดลิงก์แต่ละรายการเพื่อเปิด Firebase Console และสร้าง Index
+                                            </p>
+                                        </div>
+
+                                        {indexResults.filter(r => r.status === "missing").map((result, index) => (
+                                            <div key={index} className="p-4 bg-red-50 border border-red-200 rounded-xl">
+                                                <div className="flex items-start justify-between gap-4">
+                                                    <div>
+                                                        <p className="font-medium text-gray-800">{result.queryName}</p>
+                                                        <p className="text-sm text-gray-500">Collection: {result.collection}</p>
+                                                    </div>
+                                                    {result.indexUrl ? (
+                                                        <a
+                                                            href={result.indexUrl}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm whitespace-nowrap"
+                                                        >
+                                                            <ExternalLink className="w-4 h-4" />
+                                                            สร้าง Index
+                                                        </a>
+                                                    ) : (
+                                                        <span className="px-3 py-1 bg-gray-200 text-gray-600 rounded-lg text-sm">
+                                                            ไม่พบ URL
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+
+                                        <div className="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-xl">
+                                            <p className="text-sm text-gray-700 font-medium">📋 วิธีใช้งาน:</p>
+                                            <ol className="text-sm text-gray-600 mt-2 space-y-1 list-decimal list-inside">
+                                                <li>กดปุ่ม "สร้าง Index" ของแต่ละรายการ</li>
+                                                <li>จะเปิดหน้า Firebase Console</li>
+                                                <li>กดปุ่ม "Create Index" ใน Firebase Console</li>
+                                                <li>รอ 1-2 นาทีจนสร้างเสร็จ</li>
+                                                <li>ทำซ้ำจนครบทุกรายการ</li>
+                                            </ol>
+                                        </div>
+
+                                        <div className="mt-6 p-4 bg-gray-900 rounded-xl text-gray-200">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <h4 className="text-sm font-bold flex items-center gap-2">
+                                                    <FileJson className="w-4 h-4" />
+                                                    firestore.indexes.json
+                                                </h4>
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={() => {
+                                                        const json = JSON.stringify({
+                                                            indexes: indexResults
+                                                                .filter(r => r.fields)
+                                                                .map(r => ({
+                                                                    collectionGroup: r.collection,
+                                                                    queryScope: "COLLECTION",
+                                                                    fields: r.fields
+                                                                })),
+                                                            fieldOverrides: []
+                                                        }, null, 2);
+                                                        navigator.clipboard.writeText(json);
+                                                        setAlertState({
+                                                            isOpen: true,
+                                                            title: "สำเร็จ",
+                                                            message: "คัดลอก JSON แล้ว!",
+                                                            type: "success"
+                                                        });
+                                                    }}
+                                                    className="text-xs hover:bg-gray-800 text-gray-300 h-8 gap-1"
+                                                >
+                                                    <Copy className="w-3 h-3" />
+                                                    คัดลอก
+                                                </Button>
+                                            </div>
+                                            <p className="text-xs text-gray-400 mb-3">
+                                                สำหรับนักพัฒนา: คัดลอก Config เพื่อนำไปใช้กับ Firebase CLI หรือตรวจสอบโครงสร้าง
+                                            </p>
+                                            <pre className="text-[10px] font-mono bg-black/50 p-2 rounded-lg overflow-x-auto max-h-32">
+                                                {JSON.stringify({
+                                                    indexes: indexResults
+                                                        .filter(r => r.fields)
+                                                        .map(r => ({
+                                                            collectionGroup: r.collection,
+                                                            queryScope: "COLLECTION",
+                                                            fields: r.fields
+                                                        })),
+                                                    fieldOverrides: []
+                                                }, null, 2)}
+                                            </pre>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Show all results */}
+                                <div className="mt-6">
+                                    <h4 className="font-medium text-gray-700 mb-3">รายการทั้งหมด:</h4>
+                                    <div className="space-y-2">
+                                        {indexResults.map((result, index) => (
+                                            <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                                <span className="text-sm text-gray-700">{result.queryName}</span>
+                                                <span className={`px-2 py-1 rounded text-xs font-medium ${result.status === "ok"
+                                                    ? "bg-green-100 text-green-700"
+                                                    : result.status === "missing"
+                                                        ? "bg-red-100 text-red-700"
+                                                        : "bg-gray-100 text-gray-700"
+                                                    }`}>
+                                                    {result.status === "ok" ? "✓ พร้อม" : result.status === "missing" ? "✕ ต้องสร้าง" : "? ไม่ทราบ"}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="p-6 border-t border-gray-100 bg-gray-50">
+                                <Button
+                                    onClick={() => setShowIndexModal(false)}
+                                    className="w-full"
+                                    variant="outline"
+                                >
+                                    ปิด
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Action Buttons */}
                 <div className="flex justify-end gap-4">
                     <Button
@@ -985,6 +1370,14 @@ export default function SettingsPage() {
                     </Button>
                 </div>
             </div>
+
+            <CustomAlert
+                isOpen={alertState.isOpen}
+                onClose={() => setAlertState(prev => ({ ...prev, isOpen: false }))}
+                title={alertState.title}
+                message={alertState.message}
+                type={alertState.type}
+            />
         </div>
     );
 }

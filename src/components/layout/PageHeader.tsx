@@ -23,7 +23,7 @@ export function PageHeader({
                 {subtitle && <p className="text-gray-500 text-sm mt-1">{subtitle}</p>}
             </div>
 
-            <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4">
+            <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 w-full md:w-auto">
                 {onSearch && (
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
