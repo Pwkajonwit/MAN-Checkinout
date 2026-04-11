@@ -248,7 +248,9 @@ export default function LeaveRequestPage() {
             let attachmentBase64: string | undefined = undefined;
             if (attachment) {
                 try {
-                    attachmentBase64 = await compressBase64Image(attachment, 640, 480, 0.6);
+                    // Use higher resolution for documents (1200x1600) with better quality (0.8)
+                    // Documents need to be readable, unlike selfies which can be smaller
+                    attachmentBase64 = await compressBase64Image(attachment, 1200, 1600, 0.8);
                 } catch (e) {
                     console.error("Error compressing attachment:", e);
                     attachmentBase64 = attachment;

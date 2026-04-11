@@ -3,19 +3,14 @@
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StatsCard } from "@/components/dashboard/StatsCard";
-import { LeaveTable } from "@/components/leave/LeaveTable";
-import { LeaveFormModal } from "@/components/leave/LeaveFormModal";
-import { Button } from "@/components/ui/button";
-import { Pencil, Plus, Clock, CheckCircle, XCircle, FileText } from "lucide-react";
-import { leaveService, type LeaveRequest, employeeService, adminService } from "@/lib/firestore";
+import { SwapTable } from "@/components/swap/SwapTable";
+import { swapService, type SwapRequest, employeeService, adminService } from "@/lib/firestore";
 import { sendPushMessage } from "@/app/actions/line";
 import { auth } from "@/lib/firebase";
 import { CustomAlert } from "@/components/ui/custom-alert";
 
-export default function LeavePage() {
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [selectedLeave, setSelectedLeave] = useState<LeaveRequest | null>(null);
-    const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
+export default function SwapPage() {
+    const [requests, setRequests] = useState<SwapRequest[]>([]);
     const [loading, setLoading] = useState(true);
     const [isSuperAdmin, setIsSuperAdmin] = useState(false);
     const [statusFilter, setStatusFilter] = useState<"all" | "รออนุมัติ" | "อนุมัติ" | "ไม่อนุมัติ">("all");
@@ -31,19 +26,19 @@ export default function LeavePage() {
         type: "info"
     });
 
-    const loadLeaves = async () => {
+    const loadRequests = async () => {
         try {
-            const data = await leaveService.getAll();
-            setLeaves(data);
+            const data = await swapService.getAll();
+            setRequests(data);
         } catch (error) {
-            console.error("Error loading leaves:", error);
+            console.error("Error loading swap requests:", error);
         } finally {
             setLoading(false);
         }
     };
 
     useEffect(() => {
-        loadLeaves();
+        loadRequests();
 
         // Check if current user is super_admin
         const checkAdminRole = async () => {
@@ -58,56 +53,47 @@ export default function LeavePage() {
         checkAdminRole();
     }, []);
 
-    const handleAddLeave = () => {
-        setSelectedLeave(null);
-        setIsModalOpen(true);
-    };
-
-    const handleEditLeave = (leave: LeaveRequest) => {
-        setSelectedLeave(leave);
-        setIsModalOpen(true);
-    };
-
-    const handleDeleteLeave = async (id: string) => {
+    const handleDeleteRequest = async (id: string) => {
         try {
-            await leaveService.delete(id);
-            loadLeaves();
+            await swapService.delete(id);
+            loadRequests();
+            setAlertState({
+                isOpen: true,
+                title: "สำเร็จ",
+                message: "ลบคำขอสลับวันหยุดเรียบร้อยแล้ว",
+                type: "success"
+            });
         } catch (error) {
-            console.error("Error deleting leave:", error);
+            console.error("Error deleting swap request:", error);
             setAlertState({
                 isOpen: true,
                 title: "ผิดพลาด",
-                message: "เกิดข้อผิดพลาดในการลบคำขอลา",
+                message: "เกิดข้อผิดพลาดในการลบคำขอ",
                 type: "error"
             });
         }
     };
 
-    const handleSuccess = () => {
-        loadLeaves();
-    };
-
-    const handleStatusUpdate = async (id: string, status: LeaveRequest["status"]) => {
+    const handleStatusUpdate = async (id: string, status: SwapRequest["status"]) => {
         try {
-            await leaveService.updateStatus(id, status);
+            await swapService.updateStatus(id, status);
 
             // Find the request and employee to send notification
-            const request = leaves.find(l => l.id === id);
+            const request = requests.find(r => r.id === id);
             if (request) {
                 const employee = await employeeService.getById(request.employeeId);
                 if (employee && employee.lineUserId) {
                     const isApproved = status === "อนุมัติ";
                     const color = isApproved ? "#1DB446" : "#D32F2F";
-                    const title = isApproved ? "อนุมัติคำขอลา" : "ไม่อนุมัติคำขอลา";
+                    const title = isApproved ? "อนุมัติคำขอสลับวันหยุด" : "ไม่อนุมัติคำขอสลับวันหยุด";
 
-                    const startDate = request.startDate instanceof Date ? request.startDate : new Date(request.startDate);
-                    const endDate = request.endDate instanceof Date ? request.endDate : new Date(request.endDate);
-                    const dateStr = `${startDate.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })} - ${endDate.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+                    const workDate = request.workDate instanceof Date ? request.workDate : new Date(request.workDate);
+                    const holidayDate = request.holidayDate instanceof Date ? request.holidayDate : new Date(request.holidayDate);
 
                     await sendPushMessage(employee.lineUserId, [
                         {
                             type: "flex",
-                            altText: `ผลการพิจารณาการลา: ${status}`,
+                            altText: `ผลการพิจารณาสลับวันหยุด: ${status}`,
                             contents: {
                                 type: "bubble",
                                 header: {
@@ -140,18 +126,19 @@ export default function LeavePage() {
                                                     contents: [
                                                         {
                                                             type: "text",
-                                                            text: "ประเภท",
+                                                            text: "มาทำงาน",
                                                             color: "#aaaaaa",
                                                             size: "sm",
-                                                            flex: 1
+                                                            flex: 2
                                                         },
                                                         {
                                                             type: "text",
-                                                            text: request.leaveType,
+                                                            text: workDate.toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'short' }),
                                                             wrap: true,
-                                                            color: "#666666",
+                                                            color: "#22c55e",
                                                             size: "sm",
-                                                            flex: 5
+                                                            flex: 5,
+                                                            weight: "bold"
                                                         }
                                                     ]
                                                 },
@@ -162,18 +149,19 @@ export default function LeavePage() {
                                                     contents: [
                                                         {
                                                             type: "text",
-                                                            text: "วันที่",
+                                                            text: "หยุดแทน",
                                                             color: "#aaaaaa",
                                                             size: "sm",
-                                                            flex: 1
+                                                            flex: 2
                                                         },
                                                         {
                                                             type: "text",
-                                                            text: dateStr,
+                                                            text: holidayDate.toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'short' }),
                                                             wrap: true,
-                                                            color: "#666666",
+                                                            color: "#ef4444",
                                                             size: "sm",
-                                                            flex: 5
+                                                            flex: 5,
+                                                            weight: "bold"
                                                         }
                                                     ]
                                                 },
@@ -187,7 +175,7 @@ export default function LeavePage() {
                                                             text: "สถานะ",
                                                             color: "#aaaaaa",
                                                             size: "sm",
-                                                            flex: 1
+                                                            flex: 2
                                                         },
                                                         {
                                                             type: "text",
@@ -210,7 +198,13 @@ export default function LeavePage() {
                 }
             }
 
-            loadLeaves();
+            loadRequests();
+            setAlertState({
+                isOpen: true,
+                title: "สำเร็จ",
+                message: `${status === "อนุมัติ" ? "อนุมัติ" : "ปฏิเสธ"}คำขอเรียบร้อยแล้ว`,
+                type: "success"
+            });
         } catch (error) {
             console.error("Error updating status:", error);
             setAlertState({
@@ -224,64 +218,43 @@ export default function LeavePage() {
 
     // Calculate stats
     const stats = {
-        pending: leaves.filter(l => l.status === "รออนุมัติ").length,
-        approved: leaves.filter(l => l.status === "อนุมัติ").length,
-        rejected: leaves.filter(l => l.status === "ไม่อนุมัติ").length,
-        total: leaves.length,
+        pending: requests.filter(r => r.status === "รออนุมัติ").length,
+        approved: requests.filter(r => r.status === "อนุมัติ").length,
+        rejected: requests.filter(r => r.status === "ไม่อนุมัติ").length,
+        total: requests.length,
     };
 
     return (
         <div>
             <PageHeader
-                title="ข้อมูลการลา"
-                subtitle={`${leaves.length} results found`}
-                searchPlaceholder="Employee |"
-                action={
-                    <div className="flex gap-2">
-                        <Button
-                            onClick={handleAddLeave}
-                            className="bg-primary-dark hover:bg-primary-dark/90 text-white rounded-xl px-6 gap-2"
-                        >
-                            <Plus className="w-4 h-4" />
-                            เพิ่มการลางาน
-                        </Button>
-
-                    </div>
-                }
+                title="คำขอสลับวันหยุด"
+                subtitle={`${requests.length} รายการทั้งหมด`}
             />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                 <StatsCard
                     title="รอการอนุมัติ"
                     value={stats.pending}
-                    icon={<Clock className="w-5 h-5 text-orange-600" />}
                     onClick={() => setStatusFilter(statusFilter === "รออนุมัติ" ? "all" : "รออนุมัติ")}
                     isActive={statusFilter === "รออนุมัติ"}
-                    className="border-orange-100 bg-orange-50/50 hover:border-orange-200"
                 />
                 <StatsCard
-                    title="อนุมัติแล้ว"
+                    title="อนุมัติ"
                     value={stats.approved}
-                    icon={<CheckCircle className="w-5 h-5 text-green-600" />}
                     onClick={() => setStatusFilter(statusFilter === "อนุมัติ" ? "all" : "อนุมัติ")}
                     isActive={statusFilter === "อนุมัติ"}
-                    className="border-green-100 bg-green-50/50 hover:border-green-200"
                 />
                 <StatsCard
                     title="ไม่อนุมัติ"
                     value={stats.rejected}
-                    icon={<XCircle className="w-5 h-5 text-red-600" />}
                     onClick={() => setStatusFilter(statusFilter === "ไม่อนุมัติ" ? "all" : "ไม่อนุมัติ")}
                     isActive={statusFilter === "ไม่อนุมัติ"}
-                    className="border-red-100 bg-red-50/50 hover:border-red-200"
                 />
                 <StatsCard
                     title="ทั้งหมด"
                     value={stats.total}
-                    icon={<FileText className="w-5 h-5 text-blue-600" />}
                     onClick={() => setStatusFilter("all")}
                     isActive={statusFilter === "all"}
-                    className="border-blue-100 bg-blue-50/50 hover:border-blue-200"
                 />
             </div>
 
@@ -291,21 +264,13 @@ export default function LeavePage() {
                     <p className="text-gray-600 mt-4">กำลังโหลดข้อมูล...</p>
                 </div>
             ) : (
-                <LeaveTable
-                    leaves={statusFilter === "all" ? leaves : leaves.filter(l => l.status === statusFilter)}
+                <SwapTable
+                    requests={statusFilter === "all" ? requests : requests.filter(r => r.status === statusFilter)}
                     onStatusUpdate={handleStatusUpdate}
-                    onEdit={handleEditLeave}
-                    onDelete={handleDeleteLeave}
+                    onDelete={handleDeleteRequest}
                     isSuperAdmin={isSuperAdmin}
                 />
             )}
-
-            <LeaveFormModal
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                leave={selectedLeave}
-                onSuccess={handleSuccess}
-            />
 
             <CustomAlert
                 isOpen={alertState.isOpen}

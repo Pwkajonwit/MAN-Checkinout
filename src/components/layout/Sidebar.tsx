@@ -56,8 +56,8 @@ const menuGroups: MenuGroup[] = [
         icon: UserCog,
         items: [
             { icon: Users, label: "พนักงาน", href: "/admin/employee" },
+            { icon: Timer, label: "กะเวลา", href: "/admin/shifts" },
             { icon: Shield, label: "ผู้ดูแลระบบ", href: "/admin/admins" },
-            { icon: Timer, label: "กะเวลาทำงาน", href: "/admin/shifts" },
         ]
     },
     {
@@ -66,6 +66,7 @@ const menuGroups: MenuGroup[] = [
         items: [
             { icon: FileText, label: "การลา", href: "/admin/leave" },
             { icon: Clock, label: "ขอทำงานล่วงเวลา", href: "/admin/ot" },
+            { icon: ArrowLeftRight, label: "สลับวันหยุด", href: "/admin/swap" },
         ]
     },
     {
@@ -117,100 +118,91 @@ export function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () =>
             )}
 
             <aside className={cn(
-                "fixed inset-y-0 left-0 z-50 w-64 bg-background flex flex-col border-r border-gray-200 transition-transform duration-300 ease-in-out",
+                "fixed inset-y-0 left-0 z-50 w-64 bg-[#009966] flex flex-col border-r border-[#008558] shadow-xl shadow-gray-200/50 transition-transform duration-300 ease-in-out",
                 isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
             )}>
-                {/* Profile Section */}
-                <div className="p-6 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gray-300 overflow-hidden relative">
-                            <div className="w-full h-full bg-emerald-600 flex items-center justify-center text-white font-bold">
-                                {adminProfile?.name?.charAt(0) || "A"}
-                            </div>
+                {/* Brand/Profile Section */}
+                <div className="h-20 flex items-center px-6 border-b border-white/10 bg-[#008f60]">
+                    <div className="flex items-center gap-3 w-full">
+                        <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-white font-bold text-lg backdrop-blur-sm">
+                            {adminProfile?.name?.charAt(0) || "A"}
                         </div>
-                        <div>
-                            <p className="text-xs text-gray-500">ยินดีต้อนรับ,</p>
-                            <p className="font-bold text-gray-800 truncate max-w-[100px]">{adminProfile?.name || "Admin"}</p>
-                            <p className="text-[10px] text-gray-400 uppercase tracking-wider">{adminProfile?.role || "Guest"}</p>
+                        <div className="flex-1 min-w-0">
+                            <p className="font-bold text-white truncate leading-tight">{adminProfile?.name || "Admin"}</p>
+                            <p className="text-[10px] text-white/70 font-semibold uppercase tracking-wider">{adminProfile?.role || "Administrator"}</p>
                         </div>
+                        <Link
+                            href="/admin/settings"
+                            className="p-1.5 text-white/60 hover:text-white hover:bg-white/20 rounded-lg transition-all"
+                            title="ตั้งค่า"
+                            onClick={onClose}
+                        >
+                            <Settings className="w-5 h-5" />
+                        </Link>
                     </div>
-                    <Link
-                        href="/admin/settings"
-                        className="p-2 bg-primary-dark rounded-lg shadow-sm hover:bg-gray-50 transition-colors"
-                        title="ตั้งค่า"
-                        onClick={onClose}
-                    >
-                        <Settings className="w-4 h-4 text-gray-100" />
-                    </Link>
                 </div>
 
                 {/* Menu Groups */}
-                <nav className="flex-1 px-3 py-2 overflow-y-auto">
+                <nav className="flex-1 px-4 py-6 overflow-y-auto custom-scrollbar space-y-6">
                     {menuGroups.map((group) => {
                         const isOpen = openGroups.includes(group.title);
                         const groupActive = isGroupActive(group);
 
                         return (
-                            <div key={group.title} className="mb-2">
+                            <div key={group.title}>
                                 {/* Group Header */}
-                                <button
-                                    onClick={() => toggleGroup(group.title)}
-                                    className={cn(
-                                        "w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                                        groupActive
-                                            ? "text-emerald-800 bg-white/30"
-                                            : "text-emerald-900/70 hover:bg-white/20"
-                                    )}
-                                >
-                                    <div className="flex items-center gap-2">
-                                        <group.icon className="w-4 h-4" />
-                                        <span>{group.title}</span>
-                                    </div>
-                                    <ChevronDown className={cn(
-                                        "w-4 h-4 transition-transform",
-                                        isOpen ? "rotate-180" : ""
-                                    )} />
-                                </button>
+                                <div className="px-2 mb-2">
+                                    <h3 className="text-xs font-bold text-white/40 uppercase tracking-wider flex items-center gap-2">
+                                        {group.title}
+                                    </h3>
+                                </div>
 
-                                {/* Group Items */}
-                                {isOpen && (
-                                    <div className="mt-1 ml-3 space-y-0.5">
-                                        {group.items.map((item) => {
-                                            const isActive = pathname === item.href;
-                                            return (
-                                                <Link
-                                                    key={item.href}
-                                                    href={item.href}
-                                                    onClick={onClose}
-                                                    className={cn(
-                                                        "flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors",
-                                                        isActive
-                                                            ? "bg-white text-emerald-900 shadow-sm font-medium"
-                                                            : "text-emerald-900/60 hover:bg-white/50 hover:text-emerald-900"
-                                                    )}
-                                                >
-                                                    <item.icon className={cn("w-4 h-4", isActive ? "text-emerald-600" : "")} />
-                                                    {item.label}
-                                                </Link>
-                                            );
-                                        })}
-                                    </div>
-                                )}
+                                <div className="space-y-1">
+                                    {group.items.map((item) => {
+                                        const isActive = pathname === item.href;
+                                        return (
+                                            <Link
+                                                key={item.href}
+                                                href={item.href}
+                                                onClick={onClose}
+                                                className={cn(
+                                                    "relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 group overflow-hidden",
+                                                    isActive
+                                                        ? "bg-white text-[#009966] shadow-lg shadow-black/10 font-bold"
+                                                        : "text-white/80 hover:bg-white/10 hover:text-white"
+                                                )}
+                                            >
+                                                {/* Active Indicator Highlight */}
+                                                {isActive && (
+                                                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-[#009966] rounded-r-lg opacity-0" /> // Hidden for card style
+                                                )}
+
+                                                <item.icon className={cn(
+                                                    "w-4 h-4 transition-transform group-hover:scale-110",
+                                                    isActive ? "text-[#009966]" : "text-white/70 group-hover:text-white"
+                                                )} />
+                                                <span className="relative z-10">{item.label}</span>
+                                            </Link>
+                                        );
+                                    })}
+                                </div>
                             </div>
                         );
                     })}
                 </nav>
 
                 {/* Bottom Actions */}
-                <div className="p-4 bg-gray-200 border-t border-gray-200/50">
-
+                <div className="p-4 border-t border-white/10 bg-[#008a5e]">
                     <button
                         onClick={handleLogout}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
+                        className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 text-sm font-medium text-white/90 bg-white/10 border border-white/5 hover:bg-white hover:text-[#009966] rounded-lg shadow-sm transition-all duration-200 group"
                     >
-                        <LogOut className="w-5 h-5 text-gray-400" />
-                        ออกจากระบบ
+                        <LogOut className="w-4 h-4 text-white/70 group-hover:text-[#009966] transition-colors" />
+                        <span>ออกจากระบบ</span>
                     </button>
+                    <div className="mt-3 text-center">
+                        <p className="text-[10px] text-white/30 font-mono">v.5.0.0 Business Edition</p>
+                    </div>
                 </div>
             </aside>
         </>

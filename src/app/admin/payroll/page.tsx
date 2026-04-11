@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { employeeService, attendanceService, otService, systemConfigService, type Employee, type Attendance, type OTRequest, type SystemConfig } from "@/lib/firestore";
+import { employeeService, attendanceService, otService, swapService, systemConfigService, type Employee, type Attendance, type OTRequest, type SwapRequest, type SystemConfig } from "@/lib/firestore";
 import { Search, Calendar, DollarSign, Download, Filter } from "lucide-react";
 import { format, startOfWeek, endOfWeek } from "date-fns";
 import { th } from "date-fns/locale";
@@ -351,13 +351,57 @@ export default function PayrollPage() {
                 targetEmployees = targetEmployees.filter(e => e.department === selectedDepartment);
             }
 
-            // 3. Fetch Data & Calculate
+            // 3. Fetch ALL Data ONCE (fix N+1 query problem)
+            // Instead of querying per employee, fetch all attendance, OT, and swap requests in the date range
+            const [allAttendance, allOTRequests, allSwapRequests] = await Promise.all([
+                attendanceService.getByDateRange(startDate, endDate),
+                otService.getByDateRange(startDate, endDate),
+                swapService.getAll() // Get all swap requests and filter later
+            ]);
+
+            // Filter only approved swap requests that affect the date range
+            const approvedSwaps = allSwapRequests.filter(s => {
+                if (s.status !== "อนุมัติ") return false;
+                const workDate = s.workDate instanceof Date ? s.workDate : new Date(s.workDate);
+                const holidayDate = s.holidayDate instanceof Date ? s.holidayDate : new Date(s.holidayDate);
+                return (workDate >= startDate && workDate <= endDate) ||
+                    (holidayDate >= startDate && holidayDate <= endDate);
+            });
+
+            // Group attendance and OT by employee ID for efficient lookup
+            const attendanceByEmployee = new Map<string, Attendance[]>();
+            allAttendance.forEach(a => {
+                if (!attendanceByEmployee.has(a.employeeId)) {
+                    attendanceByEmployee.set(a.employeeId, []);
+                }
+                attendanceByEmployee.get(a.employeeId)?.push(a);
+            });
+
+            const otByEmployee = new Map<string, OTRequest[]>();
+            allOTRequests.forEach(ot => {
+                if (!otByEmployee.has(ot.employeeId)) {
+                    otByEmployee.set(ot.employeeId, []);
+                }
+                otByEmployee.get(ot.employeeId)?.push(ot);
+            });
+
+            // Group swap requests by employee ID
+            const swapsByEmployee = new Map<string, SwapRequest[]>();
+            approvedSwaps.forEach(swap => {
+                if (!swapsByEmployee.has(swap.employeeId)) {
+                    swapsByEmployee.set(swap.employeeId, []);
+                }
+                swapsByEmployee.get(swap.employeeId)?.push(swap);
+            });
+
+            // 4. Calculate for each employee (no more individual queries!)
             const results: PayrollItem[] = [];
 
             // Use config values or defaults
             const otMultiplier = config?.otMultiplier ?? 1.5;
             const otMultiplierHoliday = config?.otMultiplierHoliday ?? 3.0;
-            const weeklyHolidays = config?.weeklyHolidays ?? [0, 6];
+            const globalHolidays = config?.weeklyHolidays ?? [0, 6];
+            const useIndividualHolidays = config?.useIndividualHolidays ?? false;
             const lateDeductionType = config?.lateDeductionType ?? "pro-rated";
             const lateDeductionRate = config?.lateDeductionRate ?? 0;
 
@@ -370,19 +414,12 @@ export default function PayrollPage() {
                     gracePeriod: config?.lateGracePeriod ?? 0
                 };
 
-                // Fetch Attendance & OT
-                const [attendance, otRequests] = await Promise.all([
-                    attendanceService.getHistory(emp.id, startDate, endDate),
-                    otService.getByEmployeeId(emp.id)
-                ]);
+                // Get attendance and OT from pre-fetched data (no database query!)
+                const attendance = attendanceByEmployee.get(emp.id) || [];
+                const otRequests = otByEmployee.get(emp.id) || [];
 
-                // Filter OT by date and status
-                const approvedOT = otRequests.filter(ot =>
-                    ot.status === "อนุมัติ" &&
-                    ot.date &&
-                    ot.date >= startDate &&
-                    ot.date <= endDate
-                );
+                // Filter OT by status
+                const approvedOT = otRequests.filter(ot => ot.status === "อนุมัติ");
 
                 // Group Attendance by Date
                 const dailyAttendance = new Map<string, Attendance[]>();
@@ -491,6 +528,22 @@ export default function PayrollPage() {
                 let otPayHoliday = 0;
                 let otPaySpecial = 0;
 
+                // Get this employee's swap requests for date checking
+                const employeeSwaps = swapsByEmployee.get(emp.id) || [];
+
+                // Create sets for quick lookup of swapped dates
+                // workDatesFromHoliday: วันหยุดที่ขอมาทำงาน (ถือเป็นวันทำงานปกติ)
+                // holidayDatesFromWork: วันทำงานที่ขอหยุดแทน (ถือเป็นวันหยุด)
+                const workDatesFromHoliday = new Set<string>();
+                const holidayDatesFromWork = new Set<string>();
+
+                employeeSwaps.forEach(swap => {
+                    const workDate = swap.workDate instanceof Date ? swap.workDate : new Date(swap.workDate);
+                    const holidayDate = swap.holidayDate instanceof Date ? swap.holidayDate : new Date(swap.holidayDate);
+                    workDatesFromHoliday.add(format(workDate, "yyyy-MM-dd"));
+                    holidayDatesFromWork.add(format(holidayDate, "yyyy-MM-dd"));
+                });
+
                 approvedOT.forEach(ot => {
                     if (ot.startTime && ot.endTime && ot.date) {
                         const start = ot.startTime.getTime();
@@ -509,13 +562,34 @@ export default function PayrollPage() {
                         });
 
                         if (customHoliday) {
+                            // Custom holiday (ตามที่กำหนดใน settings)
                             otHoursSpecial += hours;
                             otPaySpecial += hours * hourlyRate * customHoliday.otMultiplier;
                         } else {
                             const dayOfWeek = ot.date.getDay();
-                            const isHoliday = weeklyHolidays.includes(dayOfWeek);
+                            // Use individual or global holidays based on setting
+                            const applicableHolidays = useIndividualHolidays
+                                ? (emp.weeklyHolidays || globalHolidays)
+                                : globalHolidays;
+                            const isWeeklyHoliday = applicableHolidays.includes(dayOfWeek);
 
-                            if (isHoliday) {
+                            // Check swap status:
+                            // - ถ้าเป็นวันที่อยู่ใน workDatesFromHoliday = วันหยุดที่สลับมาทำงาน → ถือเป็นวันทำงาน (OT ปกติ)
+                            // - ถ้าเป็นวันที่อยู่ใน holidayDatesFromWork = วันทำงานที่สลับไปหยุด → ถือเป็นวันหยุด (OT x3)
+                            const isSwappedToWorkday = workDatesFromHoliday.has(otDateStr);
+                            const isSwappedToHoliday = holidayDatesFromWork.has(otDateStr);
+
+                            // Determine effective holiday status
+                            let effectiveHoliday = isWeeklyHoliday;
+                            if (isSwappedToWorkday) {
+                                // วันหยุดที่สลับมาทำงาน → ไม่ถือเป็นวันหยุด
+                                effectiveHoliday = false;
+                            } else if (isSwappedToHoliday) {
+                                // วันทำงานที่สลับไปหยุด → ถือเป็นวันหยุด
+                                effectiveHoliday = true;
+                            }
+
+                            if (effectiveHoliday) {
                                 otHoursHoliday += hours;
                                 otPayHoliday += hours * hourlyRate * otMultiplierHoliday;
                             } else {
@@ -583,254 +657,298 @@ export default function PayrollPage() {
     };
 
     return (
-        <div>
-            <PageHeader
-                title="คำนวณเงินเดือน"
-                subtitle="จัดการและคำนวณเงินเดือนพนักงาน"
-            />
-
-            {/* Controls */}
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-wrap gap-6 items-end">
-                <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">ประเภทพนักงาน</label>
-                    <div className="flex gap-2">
-                        {(["ประจำ - รายเดือน", "ประจำ - รายวัน", "ชั่วคราว"] as const).map((type) => (
-                            <button
-                                key={type}
-                                onClick={() => setEmployeeType(type)}
-                                className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${employeeType === type
-                                    ? "bg-[#000000] text-white shadow-lg shadow-[#000000]/20"
-                                    : "bg-gray-50 text-gray-600 hover:bg-gray-100"
-                                    }`}
-                            >
-                                {type}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
-                <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">แผนก/สังกัด</label>
-                    <select
-                        value={selectedDepartment}
-                        onChange={(e) => setSelectedDepartment(e.target.value)}
-                        className="px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#EBDACA] bg-white min-w-[150px]"
-                    >
-                        <option value="all">ทั้งหมด</option>
-                        {departments.map((dept) => (
-                            <option key={dept} value={dept}>
-                                {dept}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-
-                <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">รูปแบบการคำนวณ</label>
-                    <div className="flex gap-2">
-                        <button
-                            onClick={() => setCalculationPeriod("month")}
-                            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${calculationPeriod === "month"
-                                ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20"
-                                : "bg-gray-50 text-gray-600 hover:bg-gray-100"
-                                }`}
-                        >
-                            รายเดือน
-                        </button>
-                        <button
-                            onClick={() => setCalculationPeriod("custom")}
-                            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${calculationPeriod === "custom"
-                                ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20"
-                                : "bg-gray-50 text-gray-600 hover:bg-gray-100"
-                                }`}
-                        >
-                            กำหนดช่วงเวลา
-                        </button>
-                    </div>
-                </div>
-
-                <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">
-                        {calculationPeriod === "month" ? "ประจำเดือน" : "เลือกช่วงวันที่"}
-                    </label>
-
-                    {calculationPeriod === "month" ? (
-                        <div className="relative">
-                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                            <input
-                                type="month"
-                                value={format(selectedDate, "yyyy-MM")}
-                                onChange={(e) => setSelectedDate(new Date(e.target.value))}
-                                className="pl-10 pr-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#EBDACA]"
-                            />
-                        </div>
-                    ) : (
-                        <div className="flex items-center gap-2">
-                            <div className="relative">
-                                <input
-                                    type="date"
-                                    value={format(customRange.start, "yyyy-MM-dd")}
-                                    onChange={(e) => setCustomRange({ ...customRange, start: new Date(e.target.value) })}
-                                    className="px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#EBDACA]"
-                                />
-                            </div>
-                            <span className="text-gray-400">-</span>
-                            <div className="relative">
-                                <input
-                                    type="date"
-                                    value={format(customRange.end, "yyyy-MM-dd")}
-                                    onChange={(e) => setCustomRange({ ...customRange, end: new Date(e.target.value) })}
-                                    className="px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#EBDACA]"
-                                />
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                <button
-                    onClick={calculatePayroll}
-                    disabled={loading}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2"
-                >
-                    <DollarSign className="w-4 h-4" />
-                    {loading ? "กำลังคำนวณ..." : "คำนวณเงินเดือน"}
-                </button>
-
-                {payrollData.length > 0 && (
-                    <button
-                        onClick={handlePrint}
-                        disabled={selectedIds.length === 0}
-                        className="px-6 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        <Download className="w-4 h-4" />
-                        พิมพ์/บันทึก สลิป ({selectedIds.length})
-                    </button>
-                )}
+        <div className="space-y-6">
+            <div className="bg-white border-b border-gray-200 px-6 py-4">
+                <PageHeader
+                    title="ระบบคำนวณเงินเดือน (Payroll)"
+                    subtitle="จัดการและคำนวณเงินเดือนพนักงาน ค่าล่วงเวลา และรายการหักต่างๆ"
+                />
             </div>
 
-            {/* Config Summary */}
-            {config && (
-                <div className="bg-blue-50 mt-1 rounded-xl p-4 text-sm text-blue-800 flex flex-wrap gap-y-2 gap-x-6">
-                    <div>
-                        <span className="font-medium">เวลาทำงาน:</span> {config.checkInHour.toString().padStart(2, '0')}:{config.checkInMinute.toString().padStart(2, '0')} - {config.checkOutHour.toString().padStart(2, '0')}:{config.checkOutMinute.toString().padStart(2, '0')}
-                    </div>
-                    <div>
-                        <span className="font-medium">สายได้:</span> {config.lateGracePeriod} นาที
-                    </div>
-                    <div>
-                        <span className="font-medium">OT ขั้นต่ำ:</span> {config.minOTMinutes} นาที
-                    </div>
-                    <div>
-                        <span className="font-medium">OT ปกติ:</span> {config.otMultiplier ?? 1.5} เท่า
-                    </div>
-                    <div>
-                        <span className="font-medium">OT วันหยุด:</span> {config.otMultiplierHoliday ?? 3.0} เท่า
-                    </div>
-                    <div>
-                        <span className="font-medium">วันหยุด:</span> {(config.weeklyHolidays || []).map(d => ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"][d]).join(", ")}
-                    </div>
-                    <div>
-                        <span className="font-medium">การหักสาย:</span> {
-                            config.lateDeductionType === "none" ? "ไม่หัก" :
-                                config.lateDeductionType === "fixed_per_minute" ? `นาทีละ ${config.lateDeductionRate} บาท` :
-                                    "หักตามจริง (Pro-rated)"
-                        }
+            <div className="px-6 pb-8 space-y-6">
+                {/* Controls */}
+                <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+                    <div className="flex flex-col xl:flex-row gap-6 justify-between items-start xl:items-end">
+                        {/* Filters Grid */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 w-full xl:max-w-[85%]">
+                            {/* Employee Type */}
+                            <div className="space-y-2">
+                                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">ประเภทพนักงาน</label>
+                                <div className="flex bg-gray-50 p-1 rounded-lg border border-gray-100">
+                                    {(["ประจำ - รายเดือน", "ประจำ - รายวัน", "ชั่วคราว"] as const).map((type) => (
+                                        <button
+                                            key={type}
+                                            onClick={() => setEmployeeType(type)}
+                                            className={`flex-1 px-2 py-1.5 rounded-md text-[11px] font-medium transition-all text-center whitespace-nowrap ${employeeType === type
+                                                ? "bg-white text-blue-700 shadow-sm ring-1 ring-black/5"
+                                                : "text-gray-500 hover:text-gray-700"
+                                                }`}
+                                        >
+                                            {type}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Department */}
+                            <div className="space-y-2">
+                                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">แผนก/สังกัด</label>
+                                <select
+                                    value={selectedDepartment}
+                                    onChange={(e) => setSelectedDepartment(e.target.value)}
+                                    className="h-10 w-full px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white hover:border-blue-400 transition-colors"
+                                >
+                                    <option value="all">ทั้งหมด</option>
+                                    {departments.map((dept) => (
+                                        <option key={dept} value={dept}>
+                                            {dept}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Calculation Period */}
+                            <div className="space-y-2">
+                                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">รูปแบบการคำนวณ</label>
+                                <div className="flex gap-2 h-10">
+                                    <button
+                                        onClick={() => setCalculationPeriod("month")}
+                                        className={`flex-1 px-3 rounded-lg text-sm transition-all border font-medium ${calculationPeriod === "month"
+                                            ? "bg-blue-50 border-blue-200 text-blue-700"
+                                            : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                                            }`}
+                                    >
+                                        รายเดือน
+                                    </button>
+                                    <button
+                                        onClick={() => setCalculationPeriod("custom")}
+                                        className={`flex-1 px-3 rounded-lg text-sm transition-all border font-medium ${calculationPeriod === "custom"
+                                            ? "bg-blue-50 border-blue-200 text-blue-700"
+                                            : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                                            }`}
+                                    >
+                                        กำหนดเอง
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Date Picker */}
+                            <div className="space-y-2">
+                                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                    {calculationPeriod === "month" ? "ประจำเดือน" : "ช่วงวันที่"}
+                                </label>
+
+                                {calculationPeriod === "month" ? (
+                                    <div className="relative h-10">
+                                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500" />
+                                        <input
+                                            type="month"
+                                            value={format(selectedDate, "yyyy-MM")}
+                                            onChange={(e) => setSelectedDate(new Date(e.target.value))}
+                                            className="h-full w-full pl-10 pr-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-blue-400 transition-colors"
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center gap-2 h-10">
+                                        <input
+                                            type="date"
+                                            value={format(customRange.start, "yyyy-MM-dd")}
+                                            onChange={(e) => setCustomRange({ ...customRange, start: new Date(e.target.value) })}
+                                            className="h-full flex-1 min-w-0 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-blue-400 transition-colors"
+                                        />
+                                        <span className="text-gray-400">-</span>
+                                        <input
+                                            type="date"
+                                            value={format(customRange.end, "yyyy-MM-dd")}
+                                            onChange={(e) => setCustomRange({ ...customRange, end: new Date(e.target.value) })}
+                                            className="h-full flex-1 min-w-0 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-blue-400 transition-colors"
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex flex-row xl:flex-col items-end justify-end gap-3 w-full xl:w-auto mt-4 xl:mt-0 pt-4 xl:pt-0 border-t xl:border-t-0 border-gray-100">
+                            <button
+                                onClick={calculatePayroll}
+                                disabled={loading}
+                                className="h-10 px-6 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm font-medium w-full xl:w-auto min-w-[140px]"
+                            >
+                                <DollarSign className="w-4 h-4" />
+                                {loading ? "กำลังคำนวณ..." : "คำนวณเงินเดือน"}
+                            </button>
+
+                            {payrollData.length > 0 && (
+                                <button
+                                    onClick={handlePrint}
+                                    disabled={selectedIds.length === 0}
+                                    className="h-10 px-6 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm rounded-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-sm w-full xl:w-auto min-w-[140px]"
+                                >
+                                    <Download className="w-4 h-4" />
+                                    พิมพ์สลิป ({selectedIds.length})
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
-            )}
 
-            {/* Results */}
-            {payrollData.length > 0 && (
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                    <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-                        <h3 className="font-semibold text-gray-800">ผลการคำนวณ</h3>
-                        <div className="text-sm text-gray-500">
-                            รวมจ่ายสุทธิ: <span className="text-green-600 font-bold text-lg ml-2">
-                                ฿{payrollData.reduce((sum, item) => sum + item.netTotal, 0).toLocaleString()}
+                {/* Config Summary */}
+                {config && (
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-wrap gap-x-8 gap-y-3 items-center text-xs text-slate-700">
+                        <div className="flex items-center gap-2 font-medium text-slate-900 border-r border-slate-200 pr-6 mr-2">
+                            <div className="p-1.5 bg-blue-100/50 rounded-md text-blue-600">
+                                <Filter className="w-3.5 h-3.5" />
+                            </div>
+                            ค่าที่ใช้คำนวณ
+                        </div>
+
+                        <div className="flex items-center gap-2 group cursor-help" title="เวลาเช็คอิน-เช็คเอาท์ปกติ">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400 group-hover:bg-blue-500 transition-colors"></span>
+                            <span className="text-slate-500">เวลาทำงาน:</span>
+                            <span className="font-semibold font-mono">{config.checkInHour.toString().padStart(2, '0')}:{config.checkInMinute.toString().padStart(2, '0')} - {config.checkOutHour.toString().padStart(2, '0')}:{config.checkOutMinute.toString().padStart(2, '0')}</span>
+                        </div>
+                        <div className="flex items-center gap-2 group cursor-help" title="ระยะเวลาอนุโลมให้สายได้โดยไม่หักเงิน">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400 group-hover:bg-blue-500 transition-colors"></span>
+                            <span className="text-slate-500">สายได้:</span>
+                            <span className="font-semibold">{config.lateGracePeriod} นาที</span>
+                        </div>
+                        <div className="flex items-center gap-2 group cursor-help">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400 group-hover:bg-blue-500 transition-colors"></span>
+                            <span className="text-slate-500">OT ขั้นต่ำ:</span>
+                            <span className="font-semibold">{config.minOTMinutes} นาที</span>
+                        </div>
+                        <div className="flex items-center gap-2 group cursor-help">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400 group-hover:bg-blue-500 transition-colors"></span>
+                            <span className="text-slate-500">OT ปกติ:</span>
+                            <span className="font-semibold">x{config.otMultiplier ?? 1.5}</span>
+                        </div>
+                        <div className="flex items-center gap-2 group cursor-help">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400 group-hover:bg-blue-500 transition-colors"></span>
+                            <span className="text-slate-500">OT วันหยุด:</span>
+                            <span className="font-semibold">x{config.otMultiplierHoliday ?? 3.0}</span>
+                        </div>
+                        <div className="flex items-center gap-2 group cursor-help">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400 group-hover:bg-blue-500 transition-colors"></span>
+                            <span className="text-slate-500">หักสาย:</span>
+                            <span className="font-semibold">
+                                {config.lateDeductionType === "none" ? "ไม่หัก" :
+                                    config.lateDeductionType === "fixed_per_minute" ? `นาทีละ ${config.lateDeductionRate} บาท` :
+                                        "ตามจริง"}
                             </span>
                         </div>
                     </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead className="bg-gray-50/50">
-                                <tr>
-                                    <th className="px-6 py-4 text-left">
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedIds.length === payrollData.length && payrollData.length > 0}
-                                            onChange={handleSelectAll}
-                                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                        />
-                                    </th>
-                                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">พนักงาน</th>
-                                    <th className="px-6 py-4 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">วันทำงาน</th>
-                                    <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">ฐานเงินเดือน/ค่าจ้าง</th>
-                                    <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">OT ปกติ (ชม.)</th>
-                                    <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">OT วันหยุด (ชม.)</th>
-                                    <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">OT พิเศษ (ชม.)</th>
-                                    <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">วันหยุดพิเศษ (ชม.)</th>
-                                    <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">สาย (นาที)</th>
-                                    <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">รายรับรวม</th>
-                                    <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">หัก</th>
-                                    <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">สุทธิ</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {payrollData.map((item) => (
-                                    <tr key={item.employeeId} className="hover:bg-gray-50/50 transition-colors">
-                                        <td className="px-6 py-4">
+                )}
+
+                {/* Results */}
+                {payrollData.length > 0 && (
+                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50/50">
+                            <div className="flex items-center gap-2">
+                                <DollarSign className="w-5 h-5 text-emerald-600" />
+                                <h3 className="font-semibold text-gray-900">สรุปรายการจ่ายเงินเดือน</h3>
+                            </div>
+                            <div className="text-sm">
+                                <span className="text-gray-500 mr-2">รวมจ่ายสุทธิทั้งหมด:</span>
+                                <span className="text-emerald-600 font-bold text-lg">
+                                    ฿{payrollData.reduce((sum, item) => sum + item.netTotal, 0).toLocaleString()}
+                                </span>
+                            </div>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm text-left">
+                                <thead className="bg-gray-100 text-xs uppercase text-gray-500 font-semibold">
+                                    <tr>
+                                        <th className="px-6 py-3 w-10">
                                             <input
                                                 type="checkbox"
-                                                checked={selectedIds.includes(item.employeeId)}
-                                                onChange={() => handleSelectOne(item.employeeId)}
-                                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                checked={selectedIds.length === payrollData.length && payrollData.length > 0}
+                                                onChange={handleSelectAll}
+                                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                                             />
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="font-medium text-gray-900">{item.name}</div>
-                                            <div className="text-xs text-gray-500">{item.employeeId}</div>
-                                            <div className={`text-[10px] px-2 py-0.5 rounded-full inline-block mt-1 ${item.type === 'รายเดือน'
-                                                ? 'bg-blue-50 text-blue-600 border border-blue-100'
-                                                : 'bg-orange-50 text-orange-600 border border-orange-100'
-                                                }`}>
-                                                {item.type}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-center text-gray-600">{item.workDays}</td>
-                                        <td className="px-6 py-4 text-right text-gray-600">
-                                            {item.baseSalary.toLocaleString()}
-                                        </td>
-                                        <td className="px-6 py-4 text-right text-gray-600">
-                                            {item.otHoursNormal.toFixed(0)}
-                                        </td>
-                                        <td className="px-6 py-4 text-right text-gray-600">
-                                            {item.otHoursHoliday.toFixed(0)}
-                                        </td>
-                                        <td className="px-6 py-4 text-right text-gray-600">
-                                            {item.otHoursSpecial.toFixed(0)}
-                                        </td>
-                                        <td className="px-6 py-4 text-right text-gray-600">
-                                            {item.customHolidayWorkHours.toFixed(0)}
-                                        </td>
-                                        <td className="px-6 py-4 text-right text-red-500">
-                                            {item.lateMinutes}
-                                        </td>
-                                        <td className="px-6 py-4 text-right text-green-600 font-medium">
-                                            {item.totalIncome.toLocaleString()}
-                                        </td>
-                                        <td className="px-6 py-4 text-right text-red-600 font-medium">
-                                            {item.totalDeduction.toLocaleString()}
-                                        </td>
-                                        <td className="px-6 py-4 text-right font-bold text-gray-900">
-                                            {item.netTotal.toLocaleString()}
-                                        </td>
+                                        </th>
+                                        <th className="px-6 py-3 min-w-[200px]">พนักงาน</th>
+                                        <th className="px-6 py-3 text-center">วันทำงาน</th>
+                                        <th className="px-6 py-3 text-right">ฐานเงินเดือน</th>
+                                        <th className="px-6 py-3 text-right">OT ปกติ</th>
+                                        <th className="px-6 py-3 text-right">OT วันหยุด</th>
+                                        <th className="px-6 py-3 text-right">OT พิเศษ</th>
+                                        <th className="px-6 py-3 text-right">วันหยุดพิเศษ</th>
+                                        <th className="px-6 py-3 text-right text-red-600">สาย (นาที)</th>
+                                        <th className="px-6 py-3 text-right text-emerald-600">รายรับรวม</th>
+                                        <th className="px-6 py-3 text-right text-red-600">หัก</th>
+                                        <th className="px-6 py-3 text-right font-bold text-gray-900">สุทธิ</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {payrollData.map((item) => (
+                                        <tr key={item.employeeId} className="hover:bg-blue-50/30 transition-colors group">
+                                            <td className="px-6 py-4">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedIds.includes(item.employeeId)}
+                                                    onChange={() => handleSelectOne(item.employeeId)}
+                                                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                                />
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="font-semibold text-gray-900 group-hover:text-blue-700 transition-colors">{item.name}</div>
+                                                <div className="text-xs text-gray-400 font-mono">{item.employeeId}</div>
+                                                <div className="mt-1 flex gap-1">
+                                                    <span className={`text-[10px] px-2 py-0.5 rounded-full ${item.type === 'รายเดือน'
+                                                        ? 'bg-blue-50 text-blue-600 border border-blue-100'
+                                                        : 'bg-orange-50 text-orange-600 border border-orange-100'
+                                                        }`}>
+                                                        {item.type}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-center text-gray-600">{item.workDays}</td>
+                                            <td className="px-6 py-4 text-right text-gray-600 font-mono">
+                                                {item.baseSalary.toLocaleString()}
+                                            </td>
+                                            <td className="px-6 py-4 text-right text-gray-600 font-mono">
+                                                {item.otHoursNormal > 0 ? (
+                                                    <span className="text-gray-900">{item.otHoursNormal.toFixed(1)} <span className="text-gray-400 text-xs">ชม.</span></span>
+                                                ) : "-"}
+                                            </td>
+                                            <td className="px-6 py-4 text-right text-gray-600 font-mono">
+                                                {item.otHoursHoliday > 0 ? (
+                                                    <span className="text-gray-900">{item.otHoursHoliday.toFixed(1)} <span className="text-gray-400 text-xs">ชม.</span></span>
+                                                ) : "-"}
+                                            </td>
+                                            <td className="px-6 py-4 text-right text-gray-600 font-mono">
+                                                {item.otHoursSpecial > 0 ? (
+                                                    <span className="text-gray-900">{item.otHoursSpecial.toFixed(1)} <span className="text-gray-400 text-xs">ชม.</span></span>
+                                                ) : "-"}
+                                            </td>
+                                            <td className="px-6 py-4 text-right text-gray-600 font-mono">
+                                                {item.customHolidayWorkHours > 0 ? (
+                                                    <span className="text-gray-900">{item.customHolidayWorkHours.toFixed(1)} <span className="text-gray-400 text-xs">ชม.</span></span>
+                                                ) : "-"}
+                                            </td>
+                                            <td className="px-6 py-4 text-right text-red-500 font-mono">
+                                                {item.lateMinutes > 0 ? item.lateMinutes : "-"}
+                                            </td>
+                                            <td className="px-6 py-4 text-right text-emerald-600 font-medium font-mono">
+                                                {item.totalIncome.toLocaleString()}
+                                            </td>
+                                            <td className="px-6 py-4 text-right text-red-600 font-medium font-mono">
+                                                {item.totalDeduction > 0 ? item.totalDeduction.toLocaleString() : "-"}
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <span className="font-bold text-gray-900 bg-emerald-50 px-2 py-1 rounded border border-emerald-100 font-mono">
+                                                    ฿{item.netTotal.toLocaleString()}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                </div>
-            )}
+                )}
+            </div>
         </div>
     );
 }

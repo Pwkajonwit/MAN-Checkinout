@@ -1,5 +1,6 @@
 import { collection, getDocs, query, where, orderBy, Timestamp, deleteDoc, doc } from "firebase/firestore";
-import { db } from "./firebase";
+import { db, storage } from "./firebase";
+import { ref, uploadString, getDownloadURL } from "firebase/storage";
 
 // Constants for storage management
 const STORAGE_LIMIT_BYTES = 800 * 1024 * 1024; // 800MB soft limit (Firestore free tier is 1GB)
@@ -235,3 +236,21 @@ export const deleteAllPhotos = async (): Promise<{ deletedCount: number; freedBy
 // Export constants for use in other files
 export const PHOTO_STORAGE_LIMIT = STORAGE_LIMIT_BYTES;
 export const PHOTO_WARNING_THRESHOLD = WARNING_THRESHOLD;
+
+/**
+ * Upload base64 image to Firebase Storage and return download URL
+ */
+export const uploadToStorage = async (path: string, base64String: string): Promise<string> => {
+    try {
+        const storageRef = ref(storage, path);
+
+        // uploadString automatically handles data_url if format is specified
+        const snapshot = await uploadString(storageRef, base64String, 'data_url');
+        const downloadURL = await getDownloadURL(snapshot.ref);
+
+        return downloadURL;
+    } catch (error) {
+        console.error("Error uploading to storage:", error);
+        throw error;
+    }
+};

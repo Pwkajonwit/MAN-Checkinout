@@ -22,6 +22,8 @@ export default function DashboardPage() {
     const [isSuperAdmin, setIsSuperAdmin] = useState(false);
     const [locationEnabled, setLocationEnabled] = useState(false);
     const [workTimeEnabled, setWorkTimeEnabled] = useState(true);
+    const [enableBreak, setEnableBreak] = useState(true);
+    const [enableOffsite, setEnableOffsite] = useState(true);
     const [statusFilter, setStatusFilter] = useState<string | null>(null);
     const [alertState, setAlertState] = useState<{
         isOpen: boolean;
@@ -49,7 +51,9 @@ export default function DashboardPage() {
 
     useEffect(() => {
         loadAttendances(selectedDate);
+    }, [selectedDate]);
 
+    useEffect(() => {
         // Check if current user is super_admin
         const checkAdminRole = async () => {
             const user = auth.currentUser;
@@ -70,12 +74,14 @@ export default function DashboardPage() {
                     setLocationEnabled(true);
                 }
                 setWorkTimeEnabled(config?.workTimeEnabled ?? true);
+                setEnableBreak(config?.enableBreak ?? true);
+                setEnableOffsite(config?.enableOffsite ?? true);
             } catch (error) {
                 console.error("Error loading config:", error);
             }
         };
         loadConfig();
-    }, [selectedDate]);
+    }, []);
 
     const handleAddAttendance = () => {
         setSelectedAttendance(null);
@@ -110,6 +116,7 @@ export default function DashboardPage() {
     const lateEmployeeIds = new Set<string>();
     const checkedOutEmployeeIds = new Set<string>();
     const offsiteEmployeeIds = new Set<string>();
+    const breakEmployeeIds = new Set<string>();
 
     attendances.forEach(a => {
         if (a.status === "เข้างาน" || a.status === "สาย") {
@@ -125,13 +132,17 @@ export default function DashboardPage() {
         if (a.status === "ออกนอกพื้นที่ขาไป" || a.status === "ออกนอกพื้นที่ขากลับ") {
             offsiteEmployeeIds.add(a.employeeId);
         }
+
+        if (a.status === "ก่อนพัก" || a.status === "หลังพัก") {
+            breakEmployeeIds.add(a.employeeId);
+        }
     });
 
     const stats = {
         checkedIn: uniqueEmployeeIds.size,
         checkedOut: checkedOutEmployeeIds.size,
         late: lateEmployeeIds.size,
-
+        break: breakEmployeeIds.size,
         offsite: offsiteEmployeeIds.size,
         total: attendances.length,
     };
@@ -142,7 +153,7 @@ export default function DashboardPage() {
             if (statusFilter === "เข้างาน") return a.status === "เข้างาน" || a.status === "สาย";
             if (statusFilter === "ออกงาน") return a.status === "ออกงาน";
             if (statusFilter === "สาย") return a.status === "สาย";
-
+            if (statusFilter === "พัก") return a.status === "ก่อนพัก" || a.status === "หลังพัก";
             if (statusFilter === "นอกพื้นที่") return a.status === "ออกนอกพื้นที่ขาไป" || a.status === "ออกนอกพื้นที่ขากลับ";
             return true;
         })
@@ -176,7 +187,7 @@ export default function DashboardPage() {
                 }
             />
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
                 <div
                     onClick={() => setStatusFilter(statusFilter === "เข้างาน" ? null : "เข้างาน")}
                     className={`bg-white p-4 rounded-xl border cursor-pointer transition-all ${statusFilter === "เข้างาน" ? "border-green-500 ring-2 ring-green-200" : "border-gray-100 hover:border-gray-300"}`}
@@ -198,14 +209,24 @@ export default function DashboardPage() {
                     <div className="text-xs text-gray-500">สาย</div>
                     <div className={`text-2xl font-bold ${statusFilter === "สาย" ? "text-red-600" : "text-gray-800"}`}>{stats.late}</div>
                 </div>
-
-                <div
-                    onClick={() => setStatusFilter(statusFilter === "นอกพื้นที่" ? null : "นอกพื้นที่")}
-                    className={`bg-white p-4 rounded-xl border cursor-pointer transition-all ${statusFilter === "นอกพื้นที่" ? "border-purple-500 ring-2 ring-purple-200" : "border-gray-100 hover:border-gray-300"}`}
-                >
-                    <div className="text-xs text-gray-500">นอกพื้นที่</div>
-                    <div className={`text-2xl font-bold ${statusFilter === "นอกพื้นที่" ? "text-purple-600" : "text-gray-800"}`}>{stats.offsite}</div>
-                </div>
+                {enableBreak && (
+                    <div
+                        onClick={() => setStatusFilter(statusFilter === "พัก" ? null : "พัก")}
+                        className={`bg-white p-4 rounded-xl border cursor-pointer transition-all ${statusFilter === "พัก" ? "border-orange-500 ring-2 ring-orange-200" : "border-gray-100 hover:border-gray-300"}`}
+                    >
+                        <div className="text-xs text-gray-500">พัก</div>
+                        <div className={`text-2xl font-bold ${statusFilter === "พัก" ? "text-orange-600" : "text-gray-800"}`}>{stats.break}</div>
+                    </div>
+                )}
+                {enableOffsite && (
+                    <div
+                        onClick={() => setStatusFilter(statusFilter === "นอกพื้นที่" ? null : "นอกพื้นที่")}
+                        className={`bg-white p-4 rounded-xl border cursor-pointer transition-all ${statusFilter === "นอกพื้นที่" ? "border-purple-500 ring-2 ring-purple-200" : "border-gray-100 hover:border-gray-300"}`}
+                    >
+                        <div className="text-xs text-gray-500">นอกพื้นที่</div>
+                        <div className={`text-2xl font-bold ${statusFilter === "นอกพื้นที่" ? "text-purple-600" : "text-gray-800"}`}>{stats.offsite}</div>
+                    </div>
+                )}
                 <div
                     onClick={() => setStatusFilter(null)}
                     className={`bg-white p-4 rounded-xl border cursor-pointer transition-all ${statusFilter === null ? "border-gray-500 ring-2 ring-gray-200" : "border-gray-100 hover:border-gray-300"}`}

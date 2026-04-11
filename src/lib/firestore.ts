@@ -57,6 +57,7 @@ export interface Attendance {
     locationNote?: string;
     distance?: number; // Distance from workplace in meters
     lateMinutes?: number; // จำนวนนาทีที่สาย
+    photoType?: "base64" | "storage"; // รูปแบบการเก็บรูปภาพ (default: 'base64')
 }
 
 // Leave Request types
@@ -606,7 +607,7 @@ export const swapService = {
 
     async update(id: string, data: Partial<Omit<SwapRequest, "id">>) {
         const docRef = doc(db, "swapRequests", id);
-        const updateData: any = { ...data };
+        const updateData: Partial<Record<keyof Omit<SwapRequest, "id">, unknown>> = { ...data };
 
         // Convert Date to Timestamp
         if (data.workDate) {
@@ -624,6 +625,133 @@ export const swapService = {
 
     async delete(id: string) {
         await deleteDoc(doc(db, "swapRequests", id));
+    },
+};
+
+// Shift Change Request types (ขอเปลี่ยนกะ)
+export interface ShiftChangeRequest {
+    id?: string;
+    employeeId: string;
+    employeeName: string;
+    date: Date;                  // วันที่ต้องการเปลี่ยนกะ
+    currentShiftId?: string;     // ID กะเดิม (อ้างอิง)
+    currentShiftName?: string;   // ชื่อกะเดิม
+    targetShiftId: string;       // ID กะใหม่ที่ต้องการ
+    targetShiftName: string;     // ชื่อกะใหม่
+    reason: string;
+    status: "รออนุมัติ" | "อนุมัติ" | "ไม่อนุมัติ";
+    createdAt: Date;
+}
+
+// Shift Change Request CRUD operations (ขอเปลี่ยนกะ)
+export const shiftChangeService = {
+    async create(request: Omit<ShiftChangeRequest, "id">) {
+        const docRef = await addDoc(collection(db, "shiftChangeRequests"), {
+            ...request,
+            date: Timestamp.fromDate(request.date),
+            createdAt: Timestamp.fromDate(request.createdAt),
+        });
+        return docRef.id;
+    },
+
+    async getAll() {
+        const q = query(collection(db, "shiftChangeRequests"), orderBy("createdAt", "desc"));
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            date: doc.data().date?.toDate(),
+            createdAt: doc.data().createdAt?.toDate(),
+        })) as ShiftChangeRequest[];
+    },
+
+    async getByEmployeeId(employeeId: string) {
+        const q = query(
+            collection(db, "shiftChangeRequests"),
+            where("employeeId", "==", employeeId),
+            orderBy("createdAt", "desc")
+        );
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            date: doc.data().date?.toDate(),
+            createdAt: doc.data().createdAt?.toDate(),
+        })) as ShiftChangeRequest[];
+    },
+
+    async getByDateRange(startDate: Date, endDate: Date) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+
+        const q = query(
+            collection(db, "shiftChangeRequests"),
+            where("date", ">=", Timestamp.fromDate(start)),
+            where("date", "<=", Timestamp.fromDate(end)),
+            orderBy("date", "desc")
+        );
+
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            date: doc.data().date?.toDate(),
+            createdAt: doc.data().createdAt?.toDate(),
+        })) as ShiftChangeRequest[];
+    },
+
+    async getApprovedByEmployeeAndDate(employeeId: string, date: Date) {
+        const dayStart = new Date(date);
+        dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(date);
+        dayEnd.setHours(23, 59, 59, 999);
+
+        const q = query(
+            collection(db, "shiftChangeRequests"),
+            where("employeeId", "==", employeeId),
+            where("date", ">=", Timestamp.fromDate(dayStart)),
+            where("date", "<=", Timestamp.fromDate(dayEnd)),
+            where("status", "==", "อนุมัติ")
+        );
+
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty) {
+            const docData = querySnapshot.docs[0];
+            return {
+                id: docData.id,
+                ...docData.data(),
+                date: docData.data().date?.toDate(),
+                createdAt: docData.data().createdAt?.toDate(),
+            } as ShiftChangeRequest;
+        }
+        return null;
+    },
+
+    async updateStatus(id: string, status: ShiftChangeRequest["status"]) {
+        const docRef = doc(db, "shiftChangeRequests", id);
+        await updateDoc(docRef, { status });
+    },
+
+    async update(id: string, data: Partial<Omit<ShiftChangeRequest, "id">>) {
+        const docRef = doc(db, "shiftChangeRequests", id);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const updateData: any = { ...data };
+
+        if (data.date) {
+            updateData.date = Timestamp.fromDate(data.date);
+        }
+        if (data.createdAt) {
+            updateData.createdAt = Timestamp.fromDate(data.createdAt);
+        }
+
+        Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
+        await updateDoc(docRef, updateData);
+    },
+
+    async delete(id: string) {
+        await deleteDoc(doc(db, "shiftChangeRequests", id));
     },
 };
 
@@ -710,6 +838,7 @@ export interface SystemConfig {
     otMultiplier: number; // Normal OT (e.g. 1.5)
     otMultiplierHoliday: number; // Holiday/Weekend OT (e.g. 3.0)
     weeklyHolidays: number[]; // Days of week that are holidays (0=Sun, 6=Sat)
+    useIndividualHolidays?: boolean; // Use individual employee's weekly holidays instead of global setting
     lateDeductionType: "none" | "pro-rated" | "fixed_per_minute";
     lateDeductionRate: number; // Used if fixed_per_minute
     customHolidays: CustomHoliday[];
@@ -724,11 +853,18 @@ export interface SystemConfig {
     requirePhoto: boolean; // Require photo during check-in
     adminLineGroupId?: string; // Line Group ID for admin notifications
     enableDailyReport?: boolean; // Enable daily summary report
+    enableLineCheckInNotification?: boolean; // Enable LINE OA group notifications for check-in
+    lineCheckInGroupId?: string; // LINE OA Group ID for check-in notifications
+    enableTelegramCheckInNotification?: boolean; // Enable Telegram notifications for check-in
+    telegramChatId?: string; // Telegram chat/group ID for check-in notifications
     allowNewRegistration?: boolean; // Allow new employee registration
     // Retroactive request limits (จำนวนวันย้อนหลัง)
     otRetroactiveDays?: number;      // วันย้อนหลังที่อนุญาตให้ขอ OT (default: 7)
     leaveRetroactiveDays?: number;   // วันย้อนหลังที่อนุญาตให้แนบหลักฐานลา (default: 7)
     swapAdvanceDays?: number;        // วันล่วงหน้าที่ต้องขอสลับวันหยุด (default: 3)
+    storageType?: "base64" | "storage"; // รูปแบบการจัดเก็บรูปภาพ (default: 'base64')
+    enableBreak?: boolean;           // เปิด/ปิด การลงเวลาก่อนพัก-หลังพัก (default: true)
+    enableOffsite?: boolean;         // เปิด/ปิด การลงเวลาออกนอกพื้นที่ (default: true)
 }
 // System Config CRUD operations
 export const systemConfigService = {
@@ -737,11 +873,14 @@ export const systemConfigService = {
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
             const data = docSnap.data();
+            const holidayData = Array.isArray(data.customHolidays)
+                ? data.customHolidays as Array<CustomHoliday & { date?: { toDate?: () => Date } }>
+                : [];
             return {
                 ...data,
-                customHolidays: data.customHolidays?.map((h: any) => ({
+                customHolidays: holidayData.map((h) => ({
                     ...h,
-                    date: h.date?.toDate()
+                    date: typeof h.date?.toDate === "function" ? h.date.toDate() : h.date
                 })) || []
             } as SystemConfig;
         }

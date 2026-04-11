@@ -41,8 +41,9 @@ import { th } from "date-fns/locale";
 import { isLate, getLateMinutes, formatMinutesToHours } from "@/lib/workTime";
 import { Users, UserCheck, Clock, CalendarOff, Download, Filter, CheckSquare, Square, X, FileSpreadsheet, Calendar } from "lucide-react";
 
-const COLORS = ["#059669", "#10B981", "#34D399", "#6EE7B7", "#C6F6D5"];
-const LEAVE_COLORS = ["#FF8042", "#00C49F", "#FFBB28", "#0088FE"];
+const COLORS = ["#059669", "#10B981", "#34D399", "#6EE7B7", "#A7F3D0"];
+const LEAVE_COLORS = ["#F59E0B", "#3B82F6", "#EC4899", "#6366F1", "#8B5CF6"];
+
 
 export function AnalyticsCharts() {
     const [loading, setLoading] = useState(true);
@@ -547,31 +548,32 @@ export function AnalyticsCharts() {
     return (
         <div className="space-y-6">
             {/* Filters Toolbar */}
-            <Card className="p-4">
-                <div className="flex flex-col md:flex-row gap-4 items-end md:items-center justify-between">
-                    <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
-                        <div className="space-y-1.5">
-                            <label className="text-sm font-medium text-gray-700">ตั้งแต่วันที่</label>
+            {/* Filters Toolbar */}
+            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+                <div className="flex flex-col xl:flex-row gap-4 justify-between items-end xl:items-center">
+                    <div className="flex flex-col md:flex-row gap-4 w-full xl:w-auto">
+                        <div className="space-y-1.5 flex-1 md:flex-none">
+                            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">ตั้งแต่วันที่</label>
                             <Input
                                 type="date"
                                 value={startDate}
                                 onChange={(e) => setStartDate(e.target.value)}
-                                className="w-full md:w-[180px]"
+                                className="h-9 text-sm w-full md:w-[160px]"
                             />
                         </div>
-                        <div className="space-y-1.5">
-                            <label className="text-sm font-medium text-gray-700">ถึงวันที่</label>
+                        <div className="space-y-1.5 flex-1 md:flex-none">
+                            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">ถึงวันที่</label>
                             <Input
                                 type="date"
                                 value={endDate}
                                 onChange={(e) => setEndDate(e.target.value)}
-                                className="w-full md:w-[180px]"
+                                className="h-9 text-sm w-full md:w-[160px]"
                             />
                         </div>
-                        <div className="space-y-1.5">
-                            <label className="text-sm font-medium text-gray-700">ประเภทพนักงาน</label>
+                        <div className="space-y-1.5 flex-1 md:flex-none">
+                            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">ประเภทพนักงาน</label>
                             <Select value={selectedEmployeeType} onValueChange={setSelectedEmployeeType}>
-                                <SelectTrigger className="w-full md:w-[180px]">
+                                <SelectTrigger className="h-9 text-sm w-full md:w-[180px]">
                                     <SelectValue placeholder="ทั้งหมด" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -583,18 +585,26 @@ export function AnalyticsCharts() {
                             </Select>
                         </div>
                     </div>
-                    <div className="flex gap-2 w-full md:w-auto">
-                        <Button onClick={() => setShowExportModal(true)} variant="outline" className="gap-2 flex-1 md:flex-none bg-primary hover:bg-primary text-white">
+
+                    <div className="flex gap-2 w-full xl:w-auto pt-4 md:pt-0 border-t md:border-t-0 border-gray-100">
+                        <Button
+                            onClick={() => setShowExportModal(true)}
+                            variant="outline"
+                            className="gap-2 flex-1 xl:flex-none h-9 text-sm border-gray-300 text-gray-700 hover:bg-gray-50"
+                        >
                             <Download className="w-4 h-4" />
-                            Export CSV
+                            <span>Export รายงาน</span>
                         </Button>
-                        <Button onClick={() => setShowRawExportModal(true)} className="gap-2 flex-1 md:flex-none  bg-primary-dark hover:bg-primary-dark text-white">
+                        <Button
+                            onClick={() => setShowRawExportModal(true)}
+                            className="gap-2 flex-1 xl:flex-none h-9 text-sm bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+                        >
                             <FileSpreadsheet className="w-4 h-4" />
-                            Export ข้อมูลดิบ
+                            <span>Export ข้อมูลดิบ</span>
                         </Button>
                     </div>
                 </div>
-            </Card>
+            </div>
 
             {/* Export Modal */}
             {showExportModal && (
@@ -945,73 +955,125 @@ export function AnalyticsCharts() {
             ) : (
                 <>
                     {/* Summary Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                        <Card className="p-6 flex items-center gap-4 border-l-4 border-l-blue-500">
-                            <div className="p-3 bg-blue-50 rounded-full">
-                                <Users className="w-6 h-6 text-blue-600" />
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm flex flex-col justify-between h-[130px] relative overflow-hidden group hover:border-blue-300 hover:shadow-md transition-all">
+                            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                                <Users className="w-16 h-16 text-blue-600" />
                             </div>
-                            <div>
-                                <p className="text-sm text-gray-500">พนักงาน (ที่เลือก)</p>
-                                <h3 className="text-2xl font-bold text-gray-800">{summaryStats.totalEmployees}</h3>
+                            <div className="flex items-center gap-3 mb-1">
+                                <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
+                                    <Users className="w-5 h-5" />
+                                </div>
+                                <span className="text-sm font-medium text-gray-600">พนักงาน (ที่เลือก)</span>
                             </div>
-                        </Card>
+                            <div className="mt-auto relative z-10">
+                                <h3 className="text-3xl font-bold text-gray-900 tracking-tight">{summaryStats.totalEmployees}</h3>
+                                <p className="text-xs text-blue-600 font-medium mt-1">คน</p>
+                            </div>
+                        </div>
 
-                        <Card className="p-6 flex items-center gap-4 border-l-4 border-l-green-500">
-                            <div className="p-3 bg-green-50 rounded-full">
-                                <UserCheck className="w-6 h-6 text-green-600" />
+                        <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm flex flex-col justify-between h-[130px] relative overflow-hidden group hover:border-emerald-300 hover:shadow-md transition-all">
+                            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                                <UserCheck className="w-16 h-16 text-emerald-600" />
                             </div>
-                            <div>
-                                <p className="text-sm text-gray-500">เข้างานเฉลี่ย/วัน</p>
-                                <h3 className="text-2xl font-bold text-gray-800">{summaryStats.avgAttendance}</h3>
+                            <div className="flex items-center gap-3 mb-1">
+                                <div className="p-2 bg-emerald-50 rounded-lg text-emerald-600">
+                                    <UserCheck className="w-5 h-5" />
+                                </div>
+                                <span className="text-sm font-medium text-gray-600">เข้างานเฉลี่ย/วัน</span>
                             </div>
-                        </Card>
+                            <div className="mt-auto relative z-10">
+                                <h3 className="text-3xl font-bold text-gray-900 tracking-tight">{summaryStats.avgAttendance}</h3>
+                                <p className="text-xs text-emerald-600 font-medium mt-1">คน</p>
+                            </div>
+                        </div>
 
-                        <Card className="p-6 flex items-center gap-4 border-l-4 border-l-yellow-500">
-                            <div className="p-3 bg-yellow-50 rounded-full">
-                                <Clock className="w-6 h-6 text-yellow-600" />
+                        <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm flex flex-col justify-between h-[130px] relative overflow-hidden group hover:border-amber-300 hover:shadow-md transition-all">
+                            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                                <Clock className="w-16 h-16 text-amber-600" />
                             </div>
-                            <div>
-                                <p className="text-sm text-gray-500">สาย (ครั้ง)</p>
-                                <h3 className="text-2xl font-bold text-gray-800">{summaryStats.totalLate}</h3>
+                            <div className="flex items-center gap-3 mb-1">
+                                <div className="p-2 bg-amber-50 rounded-lg text-amber-600">
+                                    <Clock className="w-5 h-5" />
+                                </div>
+                                <span className="text-sm font-medium text-gray-600">มาสาย (ครั้ง)</span>
                             </div>
-                        </Card>
+                            <div className="mt-auto relative z-10">
+                                <h3 className="text-3xl font-bold text-gray-900 tracking-tight">{summaryStats.totalLate}</h3>
+                                <p className="text-xs text-amber-600 font-medium mt-1">ครั้ง (ในช่วงเวลา)</p>
+                            </div>
+                        </div>
 
-                        <Card className="p-6 flex items-center gap-4 border-l-4 border-l-purple-500">
-                            <div className="p-3 bg-purple-50 rounded-full">
-                                <CalendarOff className="w-6 h-6 text-purple-600" />
+                        <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm flex flex-col justify-between h-[130px] relative overflow-hidden group hover:border-purple-300 hover:shadow-md transition-all">
+                            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                                <CalendarOff className="w-16 h-16 text-purple-600" />
                             </div>
-                            <div>
-                                <p className="text-sm text-gray-500">ลา (ครั้ง)</p>
-                                <h3 className="text-2xl font-bold text-gray-800">{summaryStats.totalLeaves}</h3>
+                            <div className="flex items-center gap-3 mb-1">
+                                <div className="p-2 bg-purple-50 rounded-lg text-purple-600">
+                                    <CalendarOff className="w-5 h-5" />
+                                </div>
+                                <span className="text-sm font-medium text-gray-600">ลางาน (ครั้ง)</span>
                             </div>
-                        </Card>
+                            <div className="mt-auto relative z-10">
+                                <h3 className="text-3xl font-bold text-gray-900 tracking-tight">{summaryStats.totalLeaves}</h3>
+                                <p className="text-xs text-purple-600 font-medium mt-1">ครั้ง (อนุมัติแล้ว)</p>
+                            </div>
+                        </div>
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {/* Attendance Trend */}
-                        <Card className="p-6">
-                            <h3 className="text-lg font-semibold text-gray-800 mb-4">แนวโน้มการเข้างาน</h3>
+                        <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
+                            <div className="flex items-center justify-between mb-6">
+                                <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                                    <div className="w-1 h-4 bg-emerald-500 rounded-full"></div>
+                                    แนวโน้มการเข้างาน
+                                </h3>
+                                <Select defaultValue="daily">
+                                    <SelectTrigger className="h-8 text-xs w-[100px]">
+                                        <SelectValue placeholder="รายวัน" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="daily">รายวัน</SelectItem>
+                                        <SelectItem value="weekly">รายสัปดาห์</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
                             <div className="h-[300px] w-full">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={attendanceData}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF' }} />
-                                        <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF' }} />
+                                    <BarChart data={attendanceData} barGap={4} barSize={24}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                                        <XAxis
+                                            dataKey="name"
+                                            axisLine={false}
+                                            tickLine={false}
+                                            tick={{ fill: '#6B7280', fontSize: 11 }}
+                                            dy={10}
+                                        />
+                                        <YAxis
+                                            axisLine={false}
+                                            tickLine={false}
+                                            tick={{ fill: '#6B7280', fontSize: 11 }}
+                                            dx={-10}
+                                        />
                                         <Tooltip
-                                            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                            contentStyle={{ borderRadius: '8px', border: '1px solid #E5E7EB', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                                             cursor={{ fill: '#F9FAFB' }}
                                         />
-                                        <Legend />
-                                        <Bar dataKey="present" name="ตรงเวลา" fill="#7bd4abff" radius={[4, 4, 0, 0]} stackId="a" />
-                                        <Bar dataKey="late" name="สาย" fill="#1c7a56ff" radius={[4, 4, 0, 0]} stackId="a" />
+                                        <Legend wrapperStyle={{ paddingTop: '20px', fontSize: '12px' }} />
+                                        <Bar dataKey="present" name="ตรงเวลา" fill="#10B981" radius={[4, 4, 0, 0]} stackId="a" />
+                                        <Bar dataKey="late" name="สาย" fill="#F59E0B" radius={[4, 4, 0, 0]} stackId="a" />
                                     </BarChart>
                                 </ResponsiveContainer>
                             </div>
-                        </Card>
+                        </div>
 
                         {/* Employee Distribution */}
-                        <Card className="p-6">
-                            <h3 className="text-lg font-semibold text-gray-800 mb-4">สัดส่วนพนักงาน</h3>
+                        <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
+                            <h3 className="font-semibold text-gray-900 mb-6 flex items-center gap-2">
+                                <div className="w-1 h-4 bg-blue-500 rounded-full"></div>
+                                สัดส่วนพนักงาน
+                            </h3>
                             <div className="h-[300px] w-full flex items-center justify-center">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <PieChart>
@@ -1019,107 +1081,162 @@ export function AnalyticsCharts() {
                                             data={employeeTypeData}
                                             cx="50%"
                                             cy="50%"
-                                            innerRadius={60}
+                                            innerRadius={70}
                                             outerRadius={100}
                                             fill="#8884d8"
-                                            paddingAngle={5}
+                                            paddingAngle={4}
                                             dataKey="value"
                                         >
                                             {employeeTypeData.map((entry, index) => (
-                                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} strokeWidth={2} stroke="#fff" />
                                             ))}
                                         </Pie>
-                                        <Tooltip />
-                                        <Legend />
+                                        <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                                        <Legend layout="horizontal" verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
                                     </PieChart>
                                 </ResponsiveContainer>
                             </div>
-                        </Card>
+                        </div>
 
                         {/* Leave Analysis */}
-                        <Card className="p-6">
-                            <h3 className="text-lg font-semibold text-gray-800 mb-4">สถิติการลา (ตามประเภท)</h3>
-                            <div className="h-[300px] w-full flex items-center justify-center">
+                        <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
+                            <h3 className="font-semibold text-gray-900 mb-6 flex items-center gap-2">
+                                <div className="w-1 h-4 bg-purple-500 rounded-full"></div>
+                                สถิติการลา (ตามประเภท)
+                            </h3>
+                            <div className="h-[300px] w-full flex items-center justify-center relative">
                                 {leaveData.length > 0 ? (
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <PieChart>
-                                            <Pie
-                                                data={leaveData}
-                                                cx="50%"
-                                                cy="50%"
-                                                outerRadius={100}
-                                                fill="#8884d8"
-                                                dataKey="value"
-                                                label={({ name, percent }: { name?: string | number; percent?: number }) => `${name ?? ''} ${(percent ? percent * 100 : 0).toFixed(0)}%`}
-                                            >
-                                                {leaveData.map((entry, index) => (
-                                                    <Cell key={`cell-${index}`} fill={LEAVE_COLORS[index % LEAVE_COLORS.length]} />
-                                                ))}
-                                            </Pie>
-                                            <Tooltip />
-                                        </PieChart>
-                                    </ResponsiveContainer>
+                                    <>
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <PieChart>
+                                                <Pie
+                                                    data={leaveData}
+                                                    cx="50%"
+                                                    cy="50%"
+                                                    outerRadius={100}
+                                                    fill="#8884d8"
+                                                    dataKey="value"
+                                                    label={({ name, percent }: { name?: string | number; percent?: number }) => `${(percent ? percent * 100 : 0).toFixed(0)}%`}
+                                                    labelLine={false}
+                                                >
+                                                    {leaveData.map((entry, index) => (
+                                                        <Cell key={`cell-${index}`} fill={LEAVE_COLORS[index % LEAVE_COLORS.length]} strokeWidth={2} stroke="#fff" />
+                                                    ))}
+                                                </Pie>
+                                                <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                                                <Legend layout="horizontal" verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                        {/* Donut Content or Overlay Stats */}
+                                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                            {/* Keep empty for standard Pie, or use if Donut */}
+                                        </div>
+                                    </>
                                 ) : (
                                     <div className="text-gray-400 flex flex-col items-center">
-                                        <CalendarOff className="w-12 h-12 mb-2 opacity-50" />
-                                        <p>ไม่มีข้อมูลการลาในช่วงนี้</p>
+                                        <div className="p-4 bg-gray-50 rounded-full mb-3">
+                                            <CalendarOff className="w-8 h-8 opacity-40" />
+                                        </div>
+                                        <p className="text-sm font-medium">ไม่มีข้อมูลการลา</p>
                                     </div>
                                 )}
                             </div>
-                        </Card>
+                        </div>
 
                         {/* Late Employees List */}
-                        <Card className="p-6 overflow-hidden">
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-lg font-semibold text-gray-800">ประวัติการมาสาย ({lateEmployees.length})</h3>
+                        {/* Late Employees List */}
+                        <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden flex flex-col h-[400px]">
+                            <div className="p-5 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+                                <div className="flex items-center gap-2">
+                                    <div className="p-1.5 bg-red-50 rounded text-red-600">
+                                        <Clock className="w-4 h-4" />
+                                    </div>
+                                    <h3 className="font-semibold text-gray-900">ประวัติการมาสายล่าสุด</h3>
+                                </div>
+                                <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full font-medium">
+                                    {lateEmployees.length} รายการ
+                                </span>
                             </div>
-                            <div className="overflow-y-auto max-h-[300px]">
+
+                            <div className="overflow-y-auto flex-1 custom-scrollbar p-0">
                                 {lateEmployees.length > 0 ? (
-                                    <div className="space-y-3">
+                                    <div className="divide-y divide-gray-100">
                                         {lateEmployees.map((emp, index) => (
-                                            <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100">
+                                            <div key={index} className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-xs">
+                                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-red-100 to-red-200 flex items-center justify-center text-red-700 font-bold text-xs shadow-sm border border-red-200">
                                                         {emp.name.charAt(0)}
                                                     </div>
                                                     <div>
-                                                        <p className="font-medium text-gray-800 text-sm">{emp.name}</p>
-                                                        <p className="text-xs text-gray-500">{emp.date} - {emp.department}</p>
+                                                        <p className="font-semibold text-gray-900 text-sm">{emp.name}</p>
+                                                        <div className="flex items-center gap-2 text-xs text-gray-500">
+                                                            <span>{emp.date}</span>
+                                                            <span className="w-1 h-1 rounded-full bg-gray-300"></span>
+                                                            <span>{emp.department}</span>
+                                                        </div>
                                                     </div>
                                                 </div>
                                                 <div className="text-right">
-                                                    <p className="text-red-600 font-bold text-sm">{emp.time}</p>
-                                                    <p className="text-xs text-gray-500">สาย {formatMinutesToHours(emp.lateMinutes)}</p>
+                                                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-red-50 rounded-md border border-red-100">
+                                                        <span className="text-red-700 font-bold text-sm">{emp.time}</span>
+                                                        <span className="text-[10px] text-red-400">({formatMinutesToHours(emp.lateMinutes)})</span>
+                                                    </div>
                                                 </div>
                                             </div>
                                         ))}
                                     </div>
                                 ) : (
                                     <div className="h-full flex flex-col items-center justify-center text-gray-400 py-10">
-                                        <UserCheck className="w-12 h-12 mb-2 opacity-50" />
-                                        <p>ไม่มีใครมาสายในช่วงนี้</p>
+                                        <div className="p-4 bg-gray-50 rounded-full mb-3">
+                                            <UserCheck className="w-8 h-8 text-emerald-500 opacity-60" />
+                                        </div>
+                                        <p className="font-medium text-gray-500">ไม่มีสถิติการมาสาย</p>
+                                        <p className="text-xs text-gray-400 mt-1">ในช่วงเวลาที่เลือก</p>
                                     </div>
                                 )}
                             </div>
-                        </Card>
+                        </div>
 
                         {/* Monthly Trend */}
-                        <Card className="p-6 lg:col-span-2">
-                            <h3 className="text-lg font-semibold text-gray-800 mb-4">แนวโน้มโอที (ชั่วโมง)</h3>
+                        <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm lg:col-span-2">
+                            <h3 className="font-semibold text-gray-900 mb-6 flex items-center gap-2">
+                                <div className="w-1 h-4 bg-indigo-500 rounded-full"></div>
+                                แนวโน้มชั่วโมงโอที
+                            </h3>
                             <div className="h-[300px] w-full">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <LineChart data={otData}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF' }} />
-                                        <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF' }} />
-                                        <Tooltip
-                                            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                                        <XAxis
+                                            dataKey="name"
+                                            axisLine={false}
+                                            tickLine={false}
+                                            tick={{ fill: '#6B7280', fontSize: 11 }}
+                                            dy={10}
                                         />
-                                        <Line type="monotone" dataKey="hours" name="ชั่วโมงโอที" stroke="#553734" strokeWidth={3} dot={{ r: 4, fill: '#553734', strokeWidth: 2, stroke: '#fff' }} />
+                                        <YAxis
+                                            axisLine={false}
+                                            tickLine={false}
+                                            tick={{ fill: '#6B7280', fontSize: 11 }}
+                                            dx={-10}
+                                        />
+                                        <Tooltip
+                                            contentStyle={{ borderRadius: '8px', border: '1px solid #E5E7EB', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                            labelStyle={{ color: '#111827', fontWeight: 600, marginBottom: '4px' }}
+                                        />
+                                        <Line
+                                            type="monotone"
+                                            dataKey="hours"
+                                            name="ชั่วโมงโอที"
+                                            stroke="#6366F1"
+                                            strokeWidth={3}
+                                            dot={{ r: 4, fill: '#6366F1', strokeWidth: 2, stroke: '#fff' }}
+                                            activeDot={{ r: 6, fill: '#6366F1', strokeWidth: 0 }}
+                                        />
                                     </LineChart>
                                 </ResponsiveContainer>
                             </div>
-                        </Card>
+                        </div>
                     </div>
                 </>
             )}

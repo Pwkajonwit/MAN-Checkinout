@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { EmployeeHeader } from "@/components/mobile/EmployeeHeader";
-import { MapPin, Calendar, Clock, FileText, ChevronRight, LogOut } from "lucide-react";
+import { MapPin, Calendar, Clock, FileText, ChevronRight, RefreshCw } from "lucide-react";
 import { useEmployee } from "@/contexts/EmployeeContext";
 
 export default function MobileHomePage() {
@@ -40,6 +40,14 @@ export default function MobileHomePage() {
             href: "/ot-request",
             color: "bg-purple-50 text-purple-600",
             iconBg: "bg-purple-100",
+        },
+        {
+            title: "ขอสลับวันหยุด",
+            subtitle: "สลับวันหยุดกับวันทำงาน",
+            icon: RefreshCw,
+            href: "/shift-swap",
+            color: "bg-indigo-50 text-indigo-600",
+            iconBg: "bg-indigo-100",
         },
     ];
 

@@ -143,6 +143,76 @@ const REQUIRED_QUERIES: {
                 { fieldPath: "employeeId", order: "ASCENDING" },
                 { fieldPath: "createdAt", order: "DESCENDING" }
             ]
+        },
+        {
+            name: "Swap Requests by Date Range",
+            collection: "swapRequests",
+            buildQuery: () => {
+                const now = new Date();
+                return query(
+                    collection(db, "swapRequests"),
+                    where("workDate", ">=", Timestamp.fromDate(now)),
+                    where("workDate", "<=", Timestamp.fromDate(now)),
+                    orderBy("workDate", "desc"),
+                    limit(1)
+                );
+            },
+            fields: [
+                { fieldPath: "workDate", order: "ASCENDING" },
+                { fieldPath: "workDate", order: "DESCENDING" }
+            ]
+        },
+        {
+            name: "Shift Change Requests by Employee",
+            collection: "shiftChangeRequests",
+            buildQuery: () => query(
+                collection(db, "shiftChangeRequests"),
+                where("employeeId", "==", "__test__"),
+                orderBy("createdAt", "desc"),
+                limit(1)
+            ),
+            fields: [
+                { fieldPath: "employeeId", order: "ASCENDING" },
+                { fieldPath: "createdAt", order: "DESCENDING" }
+            ]
+        },
+        {
+            name: "Shift Change Requests by Date Range",
+            collection: "shiftChangeRequests",
+            buildQuery: () => {
+                const now = new Date();
+                return query(
+                    collection(db, "shiftChangeRequests"),
+                    where("date", ">=", Timestamp.fromDate(now)),
+                    where("date", "<=", Timestamp.fromDate(now)),
+                    orderBy("date", "desc"),
+                    limit(1)
+                );
+            },
+            fields: [
+                { fieldPath: "date", order: "ASCENDING" },
+                { fieldPath: "date", order: "DESCENDING" }
+            ]
+        },
+        {
+            name: "Approved Shift Change by Employee and Date",
+            collection: "shiftChangeRequests",
+            buildQuery: () => {
+                const now = new Date();
+                return query(
+                    collection(db, "shiftChangeRequests"),
+                    where("employeeId", "==", "__test__"),
+                    where("date", ">=", Timestamp.fromDate(now)),
+                    where("date", "<=", Timestamp.fromDate(now)),
+                    where("status", "==", "อนุมัติ"),
+                    limit(1)
+                );
+            },
+            fields: [
+                { fieldPath: "employeeId", order: "ASCENDING" },
+                { fieldPath: "date", order: "ASCENDING" },
+                { fieldPath: "status", order: "ASCENDING" }
+            ]
         }
     ];
 

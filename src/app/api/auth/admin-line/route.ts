@@ -77,8 +77,6 @@ export async function POST(request: Request) {
 
         // Real LINE token flow
         // Verify the LINE access token by calling LINE API
-        console.log('[Admin LINE Auth] Calling LINE API with token:', accessToken?.substring(0, 20) + '...');
-        
         const lineResponse = await fetch('https://api.line.me/v2/profile', {
             headers: {
                 Authorization: `Bearer ${accessToken}`
@@ -86,10 +84,9 @@ export async function POST(request: Request) {
         });
 
         if (!lineResponse.ok) {
-            const errorText = await lineResponse.text();
-            console.error('[Admin LINE Auth] LINE API error:', lineResponse.status, errorText);
+            console.error('[Admin LINE Auth] LINE API error:', lineResponse.status);
             return NextResponse.json(
-                { error: 'Invalid LINE access token', details: `LINE API: ${lineResponse.status} - ${errorText}` },
+                { error: 'Invalid LINE access token' },
                 { status: 401 }
             );
         }

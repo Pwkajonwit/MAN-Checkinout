@@ -158,7 +158,8 @@ export const generateAttendancePDF = (
                 .status-checkin { color: #16a34a; font-weight: bold; }
                 .status-checkout { color: #2563eb; font-weight: bold; }
                 .status-offsite { color: #9333ea; font-weight: bold; }
-                .status-break { color: #d97706; }
+                .status-break-out { color: #d97706; font-weight: bold; }
+                .status-break-in { color: #0891b2; font-weight: bold; }
                 .status-ot { color: #0891b2; font-weight: bold; }
                 .note { color: #666; font-style: italic; font-size: 10px; }
                 tr:nth-child(even) { background-color: #f9f9f9; }
@@ -258,7 +259,8 @@ export const generateAttendancePDF = (
         else if (a.status === "เข้างาน") statusClass = "status-checkin";
         else if (a.status === "ออกงาน") statusClass = "status-checkout";
         else if (a.status?.includes("ออกนอกพื้นที่")) statusClass = "status-offsite";
-        else if (a.status?.includes("พัก")) statusClass = "status-break";
+        else if (a.status === "ก่อนพัก") statusClass = "status-break-out";
+        else if (a.status === "หลังพัก") statusClass = "status-break-in";
 
         return `
                         <tr>

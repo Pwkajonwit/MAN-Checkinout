@@ -12,9 +12,9 @@ const SelectContext = React.createContext<{
     setOpen: (open: boolean) => void
 } | null>(null)
 
-const Select = ({ children, value, onValueChange }: { children: React.ReactNode, value?: string, onValueChange?: (val: string) => void }) => {
+const Select = ({ children, value, defaultValue, onValueChange }: { children: React.ReactNode, value?: string, defaultValue?: string, onValueChange?: (val: string) => void }) => {
     const [open, setOpen] = React.useState(false)
-    const [internalValue, setInternalValue] = React.useState(value || "")
+    const [internalValue, setInternalValue] = React.useState(value || defaultValue || "")
 
     React.useEffect(() => {
         if (value !== undefined) setInternalValue(value)

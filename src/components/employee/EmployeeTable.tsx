@@ -26,137 +26,140 @@ export function EmployeeTable({ employees, onEdit, onDelete, onView, canManage =
     };
 
     return (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="overflow-x-auto">
-                <table className="w-full">
-                    <thead>
-                        <tr className="bg-gray-50/50 border-b border-gray-100 text-left">
-                            <th className="py-4 px-6 text-xs font-medium text-gray-400 uppercase tracking-wider">Name</th>
-                            <th className="py-4 px-6 text-xs font-medium text-gray-400 uppercase tracking-wider">รหัสพนักงาน</th>
-                            <th className="py-4 px-6 text-xs font-medium text-gray-400 uppercase tracking-wider">LINE ID</th>
-                            <th className="py-4 px-6 text-xs font-medium text-gray-400 uppercase tracking-wider">แผนก/ตำแหน่ง</th>
-                            <th className="py-4 px-6 text-xs font-medium text-gray-400 uppercase tracking-wider">ข้อมูลการลา</th>
-                            <th className="py-4 px-6 text-xs font-medium text-gray-400 uppercase tracking-wider">พนักงาน</th>
-                            <th className="py-4 px-6 text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+
+        <div className="overflow-x-auto">
+            <table className="w-full">
+                <thead>
+                    <tr className="bg-gray-50/50 border-b border-gray-200">
+                        <th className="py-4 px-6 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">พนักงาน</th>
+                        <th className="py-4 px-6 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">รหัส / ตำแหน่ง</th>
+                        <th className="py-4 px-6 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">รูปแบบการจ้าง</th>
+                        <th className="py-4 px-6 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">สถานะ</th>
+                        <th className="py-4 px-6 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">LINE ID</th>
+                        <th className="py-4 px-6 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">จัดการ</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                    {employees.length === 0 ? (
+                        <tr>
+                            <td colSpan={6} className="py-12 text-center text-gray-500">
+                                ไม่พบข้อมูลพนักงาน
+                            </td>
                         </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                        {employees.length === 0 ? (
-                            <tr>
-                                <td colSpan={7} className="py-12 text-center text-gray-500">
-                                    ไม่มีข้อมูลพนักงาน
+                    ) : (
+                        employees.map((employee) => (
+                            <tr key={employee.id} className="hover:bg-gray-50/50 transition-colors group">
+                                <td className="py-4 px-6">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-medium text-sm shadow-sm ring-2 ring-white">
+                                            {employee.name.charAt(0)}
+                                        </div>
+                                        <div>
+                                            <div className="text-sm font-medium text-gray-900">{employee.name}</div>
+                                            <div className="text-xs text-gray-500">{employee.email || "-"}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td className="py-4 px-6">
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-medium text-gray-900">{employee.position}</span>
+                                        <span className="text-xs text-gray-500 font-mono">{employee.employeeId || "-"}</span>
+                                    </div>
+                                </td>
+                                <td className="py-4 px-6">
+                                    <div className="flex flex-col gap-1 items-start">
+                                        <span className={cn(
+                                            "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border",
+                                            employee.type === "รายเดือน"
+                                                ? "bg-blue-50 text-blue-700 border-blue-100"
+                                                : employee.type === "รายวัน"
+                                                    ? "bg-orange-50 text-orange-700 border-orange-100"
+                                                    : "bg-purple-50 text-purple-700 border-purple-100"
+                                        )}>
+                                            {employee.type}
+                                        </span>
+                                        {employee.employmentType === "ชั่วคราว" && (
+                                            <span className="text-[10px] text-gray-500 px-1">
+                                                (ชั่วคราว)
+                                            </span>
+                                        )}
+                                    </div>
+                                </td>
+                                <td className="py-4 px-6">
+                                    <span className={cn(
+                                        "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border",
+                                        !employee.status || employee.status === "ทำงาน"
+                                            ? "bg-green-50 text-green-700 border-green-100"
+                                            : "bg-red-50 text-red-700 border-red-100"
+                                    )}>
+                                        <span className={cn(
+                                            "w-1.5 h-1.5 rounded-full mr-1.5",
+                                            !employee.status || employee.status === "ทำงาน" ? "bg-green-500" : "bg-red-500"
+                                        )} />
+                                        {employee.status || "ทำงาน"}
+                                    </span>
+                                </td>
+                                <td className="py-4 px-6">
+                                    {employee.lineUserId ? (
+                                        <button
+                                            onClick={() => handleCopyLineId(employee.lineUserId!)}
+                                            className="group/btn flex items-center gap-1.5 px-2 py-1 bg-gray-50 hover:bg-green-50 text-gray-600 hover:text-green-700 rounded transition-colors text-xs border border-gray-200 hover:border-green-200"
+                                            title="คลิกเพื่อคัดลอก"
+                                        >
+                                            <span className="font-mono max-w-[80px] truncate">
+                                                {copiedId === employee.lineUserId ? "Copied!" : employee.lineUserId}
+                                            </span>
+                                            {copiedId === employee.lineUserId ? (
+                                                <Check className="w-3 h-3" />
+                                            ) : (
+                                                <Copy className="w-3 h-3 opacity-50 group-hover/btn:opacity-100" />
+                                            )}
+                                        </button>
+                                    ) : (
+                                        <span className="text-xs text-gray-400 italic">ยังไม่เชื่อมต่อ</span>
+                                    )}
+                                </td>
+                                <td className="py-4 px-6 text-right">
+                                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        {onView && (
+                                            <button
+                                                onClick={() => onView(employee)}
+                                                className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-gray-900 rounded-lg transition-colors border border-transparent hover:border-gray-200"
+                                                title="ดูข้อมูล"
+                                            >
+                                                <Eye className="w-4 h-4" />
+                                            </button>
+                                        )}
+                                        {canManage && (
+                                            <>
+                                                <button
+                                                    onClick={() => onEdit(employee)}
+                                                    className="p-1.5 hover:bg-blue-50 text-gray-400 hover:text-blue-600 rounded-lg transition-colors border border-transparent hover:border-blue-100"
+                                                    title="แก้ไข"
+                                                >
+                                                    <Pencil className="w-4 h-4" />
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        if (confirm(`คุณต้องการลบพนักงาน "${employee.name}" ใช่หรือไม่?`)) {
+                                                            onDelete(employee);
+                                                        }
+                                                    }}
+                                                    className="p-1.5 hover:bg-red-50 text-gray-400 hover:text-red-600 rounded-lg transition-colors border border-transparent hover:border-red-100"
+                                                    title="ลบ"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
                                 </td>
                             </tr>
-                        ) : (
-                            employees.map((employee) => (
-                                <tr key={employee.id} className="hover:bg-gray-50/50 transition-colors">
-                                    <td className="py-4 px-6">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold text-sm">
-                                                {employee.name.charAt(0)}
-                                            </div>
-                                            <span className="text-sm font-medium text-gray-700">{employee.name}</span>
-                                        </div>
-                                    </td>
-                                    <td className="py-4 px-6">
-                                        <span className="text-sm text-gray-600 font-mono">
-                                            {employee.employeeId || "-"}
-                                        </span>
-                                    </td>
-                                    <td className="py-4 px-6">
-                                        {employee.lineUserId ? (
-                                            <button
-                                                onClick={() => handleCopyLineId(employee.lineUserId!)}
-                                                className="p-2 bg-green-50 hover:bg-green-100 rounded-lg transition-colors border border-green-200"
-                                                title={`คัดลอก: ${employee.lineUserId}`}
-                                            >
-                                                {copiedId === employee.lineUserId ? (
-                                                    <Check className="w-4 h-4 text-green-600" />
-                                                ) : (
-                                                    <svg className="w-4 h-4 text-green-600" viewBox="0 0 24 24" fill="currentColor">
-                                                        <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.346 0 .627.285.627.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.282.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314" />
-                                                    </svg>
-                                                )}
-                                            </button>
-                                        ) : (
-                                            <span className="text-xs text-gray-400">-</span>
-                                        )}
-                                    </td>
-                                    <td className="py-4 px-6">
-                                        <div className="flex flex-col">
-                                            <span className="text-sm font-medium text-gray-700">{employee.position}</span>
-                                            {employee.department && (
-                                                <span className="text-xs text-gray-500">{employee.department}</span>
-                                            )}
-                                        </div>
-                                    </td>
-                                    <td className="py-4 px-6">
-                                        <span className="text-xs text-gray-500">
-                                            กิจ {employee.leaveQuota.personal} ป่วย {employee.leaveQuota.sick} พัก {employee.leaveQuota.vacation}
-                                        </span>
-                                    </td>
-                                    <td className="py-4 px-6">
-                                        <div className="flex flex-col gap-1">
-                                            <span className={cn(
-                                                "px-3 py-1 rounded-full text-xs font-medium w-fit",
-                                                employee.type === "รายเดือน" ? "bg-blue-100 text-blue-700" :
-                                                    employee.type === "รายวัน" ? "bg-green-100 text-green-700" :
-                                                        "bg-orange-100 text-orange-700"
-                                            )}>
-                                                {employee.type}
-                                            </span>
-                                            {employee.status && employee.status !== "ทำงาน" && (
-                                                <span className={cn(
-                                                    "px-3 py-1 rounded-full text-xs font-medium w-fit",
-                                                    employee.status === "ลาออก" ? "bg-red-100 text-red-700" :
-                                                        "bg-gray-100 text-gray-700"
-                                                )}>
-                                                    {employee.status}
-                                                </span>
-                                            )}
-                                        </div>
-                                    </td>
-                                    <td className="py-4 px-6">
-                                        <div className="flex items-center gap-2">
-                                            {onView && (
-                                                <button
-                                                    onClick={() => onView(employee)}
-                                                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors group"
-                                                    title="ดูข้อมูล"
-                                                >
-                                                    <Eye className="w-4 h-4 text-gray-600 group-hover:text-gray-900" />
-                                                </button>
-                                            )}
-                                            {canManage && (
-                                                <>
-                                                    <button
-                                                        onClick={() => onEdit(employee)}
-                                                        className="p-2 hover:bg-blue-50 rounded-lg transition-colors group"
-                                                        title="แก้ไข"
-                                                    >
-                                                        <Pencil className="w-4 h-4 text-gray-600 group-hover:text-blue-600" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => {
-                                                            if (confirm(`คุณต้องการลบพนักงาน "${employee.name}" ใช่หรือไม่?`)) {
-                                                                onDelete(employee);
-                                                            }
-                                                        }}
-                                                        className="p-2 hover:bg-red-50 rounded-lg transition-colors group"
-                                                        title="ลบ"
-                                                    >
-                                                        <Trash2 className="w-4 h-4 text-gray-600 group-hover:text-red-600" />
-                                                    </button>
-                                                </>
-                                            )}
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
-            </div>
+                        ))
+                    )}
+                </tbody>
+            </table>
         </div>
     );
 }
+

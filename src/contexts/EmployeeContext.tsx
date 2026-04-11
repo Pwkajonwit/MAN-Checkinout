@@ -38,7 +38,7 @@ export function EmployeeProvider({ children }: { children: ReactNode }) {
                 const mockProfile = {
                     userId: mockUserId,
                     displayName: "Dev User (ทดสอบ)",
-                    pictureUrl: "https://via.placeholder.com/150/059669/FFFFFF?text=DEV",
+                    pictureUrl: "",
                 };
                 setLineUserId(mockUserId);
                 setLineProfile(mockProfile);
