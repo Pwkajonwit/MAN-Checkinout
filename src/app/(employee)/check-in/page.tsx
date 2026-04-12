@@ -613,11 +613,15 @@ export default function CheckInPage() {
             todayEnd.setHours(23, 59, 59, 999);
 
             const history = await attendanceService.getHistory(employee.id || "", todayStart, todayEnd);
-            const mainActions = history.filter(h => h.status === "เข้างาน" || h.status === "ออกงาน");
+            const mainActions = history.filter(h =>
+                h.status === "เข้างาน" ||
+                h.status === "สาย" ||
+                h.status === "ออกงาน"
+            );
 
             // ป้องกันเข้างานซ้ำ
             if (checkInType === "เข้างาน") {
-                const hasCheckedIn = mainActions.some(a => a.status === "เข้างาน");
+                const hasCheckedIn = mainActions.some(a => a.status === "เข้างาน" || a.status === "สาย");
                 if (hasCheckedIn) {
                     showAlert("ลงเวลาซ้ำไม่ได้", "คุณได้ลงเวลาเข้างานวันนี้แล้ว", "warning");
                     setLoading(false);
@@ -840,7 +844,7 @@ export default function CheckInPage() {
             sendFlexMessage(checkInType, now, location.address, locationConfig?.enabled ? distance : null)
                 .catch(flexError => console.error("Error sending Flex Message:", flexError));
 
-            if (savedStatus === "เข้างาน" || savedStatus === "สาย") {
+            if (["เข้างาน", "สาย", "ออกงาน", "ออกนอกพื้นที่"].includes(savedStatus)) {
                 fetch("/api/notifications/check-in", {
                     method: "POST",
                     headers: {
@@ -855,7 +859,14 @@ export default function CheckInPage() {
                         locationNote: locationNote.trim() || "",
                         photo: processedPhotoValue,
                     }),
-                }).catch((notifyError) => console.error("Error sending check-in notifications:", notifyError));
+                })
+                    .then(async (response) => {
+                        if (!response.ok) {
+                            const errorBody = await response.text();
+                            console.error("Check-in notification request failed:", response.status, errorBody);
+                        }
+                    })
+                    .catch((notifyError) => console.error("Error sending check-in notifications:", notifyError));
             }
 
             // Refresh status in background
