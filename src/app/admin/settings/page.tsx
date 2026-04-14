@@ -54,7 +54,7 @@ export default function SettingsPage() {
     });
 
     const [newHoliday, setNewHoliday] = useState({
-        date: format(new Date(), "yyyy-MM-dd"),
+        date: new Date().toLocaleDateString('en-CA'),
         name: "",
         workdayMultiplier: 2.0,
         otMultiplier: 3.0
@@ -186,7 +186,9 @@ export default function SettingsPage() {
     const handleAddHoliday = () => {
         if (!newHoliday.name) return;
 
-        const holidayDate = new Date(newHoliday.date);
+        // Parse date details explicitly to create a Date in local time, avoiding UTC shift
+        const [y, m, d] = newHoliday.date.split('-').map(Number);
+        const holidayDate = new Date(y, m - 1, d);
         const holidays = [...(settings.customHolidays || [])];
         holidays.push({
             date: holidayDate,
@@ -200,7 +202,7 @@ export default function SettingsPage() {
 
         setSettings({ ...settings, customHolidays: holidays });
         setNewHoliday({
-            date: format(new Date(), "yyyy-MM-dd"),
+            date: new Date().toLocaleDateString('en-CA'),
             name: "",
             workdayMultiplier: 2.0,
             otMultiplier: 3.0

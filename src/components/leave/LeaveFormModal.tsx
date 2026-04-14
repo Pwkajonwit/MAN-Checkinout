@@ -125,12 +125,16 @@ export function LeaveFormModal({ isOpen, onClose, leave, onSuccess }: LeaveFormM
         setLoading(true);
 
         try {
+            // Parse dates using local components to avoid UTC timezone shifts
+            const [sY, sM, sD] = formData.startDate.split('-').map(Number);
+            const [eY, eM, eD] = formData.endDate.split('-').map(Number);
+            
             const leaveData = {
                 employeeId: formData.employeeId,
                 employeeName: formData.employeeName,
                 leaveType: formData.leaveType,
-                startDate: new Date(formData.startDate),
-                endDate: new Date(formData.endDate),
+                startDate: new Date(sY, sM - 1, sD),
+                endDate: new Date(eY, eM - 1, eD),
                 reason: formData.reason,
                 status: formData.status,
                 attachment: formData.attachment || undefined,

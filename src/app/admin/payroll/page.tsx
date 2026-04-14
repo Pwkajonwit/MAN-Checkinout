@@ -744,7 +744,10 @@ export default function PayrollPage() {
                                         <input
                                             type="month"
                                             value={format(selectedDate, "yyyy-MM")}
-                                            onChange={(e) => setSelectedDate(new Date(e.target.value))}
+                                            onChange={(e) => {
+                                                const [y, m] = e.target.value.split('-').map(Number);
+                                                setSelectedDate(new Date(y, m - 1, 1));
+                                            }}
                                             className="h-full w-full pl-10 pr-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-blue-400 transition-colors"
                                         />
                                     </div>
@@ -753,14 +756,20 @@ export default function PayrollPage() {
                                         <input
                                             type="date"
                                             value={format(customRange.start, "yyyy-MM-dd")}
-                                            onChange={(e) => setCustomRange({ ...customRange, start: new Date(e.target.value) })}
+                                            onChange={(e) => {
+                                                const [y, m, d] = e.target.value.split('-').map(Number);
+                                                setCustomRange({ ...customRange, start: new Date(y, m - 1, d) });
+                                            }}
                                             className="h-full flex-1 min-w-0 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-blue-400 transition-colors"
                                         />
                                         <span className="text-gray-400">-</span>
                                         <input
                                             type="date"
                                             value={format(customRange.end, "yyyy-MM-dd")}
-                                            onChange={(e) => setCustomRange({ ...customRange, end: new Date(e.target.value) })}
+                                            onChange={(e) => {
+                                                const [y, m, d] = e.target.value.split('-').map(Number);
+                                                setCustomRange({ ...customRange, end: new Date(y, m - 1, d) });
+                                            }}
                                             className="h-full flex-1 min-w-0 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-blue-400 transition-colors"
                                         />
                                     </div>
