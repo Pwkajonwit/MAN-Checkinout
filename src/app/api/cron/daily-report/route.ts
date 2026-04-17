@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { systemConfigService, employeeService, attendanceService } from "@/lib/firestore";
+import { systemConfigService, employeeService, attendanceService, leaveService } from "@/lib/firestore";
 import { isLate } from "@/lib/workTime";
 
 // Force dynamic to prevent caching
@@ -24,7 +24,8 @@ export async function GET(request: Request) {
         }
 
         // 2. Get All Employees
-        const employees = await employeeService.getAll();
+        const allEmployees = await employeeService.getAll();
+        const employees = allEmployees.filter((employee) => employee.status === "ทำงาน");
         const totalEmployees = employees.length;
 
         // 3. Get Today's Attendance
@@ -45,41 +46,55 @@ export async function GET(request: Request) {
             day: 'numeric'
         });
 
-        // Parallel fetch for performance
-        const attendancePromises = employees.map(async (emp) => {
-            if (!emp.id) return null;
-            try {
-                const history = await attendanceService.getHistory(emp.id, todayStart, todayEnd);
-                // Find check-in record
-                const checkInRecord = history.find(h => h.status === "เข้างาน");
-                const leaveRecord = history.find(h => h.status === "ลางาน");
+        const [todayAttendances, leaveRequests] = await Promise.all([
+            attendanceService.getByDateRange(todayStart, todayEnd),
+            leaveService.getAll(),
+        ]);
 
-                if (leaveRecord) {
-                    return "leave";
-                } else if (checkInRecord) {
-                    if (isLate(checkInRecord.date)) {
-                        return "late";
-                    }
-                    return "present";
-                } else {
-                    return "absent";
-                }
-            } catch (e) {
-                console.error(`Error fetching attendance for ${emp.name}:`, e);
-                return "error";
-            }
+        const attendanceByEmployee = new Map<string, typeof todayAttendances>();
+        todayAttendances.forEach((record) => {
+            const records = attendanceByEmployee.get(record.employeeId) || [];
+            records.push(record);
+            attendanceByEmployee.set(record.employeeId, records);
         });
 
-        const results = await Promise.all(attendancePromises);
+        const approvedLeaveEmployeeIds = new Set(
+            leaveRequests
+                .filter((leave) =>
+                    leave.status === "อนุมัติ" &&
+                    leave.startDate <= todayEnd &&
+                    leave.endDate >= todayStart
+                )
+                .map((leave) => leave.employeeId)
+        );
 
-        results.forEach(status => {
-            if (status === "present") presentCount++;
-            else if (status === "late") {
-                lateCount++;
-                presentCount++; // Late is also present
+        employees.forEach((employee) => {
+            if (!employee.id) return;
+
+            if (approvedLeaveEmployeeIds.has(employee.id)) {
+                leaveCount++;
+                return;
             }
-            else if (status === "leave") leaveCount++;
-            else if (status === "absent") absentCount++;
+
+            const records = attendanceByEmployee.get(employee.id) || [];
+            const checkInRecord = records.find((record) =>
+                record.status === "เข้างาน" || record.status === "สาย"
+            );
+
+            if (!checkInRecord) {
+                absentCount++;
+                return;
+            }
+
+            presentCount++;
+
+            const isEmployeeLate = records.some((record) =>
+                record.status === "สาย" || (record.lateMinutes ?? 0) > 0
+            ) || (checkInRecord.checkIn ? isLate(checkInRecord.checkIn) : false);
+
+            if (isEmployeeLate) {
+                lateCount++;
+            }
         });
 
         // 4. Send Line Message
