@@ -1,10 +1,10 @@
-"use client";
+﻿"use client";
 
 import { useRef, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { MapPin, Camera, RotateCcw, CheckCircle, Clock, AlertTriangle } from "lucide-react";
-import { attendanceService, systemConfigService, shiftService, type Shift, type SystemConfig } from "@/lib/firestore";
+import { attendanceService, systemConfigService, shiftService, type Shift, type SystemConfig, type WorkLocation } from "@/lib/firestore";
 import { isLate, getLateMinutes, isEligibleForOT, getOTMinutes, formatMinutesToHours } from "@/lib/workTime";
 import { useEmployee } from "@/contexts/EmployeeContext";
 import { EmployeeHeader } from "@/components/mobile/EmployeeHeader";
@@ -77,12 +77,8 @@ export default function CheckInPage() {
     const [workTimeEnabled, setWorkTimeEnabled] = useState(true);
     const [systemConfig, setSystemConfig] = useState<SystemConfig | null>(null);
     const [employeeShift, setEmployeeShift] = useState<Shift | null>(null);
-    const [locationConfig, setLocationConfig] = useState<{
-        enabled: boolean;
-        latitude: number;
-        longitude: number;
-        radius: number;
-    } | null>(null);
+    const [matchedWorkLocation, setMatchedWorkLocation] = useState<WorkLocation | null>(null);
+    const [nearestWorkLocation, setNearestWorkLocation] = useState<WorkLocation | null>(null);
 
     useEffect(() => {
         const timer = setInterval(() => {
@@ -124,9 +120,6 @@ export default function CheckInPage() {
                     setSystemConfig(config);
                     setRequirePhoto(config.requirePhoto ?? true);
                     setWorkTimeEnabled(config.workTimeEnabled ?? true);
-                    if (config.locationConfig) {
-                        setLocationConfig(config.locationConfig);
-                    }
                 }
             } catch (error) {
                 console.error("Error loading settings:", error);
@@ -134,6 +127,26 @@ export default function CheckInPage() {
         };
         loadSettings();
     }, []);
+
+    const getAllowedWorkLocations = (): WorkLocation[] => {
+        if (!systemConfig?.locationEnabled) {
+            return [];
+        }
+
+        const configuredLocations = systemConfig.workLocations || [];
+        if (configuredLocations.length === 0) {
+            return [];
+        }
+
+        const assignedLocationIds = employee?.allowedLocationIds || [];
+        if (assignedLocationIds.length === 0) {
+            return configuredLocations;
+        }
+
+        return configuredLocations.filter(location => assignedLocationIds.includes(location.id));
+    };
+
+    const isLocationValidationActive = (): boolean => getAllowedWorkLocations().length > 0;
 
 
 
@@ -283,19 +296,33 @@ export default function CheckInPage() {
                 async (position) => {
                     const lat = position.coords.latitude;
                     const lng = position.coords.longitude;
+                    const allowedWorkLocations = getAllowedWorkLocations();
+                    const assignedLocationIds = employee?.allowedLocationIds || [];
 
-                    // Calculate distance only if location check is enabled
-                    if (locationConfig && locationConfig.enabled) {
-                        const dist = calculateDistance(
-                            lat,
-                            lng,
-                            locationConfig.latitude,
-                            locationConfig.longitude
-                        );
-                        setDistance(dist);
-                        setIsLocationValid(dist <= locationConfig.radius);
+                    if ((systemConfig?.locationEnabled ?? false) && assignedLocationIds.length > 0 && allowedWorkLocations.length === 0) {
+                        showAlert("\u0E44\u0E21\u0E48\u0E1E\u0E1A\u0E08\u0E38\u0E14\u0E40\u0E0A\u0E47\u0E01\u0E2D\u0E34\u0E19", "\u0E23\u0E32\u0E22\u0E01\u0E32\u0E23 Work Location \u0E02\u0E2D\u0E07\u0E04\u0E38\u0E13\u0E44\u0E21\u0E48\u0E15\u0E23\u0E07\u0E01\u0E31\u0E1A\u0E04\u0E48\u0E32\u0E43\u0E19\u0E23\u0E30\u0E1A\u0E1A \u0E01\u0E23\u0E38\u0E13\u0E32\u0E15\u0E34\u0E14\u0E15\u0E48\u0E2D\u0E1C\u0E39\u0E49\u0E14\u0E39\u0E41\u0E25\u0E23\u0E30\u0E1A\u0E1A", "error");
+                        setLocationLoading(false);
+                        return;
+                    }
+
+                    if (allowedWorkLocations.length > 0) {
+                        const locationDistances = allowedWorkLocations
+                            .map(workLocation => ({
+                                workLocation,
+                                distance: calculateDistance(lat, lng, workLocation.latitude, workLocation.longitude),
+                            }))
+                            .sort((a, b) => a.distance - b.distance);
+
+                        const nearest = locationDistances[0] || null;
+                        const matched = locationDistances.find(item => item.distance <= item.workLocation.radius) || null;
+
+                        setNearestWorkLocation(nearest?.workLocation || null);
+                        setMatchedWorkLocation(matched?.workLocation || null);
+                        setDistance(nearest?.distance ?? null);
+                        setIsLocationValid(Boolean(matched));
                     } else {
-                        // Location check disabled - no distance calculation
+                        setNearestWorkLocation(null);
+                        setMatchedWorkLocation(null);
                         setDistance(null);
                         setIsLocationValid(true);
                     }
@@ -841,7 +868,7 @@ export default function CheckInPage() {
             setShowSuccess(true);
 
             // Send Flex Message (Non-blocking / Fire and forget)
-            sendFlexMessage(checkInType, now, location.address, locationConfig?.enabled ? distance : null)
+            sendFlexMessage(checkInType, now, location.address, isLocationValidationActive() ? distance : null)
                 .catch(flexError => console.error("Error sending Flex Message:", flexError));
 
             if (["เข้างาน", "สาย", "ออกงาน", "ออกนอกพื้นที่"].includes(savedStatus)) {
@@ -855,7 +882,7 @@ export default function CheckInPage() {
                         status: savedStatus,
                         time: now.toISOString(),
                         location: location.address,
-                        distance: locationConfig?.enabled ? distance : null,
+                        distance: isLocationValidationActive() ? distance : null,
                         locationNote: locationNote.trim() || "",
                         photo: processedPhotoValue,
                     }),
@@ -879,6 +906,8 @@ export default function CheckInPage() {
                 setLocation(null);
                 setPhoto(null);
                 setDistance(null);
+                setMatchedWorkLocation(null);
+                setNearestWorkLocation(null);
                 setIsLocationValid(true);
                 setLocationNote("");
             }, 2000);
@@ -1128,7 +1157,7 @@ export default function CheckInPage() {
                         </div>
 
                         {/* Distance Warning */}
-                        {distance !== null && locationConfig?.enabled && (
+                        {distance !== null && isLocationValidationActive() && (
                             <div className={`mt-3 p-3 rounded-xl flex items-start gap-2 ${isLocationValid ? "bg-green-50 border border-green-200" : "bg-red-50 border border-red-200"}`}>
                                 {isLocationValid ? (
                                     <CheckCircle className="w-4 h-4 text-green-600 mt-0.5" />
@@ -1142,6 +1171,17 @@ export default function CheckInPage() {
                                     <p className="text-gray-600 mt-0.5">
                                         ห่างจากจุดเช็คอิน {distance < 1000 ? `${Math.round(distance)} เมตร` : `${(distance / 1000).toFixed(2)} กม.`}
                                     </p>
+
+                                    {matchedWorkLocation && (
+                                        <p className="text-green-700 mt-1 font-medium">
+                                            {"\u0E40\u0E02\u0E49\u0E32\u0E44\u0E14\u0E49\u0E17\u0E35\u0E48: "}{matchedWorkLocation.name}
+                                        </p>
+                                    )}
+                                    {!matchedWorkLocation && nearestWorkLocation && (
+                                        <p className="text-gray-600 mt-1">
+                                            {"\u0E08\u0E38\u0E14\u0E17\u0E35\u0E48\u0E43\u0E01\u0E25\u0E49\u0E17\u0E35\u0E48\u0E2A\u0E38\u0E14: "}{nearestWorkLocation.name}
+                                        </p>
+                                    )}
 
                                     {!isLocationValid && (
                                         <div className="mt-3">

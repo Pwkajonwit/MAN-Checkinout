@@ -1,9 +1,9 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { X, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { employeeService, shiftService, type Employee, type Shift } from "@/lib/firestore";
+import { employeeService, shiftService, systemConfigService, type Employee, type Shift, type WorkLocation } from "@/lib/firestore";
 
 interface EmployeeFormModalProps {
     isOpen: boolean;
@@ -16,6 +16,7 @@ interface EmployeeFormModalProps {
 export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOnly = false }: EmployeeFormModalProps) {
     const [loading, setLoading] = useState(false);
     const [shifts, setShifts] = useState<Shift[]>([]);
+    const [availableLocations, setAvailableLocations] = useState<WorkLocation[]>([]);
 
 
     const [formData, setFormData] = useState({
@@ -33,6 +34,7 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
         lineUserId: "",
         weeklyHolidays: [0] as number[], // Default: วันอาทิตย์หยุด
         shiftId: "" as string, // กะเวลา
+        allowedLocationIds: [] as string[],
         leaveQuota: {
             personal: 3,
             sick: 30,
@@ -46,6 +48,10 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
             shiftService.getAll()
                 .then(data => setShifts(data))
                 .catch(err => console.error("Error loading shifts:", err));
+
+            systemConfigService.get()
+                .then(config => setAvailableLocations(config?.workLocations || []))
+                .catch(err => console.error("Error loading work locations:", err));
         }
     }, [isOpen]);
 
@@ -67,6 +73,7 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
                 lineUserId: employee.lineUserId || "",
                 weeklyHolidays: employee.weeklyHolidays || [0],
                 shiftId: employee.shiftId || "",
+                allowedLocationIds: employee.allowedLocationIds || [],
                 leaveQuota: {
                     personal: employee.leaveQuota?.personal || 3,
                     sick: employee.leaveQuota?.sick || 30,
@@ -90,6 +97,7 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
                 lineUserId: "",
                 weeklyHolidays: [0],
                 shiftId: "",
+                allowedLocationIds: [],
                 leaveQuota: {
                     personal: 6,
                     sick: 30,
@@ -134,6 +142,7 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
                 lineUserId: "",
                 weeklyHolidays: [0],
                 shiftId: "",
+                allowedLocationIds: [],
                 leaveQuota: {
                     personal: 6,
                     sick: 30,
@@ -409,6 +418,49 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
                                             );
                                         })}
                                     </div>
+                                </div>
+
+                                <div className="col-span-1 md:col-span-2">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Work Locations</label>
+                                    {availableLocations.length > 0 ? (
+                                        <>
+                                            <div className="flex flex-wrap gap-2">
+                                                {availableLocations.map((location) => {
+                                                    const isSelected = formData.allowedLocationIds.includes(location.id);
+                                                    return (
+                                                        <button
+                                                            key={location.id}
+                                                            type="button"
+                                                            onClick={() => {
+                                                                if (readOnly) return;
+                                                                setFormData(prev => ({
+                                                                    ...prev,
+                                                                    allowedLocationIds: isSelected
+                                                                        ? prev.allowedLocationIds.filter(id => id !== location.id)
+                                                                        : [...prev.allowedLocationIds, location.id]
+                                                                }));
+                                                            }}
+                                                            disabled={readOnly}
+                                                            className={`px-4 py-2 text-xs font-medium rounded-lg border transition-all ${isSelected
+                                                                ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                                                                : "bg-white text-gray-600 border-gray-200 hover:border-blue-300"
+                                                                } ${readOnly ? "opacity-60 cursor-not-allowed" : ""}`}
+                                                        >
+                                                            {location.name}
+                                                            <span className="ml-2 text-[10px] opacity-80">{location.radius}m</span>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                            <p className="text-xs text-gray-500 mt-2">
+                                                หากไม่เลือกเลย ระบบจะอนุญาตทุก Work Location ที่ตั้งไว้ใน Settings
+                                            </p>
+                                        </>
+                                    ) : (
+                                        <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-500">
+                                            ยังไม่มี Work Location ใน System Settings
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </section>

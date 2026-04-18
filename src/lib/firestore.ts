@@ -37,6 +37,7 @@ export interface Employee {
     avatar?: string | null;
     lineUserId?: string;
     baseSalary?: number;
+    allowedLocationIds?: string[];
     weeklyHolidays?: number[]; // วันหยุดประจำสัปดาห์ (0=อาทิตย์, 1=จันทร์, ..., 6=เสาร์)
     shiftId?: string;           // ID ของกะเวลาทำงาน
 }
@@ -824,6 +825,14 @@ export interface CustomHoliday {
     otMultiplier: number; // OT rate for this day (e.g. 3.0)
 }
 
+export interface WorkLocation {
+    id: string;
+    name: string;
+    latitude: number;
+    longitude: number;
+    radius: number; // meters
+}
+
 export interface SystemConfig {
     id?: string;
     checkInHour: number;
@@ -844,6 +853,8 @@ export interface SystemConfig {
     customHolidays: CustomHoliday[];
     lineNotifyToken?: string; // Line Notify Token
     lineGroupId?: string; // Line Group ID for notifications
+    locationEnabled?: boolean;
+    workLocations?: WorkLocation[];
     locationConfig?: {
         enabled: boolean;
         latitude: number;
@@ -866,6 +877,43 @@ export interface SystemConfig {
     enableBreak?: boolean;           // เปิด/ปิด การลงเวลาก่อนพัก-หลังพัก (default: true)
     enableOffsite?: boolean;         // เปิด/ปิด การลงเวลาออกนอกพื้นที่ (default: true)
 }
+
+export function normalizeWorkLocations(config?: Partial<SystemConfig> | null): WorkLocation[] {
+    if (Array.isArray(config?.workLocations) && config.workLocations.length > 0) {
+        return config.workLocations.map((location, index) => ({
+            id: location.id || `loc_${index + 1}`,
+            name: location.name || `Location ${index + 1}`,
+            latitude: Number(location.latitude) || 0,
+            longitude: Number(location.longitude) || 0,
+            radius: Number(location.radius) || 100,
+        }));
+    }
+
+    if (config?.locationConfig) {
+        return [{
+            id: "default-location",
+            name: "สำนักงานใหญ่",
+            latitude: Number(config.locationConfig.latitude) || 0,
+            longitude: Number(config.locationConfig.longitude) || 0,
+            radius: Number(config.locationConfig.radius) || 100,
+        }];
+    }
+
+    return [];
+}
+
+export function isLocationVerificationEnabled(config?: Partial<SystemConfig> | null): boolean {
+    if (typeof config?.locationEnabled === "boolean") {
+        return config.locationEnabled;
+    }
+
+    if (typeof config?.locationConfig?.enabled === "boolean") {
+        return config.locationConfig.enabled;
+    }
+
+    return normalizeWorkLocations(config).length > 0;
+}
+
 // System Config CRUD operations
 export const systemConfigService = {
     async get() {
@@ -876,8 +924,11 @@ export const systemConfigService = {
             const holidayData = Array.isArray(data.customHolidays)
                 ? data.customHolidays as Array<CustomHoliday & { date?: { toDate?: () => Date } }>
                 : [];
+            const normalizedConfig = data as SystemConfig;
             return {
-                ...data,
+                ...normalizedConfig,
+                locationEnabled: isLocationVerificationEnabled(normalizedConfig),
+                workLocations: normalizeWorkLocations(normalizedConfig),
                 customHolidays: holidayData.map((h) => ({
                     ...h,
                     date: typeof h.date?.toDate === "function" ? h.date.toDate() : h.date
@@ -891,10 +942,26 @@ export const systemConfigService = {
         const docRef = doc(db, "settings", "workTime");
         // Use setDoc with merge: true to create if not exists or update if exists
         const { setDoc } = await import("firebase/firestore");
+        const workLocations = normalizeWorkLocations(config);
+        const locationEnabled = isLocationVerificationEnabled(config);
+        const primaryLocation = workLocations[0];
 
         // Convert Dates to Timestamps for storage
         const dataToSave = {
             ...config,
+            locationEnabled,
+            workLocations,
+            locationConfig: primaryLocation ? {
+                enabled: locationEnabled,
+                latitude: primaryLocation.latitude,
+                longitude: primaryLocation.longitude,
+                radius: primaryLocation.radius,
+            } : {
+                enabled: locationEnabled,
+                latitude: 0,
+                longitude: 0,
+                radius: 100,
+            },
             customHolidays: config.customHolidays?.map(h => ({
                 ...h,
                 date: Timestamp.fromDate(h.date)

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -12,10 +12,20 @@ import {
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
 import { WORK_TIME_CONFIG } from "@/lib/workTime";
-import { systemConfigService, type SystemConfig, employeeService } from "@/lib/firestore";
+import { systemConfigService, type SystemConfig, type WorkLocation, employeeService } from "@/lib/firestore";
 import { getStorageUsage, deleteOldPhotos, type StorageStats, PHOTO_STORAGE_LIMIT } from "@/lib/storage";
 import { checkAllIndexes, type IndexCheckResult } from "@/lib/indexChecker";
 import { CustomAlert } from "@/components/ui/custom-alert";
+
+function createWorkLocation(index: number): WorkLocation {
+    return {
+        id: `loc_${Date.now()}_${index}`,
+        name: `จุดเช็กอิน ${index}`,
+        latitude: 0,
+        longitude: 0,
+        radius: 100,
+    };
+}
 
 export default function SettingsPage() {
     const [settings, setSettings] = useState<SystemConfig>({
@@ -41,6 +51,8 @@ export default function SettingsPage() {
         customHolidays: [],
         allowNewRegistration: true,
         workTimeEnabled: true, // Enable work time tracking by default
+        locationEnabled: false,
+        workLocations: [createWorkLocation(1)],
         locationConfig: {
             enabled: false,
             latitude: 0,
@@ -66,7 +78,7 @@ export default function SettingsPage() {
     const [storageUsage, setStorageUsage] = useState<StorageStats | null>(null);
     const [loadingStorage, setLoadingStorage] = useState(false);
     const [cleanupLoading, setCleanupLoading] = useState(false);
-    const [gettingLocation, setGettingLocation] = useState(false);
+    const [gettingLocationId, setGettingLocationId] = useState<string | null>(null);
     const [updatingAllHolidays, setUpdatingAllHolidays] = useState(false);
 
     // Index Checker State
@@ -148,6 +160,10 @@ export default function SettingsPage() {
                         customHolidays: config.customHolidays ?? [],
                         allowNewRegistration: config.allowNewRegistration ?? true,
                         workTimeEnabled: config.workTimeEnabled ?? true,
+                        locationEnabled: config.locationEnabled ?? false,
+                        workLocations: (config.workLocations && config.workLocations.length > 0)
+                            ? config.workLocations
+                            : [createWorkLocation(1)],
                         locationConfig: config.locationConfig ?? {
                             enabled: false,
                             latitude: 0,
@@ -244,20 +260,50 @@ export default function SettingsPage() {
         }
     };
 
-    const handleGetCurrentLocation = () => {
-        setGettingLocation(true);
+    const handleAddWorkLocation = () => {
+        setSettings(prev => ({
+            ...prev,
+            workLocations: [...(prev.workLocations || []), createWorkLocation((prev.workLocations?.length || 0) + 1)]
+        }));
+    };
+
+    const handleRemoveWorkLocation = (locationId: string) => {
+        setSettings(prev => {
+            const nextLocations = (prev.workLocations || []).filter(location => location.id !== locationId);
+            return {
+                ...prev,
+                workLocations: nextLocations.length > 0 ? nextLocations : [createWorkLocation(1)]
+            };
+        });
+    };
+
+    const handleLocationFieldChange = (locationId: string, field: keyof WorkLocation, value: string | number) => {
+        setSettings(prev => ({
+            ...prev,
+            workLocations: (prev.workLocations || []).map(location =>
+                location.id === locationId ? { ...location, [field]: value } : location
+            )
+        }));
+    };
+
+    const handleGetCurrentLocation = (locationId: string) => {
+        setGettingLocationId(locationId);
         if ("geolocation" in navigator) {
             navigator.geolocation.getCurrentPosition(
                 (position) => {
                     setSettings(prev => ({
                         ...prev,
-                        locationConfig: {
-                            ...prev.locationConfig!,
-                            latitude: position.coords.latitude,
-                            longitude: position.coords.longitude
-                        }
+                        workLocations: (prev.workLocations || []).map(location =>
+                            location.id === locationId
+                                ? {
+                                    ...location,
+                                    latitude: position.coords.latitude,
+                                    longitude: position.coords.longitude
+                                }
+                                : location
+                        )
                     }));
-                    setGettingLocation(false);
+                    setGettingLocationId(null);
                 },
                 (error) => {
                     console.error("Error getting location:", error);
@@ -267,7 +313,7 @@ export default function SettingsPage() {
                         message: "ไม่สามารถดึงตำแหน่งปัจจุบันได้ กรุณาตรวจสอบการอนุญาตเข้าถึงตำแหน่ง",
                         type: "error"
                     });
-                    setGettingLocation(false);
+                    setGettingLocationId(null);
                 },
                 { enableHighAccuracy: true }
             );
@@ -278,7 +324,7 @@ export default function SettingsPage() {
                 message: "เบราว์เซอร์ของคุณไม่รองรับการระบุตำแหน่ง",
                 type: "error"
             });
-            setGettingLocation(false);
+            setGettingLocationId(null);
         }
     };
 
@@ -325,6 +371,8 @@ export default function SettingsPage() {
             customHolidays: [],
             allowNewRegistration: true,
             workTimeEnabled: true,
+            locationEnabled: false,
+            workLocations: [createWorkLocation(1)],
             locationConfig: {
                 enabled: false,
                 latitude: 0,
@@ -673,63 +721,104 @@ export default function SettingsPage() {
                             </div>
                         </div>
                         <button
-                            onClick={() => setSettings(prev => ({
-                                ...prev,
-                                locationConfig: {
-                                    ...prev.locationConfig!,
-                                    enabled: !prev.locationConfig?.enabled
-                                }
-                            }))}
-                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 ${settings.locationConfig?.enabled ? 'bg-slate-900' : 'bg-slate-200'}`}
+                            onClick={() => setSettings(prev => ({ ...prev, locationEnabled: !prev.locationEnabled }))}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 ${settings.locationEnabled ? 'bg-slate-900' : 'bg-slate-200'}`}
                         >
-                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.locationConfig?.enabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.locationEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
                         </button>
                     </div>
 
-                    <div className={`p-6 transition-opacity ${settings.locationConfig?.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div className="md:col-span-2 grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Latitude</label>
-                                    <input
-                                        type="number" step="any"
-                                        className="w-full rounded-md border-slate-300 shadow-sm focus:border-slate-500 focus:ring-slate-500 sm:text-sm h-10 font-mono"
-                                        value={settings.locationConfig?.latitude ?? 0}
-                                        onChange={(e) => setSettings(prev => ({ ...prev, locationConfig: { ...prev.locationConfig!, latitude: parseFloat(e.target.value) || 0 } }))}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Longitude</label>
-                                    <input
-                                        type="number" step="any"
-                                        className="w-full rounded-md border-slate-300 shadow-sm focus:border-slate-500 focus:ring-slate-500 sm:text-sm h-10 font-mono"
-                                        value={settings.locationConfig?.longitude ?? 0}
-                                        onChange={(e) => setSettings(prev => ({ ...prev, locationConfig: { ...prev.locationConfig!, longitude: parseFloat(e.target.value) || 0 } }))}
-                                    />
-                                </div>
+                    <div className={`p-6 transition-opacity ${settings.locationEnabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+                        <div className="flex items-start justify-between gap-4 mb-4">
+                            <div>
+                                <p className="text-sm font-medium text-slate-900">รายการจุดเช็กอิน</p>
+                                <p className="text-xs text-slate-500 mt-1">เพิ่มได้หลายจุด และนำไปกำหนดให้พนักงานแต่ละคนได้</p>
                             </div>
-                            <div className="flex flex-col justify-end">
-                                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Radius (Meters)</label>
-                                <input
-                                    type="number"
-                                    className="w-full rounded-md border-slate-300 shadow-sm focus:border-slate-500 focus:ring-slate-500 sm:text-sm h-10"
-                                    value={settings.locationConfig?.radius ?? 100}
-                                    onChange={(e) => setSettings(prev => ({ ...prev, locationConfig: { ...prev.locationConfig!, radius: parseInt(e.target.value) || 100 } }))}
-                                />
-                            </div>
-                        </div>
-                        <div className="mt-4">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={handleGetCurrentLocation}
-                                disabled={gettingLocation || !settings.locationConfig?.enabled}
-                                className="gap-2"
-                            >
-                                <Crosshair className={`w-3.5 h-3.5 ${gettingLocation ? 'animate-spin' : ''}`} />
-                                {gettingLocation ? 'Locating...' : 'Use Current Location'}
+                            <Button type="button" variant="outline" size="sm" onClick={handleAddWorkLocation} className="gap-2">
+                                <Plus className="w-3.5 h-3.5" />
+                                เพิ่มจุดเช็กอิน
                             </Button>
+                        </div>
+
+                        <div className="space-y-4">
+                            {(settings.workLocations || []).map((location, index) => (
+                                <div key={location.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                                    <div className="flex items-center justify-between gap-3 mb-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center text-sm font-bold">
+                                                {index + 1}
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-semibold text-slate-900">{location.name || `จุดเช็กอิน ${index + 1}`}</p>
+                                                <p className="text-xs text-slate-500">ID: {location.id}</p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRemoveWorkLocation(location.id)}
+                                            className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                                            disabled={(settings.workLocations || []).length === 1}
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                        <div className="md:col-span-2">
+                                            <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">ชื่อจุดเช็กอิน</label>
+                                            <input
+                                                type="text"
+                                                className="w-full rounded-md border-slate-300 shadow-sm focus:border-slate-500 focus:ring-slate-500 sm:text-sm h-10"
+                                                value={location.name}
+                                                onChange={(e) => handleLocationFieldChange(location.id, "name", e.target.value)}
+                                                placeholder={`จุดเช็กอิน ${index + 1}`}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Latitude</label>
+                                            <input
+                                                type="number"
+                                                step="any"
+                                                className="w-full rounded-md border-slate-300 shadow-sm focus:border-slate-500 focus:ring-slate-500 sm:text-sm h-10 font-mono"
+                                                value={location.latitude}
+                                                onChange={(e) => handleLocationFieldChange(location.id, "latitude", parseFloat(e.target.value) || 0)}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Longitude</label>
+                                            <input
+                                                type="number"
+                                                step="any"
+                                                className="w-full rounded-md border-slate-300 shadow-sm focus:border-slate-500 focus:ring-slate-500 sm:text-sm h-10 font-mono"
+                                                value={location.longitude}
+                                                onChange={(e) => handleLocationFieldChange(location.id, "longitude", parseFloat(e.target.value) || 0)}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Radius (Meters)</label>
+                                            <input
+                                                type="number"
+                                                className="w-full rounded-md border-slate-300 shadow-sm focus:border-slate-500 focus:ring-slate-500 sm:text-sm h-10"
+                                                value={location.radius}
+                                                onChange={(e) => handleLocationFieldChange(location.id, "radius", parseInt(e.target.value) || 100)}
+                                            />
+                                        </div>
+                                        <div className="md:col-span-3 flex items-end">
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => handleGetCurrentLocation(location.id)}
+                                                disabled={gettingLocationId === location.id}
+                                                className="gap-2"
+                                            >
+                                                <Crosshair className={`w-3.5 h-3.5 ${gettingLocationId === location.id ? 'animate-spin' : ''}`} />
+                                                {gettingLocationId === location.id ? 'กำลังระบุตำแหน่ง...' : 'ใช้ตำแหน่งปัจจุบัน'}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     </div>
                 </div>

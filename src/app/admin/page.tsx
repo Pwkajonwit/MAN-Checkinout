@@ -70,7 +70,7 @@ export default function DashboardPage() {
         const loadConfig = async () => {
             try {
                 const config = await systemConfigService.get();
-                if (config?.locationConfig?.enabled) {
+                if (config?.locationEnabled) {
                     setLocationEnabled(true);
                 }
                 setWorkTimeEnabled(config?.workTimeEnabled ?? true);
