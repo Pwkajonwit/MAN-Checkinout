@@ -51,13 +51,13 @@ export async function GET(request: Request) {
             try {
                 const history = await attendanceService.getHistory(emp.id, todayStart, todayEnd);
                 // Find check-in record
-                const checkInRecord = history.find(h => h.status === "เข้างาน");
+                const checkInRecord = history.find(h => h.status === "เข้างาน" || h.status === "สาย");
                 const leaveRecord = history.find(h => h.status === "ลางาน");
 
                 if (leaveRecord) {
                     return "leave";
                 } else if (checkInRecord) {
-                    if (isLate(checkInRecord.date)) {
+                    if (checkInRecord.status === "สาย" || isLate(checkInRecord.checkIn || checkInRecord.date)) {
                         return "late";
                     }
                     return "present";
