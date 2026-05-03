@@ -162,10 +162,10 @@ export function LeaveFormModal({ isOpen, onClose, leave, onSuccess }: LeaveFormM
 
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
                 {/* Header */}
-                <div className="sticky top-0 bg-white border-b border-gray-100 p-6 flex items-center justify-between rounded-t-3xl">
-                    <h2 className="text-2xl font-bold text-gray-800">
+                <div className="sticky top-0 bg-white border-b border-gray-100 p-6 flex items-center justify-between">
+                    <h2 className="text-xl font-semibold text-gray-800">
                         {leave ? "แก้ไขการลางาน" : "เพิ่มการลางาน"}
                     </h2>
                     <button
@@ -177,16 +177,16 @@ export function LeaveFormModal({ isOpen, onClose, leave, onSuccess }: LeaveFormM
                 </div>
 
                 {/* Form */}
-                <form onSubmit={handleSubmit} className="p-6 space-y-6">
+                <form onSubmit={handleSubmit} className="p-6 space-y-4">
                     {/* Employee Selection */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-semibold text-slate-800 mb-1">
                             เลือกพนักงาน <span className="text-red-500">*</span>
                         </label>
                         <select
                             value={formData.employeeId}
                             onChange={(e) => handleEmployeeChange(e.target.value)}
-                            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#EBDACA] focus:border-transparent"
+                            className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-[#EBDACA] focus:border-transparent"
                             required
                             disabled={!!leave}
                         >
@@ -201,13 +201,13 @@ export function LeaveFormModal({ isOpen, onClose, leave, onSuccess }: LeaveFormM
 
                     {/* Leave Type */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-semibold text-slate-800 mb-1">
                             ประเภทการลา <span className="text-red-500">*</span>
                         </label>
                         <select
                             value={formData.leaveType}
                             onChange={(e) => setFormData({ ...formData, leaveType: e.target.value as any })}
-                            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#EBDACA] focus:border-transparent"
+                            className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-[#EBDACA] focus:border-transparent"
                             required
                         >
                             <option value="ลาพักร้อน">ลาพักร้อน</option>
@@ -219,27 +219,27 @@ export function LeaveFormModal({ isOpen, onClose, leave, onSuccess }: LeaveFormM
                     {/* Date Range */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm font-semibold text-slate-800 mb-1">
                                 วันที่เริ่มต้น <span className="text-red-500">*</span>
                             </label>
                             <input
                                 type="date"
                                 value={formData.startDate}
                                 onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#EBDACA] focus:border-transparent"
+                                className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-[#EBDACA] focus:border-transparent"
                                 required
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm font-semibold text-slate-800 mb-1">
                                 วันที่สิ้นสุด <span className="text-red-500">*</span>
                             </label>
                             <input
                                 type="date"
                                 value={formData.endDate}
                                 onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#EBDACA] focus:border-transparent"
+                                className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-[#EBDACA] focus:border-transparent"
                                 required
                                 min={formData.startDate}
                             />
@@ -248,7 +248,7 @@ export function LeaveFormModal({ isOpen, onClose, leave, onSuccess }: LeaveFormM
 
                     {/* Days Display */}
                     {formData.startDate && formData.endDate && (
-                        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                        <div className="bg-blue-50 border border-blue-200 rounded-md p-3 shadow-sm">
                             <p className="text-sm text-blue-700">
                                 จำนวนวันลา: <span className="font-bold text-lg">{calculateDays()}</span> วัน
                             </p>
@@ -257,13 +257,13 @@ export function LeaveFormModal({ isOpen, onClose, leave, onSuccess }: LeaveFormM
 
                     {/* Reason */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-semibold text-slate-800 mb-1">
                             เหตุผล <span className="text-red-500">*</span>
                         </label>
                         <textarea
                             value={formData.reason}
                             onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-                            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#EBDACA] focus:border-transparent"
+                            className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-[#EBDACA] focus:border-transparent"
                             rows={3}
                             placeholder="กรอกเหตุผลการลา"
                             required
@@ -272,7 +272,7 @@ export function LeaveFormModal({ isOpen, onClose, leave, onSuccess }: LeaveFormM
 
                     {/* Attachment */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-semibold text-slate-800 mb-1">
                             หลักฐานประกอบ (ถ้ามี)
                         </label>
                         <div className="flex items-start gap-4">
@@ -313,7 +313,7 @@ export function LeaveFormModal({ isOpen, onClose, leave, onSuccess }: LeaveFormM
                                 <button
                                     type="button"
                                     onClick={() => fileInputRef.current?.click()}
-                                    className="w-full h-32 border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center text-gray-500 hover:border-gray-400 hover:bg-gray-50 transition-colors"
+                                    className="w-full h-32 border-2 border-dashed border-gray-300 rounded-md flex flex-col items-center justify-center text-gray-500 hover:border-gray-400 hover:bg-gray-50 transition-colors"
                                 >
                                     <Camera className="w-8 h-8 mb-2 text-gray-400" />
                                     <span className="text-sm">คลิกเพื่อแนบรูปภาพ</span>
@@ -325,13 +325,13 @@ export function LeaveFormModal({ isOpen, onClose, leave, onSuccess }: LeaveFormM
 
                     {/* Status */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-semibold text-slate-800 mb-1">
                             สถานะ
                         </label>
                         <select
                             value={formData.status}
                             onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-                            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#EBDACA] focus:border-transparent"
+                            className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-[#EBDACA] focus:border-transparent"
                         >
                             <option value="รอการอนุมัติ">รอการอนุมัติ</option>
                             <option value="อนุมัติ">อนุมัติ</option>
@@ -345,14 +345,14 @@ export function LeaveFormModal({ isOpen, onClose, leave, onSuccess }: LeaveFormM
                             type="button"
                             onClick={onClose}
                             variant="outline"
-                            className="flex-1 h-12 rounded-xl"
+                            className="flex-1 h-10 rounded-md text-sm font-medium"
                             disabled={loading}
                         >
                             ยกเลิก
                         </Button>
                         <Button
                             type="submit"
-                            className="flex-1 h-12 bg-primary-dark hover:bg-primary-dark/90 text-white rounded-xl"
+                            className="flex-1 h-10 bg-primary-dark hover:bg-primary-dark/90 text-white rounded-md text-sm font-medium"
                             disabled={loading}
                         >
                             {loading ? "กำลังบันทึก..." : leave ? "บันทึกการแก้ไข" : "เพิ่มการลางาน"}

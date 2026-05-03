@@ -140,10 +140,10 @@ export function OTFormModal({ isOpen, onClose, ot, onSuccess }: OTFormModalProps
 
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
                 {/* Header */}
-                <div className="sticky top-0 bg-white border-b border-gray-100 p-6 flex items-center justify-between rounded-t-3xl">
-                    <h2 className="text-2xl font-bold text-gray-800">
+                <div className="sticky top-0 bg-white border-b border-gray-100 p-6 flex items-center justify-between">
+                    <h2 className="text-xl font-semibold text-gray-800">
                         {ot ? "แก้ไขข้อมูล OT" : "เพิ่มข้อมูล OT"}
                     </h2>
                     <button
@@ -155,16 +155,16 @@ export function OTFormModal({ isOpen, onClose, ot, onSuccess }: OTFormModalProps
                 </div>
 
                 {/* Form */}
-                <form onSubmit={handleSubmit} className="p-6 space-y-6">
+                <form onSubmit={handleSubmit} className="p-6 space-y-4">
                     {/* Employee Selection */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-semibold text-slate-800 mb-1">
                             เลือกพนักงาน <span className="text-red-500">*</span>
                         </label>
                         <select
                             value={formData.employeeId}
                             onChange={(e) => handleEmployeeChange(e.target.value)}
-                            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#EBDACA] focus:border-transparent"
+                            className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-[#EBDACA] focus:border-transparent"
                             required
                             disabled={!!ot}
                         >
@@ -179,14 +179,14 @@ export function OTFormModal({ isOpen, onClose, ot, onSuccess }: OTFormModalProps
 
                     {/* Date */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-semibold text-slate-800 mb-1">
                             วันที่ทำ OT <span className="text-red-500">*</span>
                         </label>
                         <input
                             type="date"
                             value={formData.date}
                             onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#EBDACA] focus:border-transparent"
+                            className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-[#EBDACA] focus:border-transparent"
                             required
                         />
                     </div>
@@ -194,7 +194,7 @@ export function OTFormModal({ isOpen, onClose, ot, onSuccess }: OTFormModalProps
                     {/* Time Range */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm font-semibold text-slate-800 mb-1">
                                 เวลาเริ่มต้น <span className="text-red-500">*</span>
                             </label>
                             <div className="relative">
@@ -203,14 +203,14 @@ export function OTFormModal({ isOpen, onClose, ot, onSuccess }: OTFormModalProps
                                     type="time"
                                     value={formData.startTime}
                                     onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                                    className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#EBDACA] focus:border-transparent"
+                                    className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-[#EBDACA] focus:border-transparent"
                                     required
                                 />
                             </div>
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm font-semibold text-slate-800 mb-1">
                                 เวลาสิ้นสุด <span className="text-red-500">*</span>
                             </label>
                             <div className="relative">
@@ -219,7 +219,7 @@ export function OTFormModal({ isOpen, onClose, ot, onSuccess }: OTFormModalProps
                                     type="time"
                                     value={formData.endTime}
                                     onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                                    className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#EBDACA] focus:border-transparent"
+                                    className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-[#EBDACA] focus:border-transparent"
                                     required
                                 />
                             </div>
@@ -228,7 +228,7 @@ export function OTFormModal({ isOpen, onClose, ot, onSuccess }: OTFormModalProps
 
                     {/* Hours Display */}
                     {formData.hours > 0 && (
-                        <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
+                        <div className="bg-purple-50 border border-purple-200 rounded-md p-3 shadow-sm">
                             <div className="flex items-center justify-between">
                                 <p className="text-sm text-purple-700">
                                     จำนวนชั่วโมง OT: <span className="font-bold text-lg">{formData.hours}</span> ชั่วโมง
@@ -242,13 +242,13 @@ export function OTFormModal({ isOpen, onClose, ot, onSuccess }: OTFormModalProps
 
                     {/* Reason */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-semibold text-slate-800 mb-1">
                             เหตุผล / รายละเอียดงาน <span className="text-red-500">*</span>
                         </label>
                         <textarea
                             value={formData.reason}
                             onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-                            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#EBDACA] focus:border-transparent"
+                            className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-[#EBDACA] focus:border-transparent"
                             rows={3}
                             placeholder="กรอกรายละเอียดงานที่ทำ OT"
                             required
@@ -257,13 +257,13 @@ export function OTFormModal({ isOpen, onClose, ot, onSuccess }: OTFormModalProps
 
                     {/* Status */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-semibold text-slate-800 mb-1">
                             สถานะ
                         </label>
                         <select
                             value={formData.status}
                             onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-                            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#EBDACA] focus:border-transparent"
+                            className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-[#EBDACA] focus:border-transparent"
                         >
                             <option value="รออนุมัติ">รออนุมัติ</option>
                             <option value="อนุมัติ">อนุมัติ</option>
@@ -277,14 +277,14 @@ export function OTFormModal({ isOpen, onClose, ot, onSuccess }: OTFormModalProps
                             type="button"
                             onClick={onClose}
                             variant="outline"
-                            className="flex-1 h-12 rounded-xl"
+                            className="flex-1 h-10 rounded-md text-sm font-medium"
                             disabled={loading}
                         >
                             ยกเลิก
                         </Button>
                         <Button
                             type="submit"
-                            className="flex-1 h-12 bg-primary-dark hover:bg-primary-dark/90 text-white rounded-xl"
+                            className="flex-1 h-10 bg-primary-dark hover:bg-primary-dark/90 text-white rounded-md text-sm font-medium"
                             disabled={loading}
                         >
                             {loading ? "กำลังบันทึก..." : ot ? "บันทึกการแก้ไข" : "เพิ่มข้อมูล OT"}

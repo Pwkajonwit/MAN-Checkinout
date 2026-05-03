@@ -192,24 +192,30 @@ export default function ShiftsPage() {
 
             {/* Modal */}
             {showModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md">
-                        <div className="p-6 border-b border-gray-100">
-                            <h2 className="text-xl font-bold">
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+                    <div className="bg-white border border-slate-100 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+                        <div className="sticky top-0 bg-white/95 backdrop-blur-md border-b border-slate-100 p-6 flex items-center justify-between">
+                            <h2 className="text-xl font-semibold text-slate-900">
                                 {editingShift ? "แก้ไขกะ" : "เพิ่มกะใหม่"}
                             </h2>
+                            <button
+                                onClick={() => setShowModal(false)}
+                                className="p-2 hover:bg-slate-100 rounded-xl transition-colors text-slate-400 hover:text-slate-600"
+                            >
+                                <Plus className="w-5 h-5 rotate-45" /> {/* Using Plus rotated as X */}
+                            </button>
                         </div>
 
                         <form onSubmit={handleSubmit} className="p-6 space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    ชื่อกะ *
+                                <label className="block text-sm font-medium text-slate-700 mb-1">
+                                    ชื่อกะ <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     type="text"
                                     value={formData.name}
                                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl"
+                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-md shadow-sm text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#009966]/20 focus:border-[#009966] transition-all"
                                     placeholder="เช่น กะเช้า, กะบ่าย"
                                     required
                                 />
@@ -217,57 +223,57 @@ export default function ShiftsPage() {
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">
                                         เวลาเข้างาน
                                     </label>
-                                    <div className="flex gap-2">
+                                    <div className="flex items-center gap-2">
                                         <input
                                             type="number"
                                             min="0"
                                             max="23"
                                             value={formData.checkInHour}
                                             onChange={(e) => setFormData({ ...formData, checkInHour: Number(e.target.value) })}
-                                            className="w-full px-3 py-2 border border-gray-200 rounded-xl"
+                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-md shadow-sm text-sm text-center focus:outline-none focus:ring-2 focus:ring-[#009966]/20 focus:border-[#009966]"
                                         />
-                                        <span className="py-2">:</span>
+                                        <span className="text-slate-400">:</span>
                                         <input
                                             type="number"
                                             min="0"
                                             max="59"
                                             value={formData.checkInMinute}
                                             onChange={(e) => setFormData({ ...formData, checkInMinute: Number(e.target.value) })}
-                                            className="w-full px-3 py-2 border border-gray-200 rounded-xl"
+                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-md shadow-sm text-sm text-center focus:outline-none focus:ring-2 focus:ring-[#009966]/20 focus:border-[#009966]"
                                         />
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">
                                         เวลาออกงาน
                                     </label>
-                                    <div className="flex gap-2">
+                                    <div className="flex items-center gap-2">
                                         <input
                                             type="number"
                                             min="0"
                                             max="23"
                                             value={formData.checkOutHour}
                                             onChange={(e) => setFormData({ ...formData, checkOutHour: Number(e.target.value) })}
-                                            className="w-full px-3 py-2 border border-gray-200 rounded-xl"
+                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-md shadow-sm text-sm text-center focus:outline-none focus:ring-2 focus:ring-[#009966]/20 focus:border-[#009966]"
                                         />
-                                        <span className="py-2">:</span>
+                                        <span className="text-slate-400">:</span>
                                         <input
                                             type="number"
                                             min="0"
                                             max="59"
                                             value={formData.checkOutMinute}
                                             onChange={(e) => setFormData({ ...formData, checkOutMinute: Number(e.target.value) })}
-                                            className="w-full px-3 py-2 border border-gray-200 rounded-xl"
+                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-md shadow-sm text-sm text-center focus:outline-none focus:ring-2 focus:ring-[#009966]/20 focus:border-[#009966]"
                                         />
                                     </div>
                                 </div>
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                <label className="block text-sm font-medium text-slate-700 mb-1">
                                     ผ่อนผันสาย (นาที)
                                 </label>
                                 <input
@@ -275,35 +281,37 @@ export default function ShiftsPage() {
                                     min="0"
                                     value={formData.lateGracePeriod}
                                     onChange={(e) => setFormData({ ...formData, lateGracePeriod: Number(e.target.value) })}
-                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl"
+                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-md shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-[#009966]/20 focus:border-[#009966] transition-all text-slate-900"
                                 />
                             </div>
 
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 pt-1">
                                 <input
                                     type="checkbox"
                                     id="isDefault"
                                     checked={formData.isDefault}
                                     onChange={(e) => setFormData({ ...formData, isDefault: e.target.checked })}
-                                    className="w-4 h-4 rounded"
+                                    className="w-4 h-4 rounded border-slate-300 text-[#009966] focus:ring-[#009966]/20"
                                 />
-                                <label htmlFor="isDefault" className="text-sm text-gray-700">
+                                <label htmlFor="isDefault" className="text-sm text-slate-600 cursor-pointer select-none">
                                     ตั้งเป็นกะหลัก (Default)
                                 </label>
                             </div>
 
-                            <div className="flex gap-3 pt-4">
-                                <Button
+                            <div className="flex gap-3 pt-4 border-t border-slate-100 mt-6">
+                                <button
                                     type="button"
-                                    variant="outline"
-                                    className="flex-1"
                                     onClick={() => setShowModal(false)}
+                                    className="flex-1 h-10 rounded-md text-sm font-medium border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
                                 >
                                     ยกเลิก
-                                </Button>
-                                <Button type="submit" className="flex-1 bg-primary-dark">
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="flex-1 h-10 bg-[#009966] hover:bg-[#008f60] text-white rounded-md text-sm font-medium transition-all shadow-md shadow-[#009966]/20"
+                                >
                                     บันทึก
-                                </Button>
+                                </button>
                             </div>
                         </form>
                     </div>

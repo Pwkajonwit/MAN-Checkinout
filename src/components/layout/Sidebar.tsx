@@ -118,11 +118,11 @@ export function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () =>
             )}
 
             <aside className={cn(
-                "fixed inset-y-0 left-0 z-50 w-64 bg-[#009966] flex flex-col border-r border-[#008558] shadow-xl shadow-gray-200/50 transition-transform duration-300 ease-in-out",
+                "fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 flex flex-col border-r border-slate-800 shadow-2xl transition-transform duration-300 ease-in-out",
                 isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
             )}>
                 {/* Brand/Profile Section */}
-                <div className="h-20 flex items-center px-6 border-b border-white/10 bg-[#008f60]">
+                <div className="h-20 flex items-center px-6 border-b border-slate-800 bg-slate-950/50">
                     <div className="flex items-center gap-3 w-full">
                         <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-white font-bold text-lg backdrop-blur-sm">
                             {adminProfile?.name?.charAt(0) || "A"}
@@ -152,7 +152,7 @@ export function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () =>
                             <div key={group.title}>
                                 {/* Group Header */}
                                 <div className="px-2 mb-2">
-                                    <h3 className="text-xs font-bold text-white/40 uppercase tracking-wider flex items-center gap-2">
+                                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
                                         {group.title}
                                     </h3>
                                 </div>
@@ -168,18 +168,18 @@ export function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () =>
                                                 className={cn(
                                                     "relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 group overflow-hidden",
                                                     isActive
-                                                        ? "bg-white text-[#009966] shadow-lg shadow-black/10 font-bold"
-                                                        : "text-white/80 hover:bg-white/10 hover:text-white"
+                                                        ? "bg-[#009966] text-white shadow-md shadow-[#009966]/20 font-medium"
+                                                        : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-200"
                                                 )}
                                             >
                                                 {/* Active Indicator Highlight */}
                                                 {isActive && (
-                                                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-[#009966] rounded-r-lg opacity-0" /> // Hidden for card style
+                                                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-white rounded-r-lg opacity-0" /> // Hidden for card style
                                                 )}
 
                                                 <item.icon className={cn(
                                                     "w-4 h-4 transition-transform group-hover:scale-110",
-                                                    isActive ? "text-[#009966]" : "text-white/70 group-hover:text-white"
+                                                    isActive ? "text-white" : "text-slate-400 group-hover:text-slate-200"
                                                 )} />
                                                 <span className="relative z-10">{item.label}</span>
                                             </Link>
@@ -192,16 +192,16 @@ export function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () =>
                 </nav>
 
                 {/* Bottom Actions */}
-                <div className="p-4 border-t border-white/10 bg-[#008a5e]">
+                <div className="p-4 border-t border-slate-800 bg-slate-950/50">
                     <button
                         onClick={handleLogout}
-                        className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 text-sm font-medium text-white/90 bg-white/10 border border-white/5 hover:bg-white hover:text-[#009966] rounded-lg shadow-sm transition-all duration-200 group"
+                        className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 text-sm font-medium text-slate-300 bg-slate-800/50 border border-slate-700/50 hover:bg-red-500 hover:text-white hover:border-red-500 rounded-lg shadow-sm transition-all duration-200 group"
                     >
-                        <LogOut className="w-4 h-4 text-white/70 group-hover:text-[#009966] transition-colors" />
+                        <LogOut className="w-4 h-4 transition-colors group-hover:text-white" />
                         <span>ออกจากระบบ</span>
                     </button>
                     <div className="mt-3 text-center">
-                        <p className="text-[10px] text-white/30 font-mono">v.5.0.0 Business Edition</p>
+                        <p className="text-[10px] text-slate-500 font-mono">v.5.0.0 Business Edition</p>
                     </div>
                 </div>
             </aside>

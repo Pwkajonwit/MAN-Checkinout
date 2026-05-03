@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect } from "react";
 import { X, Trash2 } from "lucide-react";
@@ -17,6 +17,8 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
     const [loading, setLoading] = useState(false);
     const [shifts, setShifts] = useState<Shift[]>([]);
     const [availableLocations, setAvailableLocations] = useState<WorkLocation[]>([]);
+    const [locationEnabled, setLocationEnabled] = useState(false);
+    const [useIndividualHolidays, setUseIndividualHolidays] = useState(false);
 
 
     const [formData, setFormData] = useState({
@@ -50,7 +52,11 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
                 .catch(err => console.error("Error loading shifts:", err));
 
             systemConfigService.get()
-                .then(config => setAvailableLocations(config?.workLocations || []))
+                .then(config => {
+                    setAvailableLocations(config?.workLocations || []);
+                    setLocationEnabled(config?.locationEnabled ?? false);
+                    setUseIndividualHolidays(config?.useIndividualHolidays ?? false);
+                })
                 .catch(err => console.error("Error loading work locations:", err));
         }
     }, [isOpen]);
@@ -181,49 +187,49 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
 
                 {/* Scrollable Content */}
                 <div className="overflow-y-auto flex-1 p-6 custom-scrollbar">
-                    <form id="employee-form" onSubmit={handleSubmit} className="space-y-8">
+                    <form id="employee-form" onSubmit={handleSubmit} className="space-y-6">
 
                         {/* 1. ข้อมูลส่วนตัว (Personal Info) */}
                         <section>
-                            <div className="flex items-center gap-2 mb-4 text-blue-800">
+                            <div className="flex items-center gap-2 mb-3 text-blue-800">
                                 <span className="bg-blue-100 p-1.5 rounded-lg"><div className="w-2 h-2 rounded-full bg-blue-600" /></span>
                                 <h3 className="text-sm font-semibold uppercase tracking-wider">ข้อมูลส่วนตัว</h3>
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-3">
                                 <div className="col-span-1 md:col-span-2">
-                                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                                    <label className="block text-sm font-semibold text-slate-800 mb-1">
                                         ชื่อ-นามสกุล <span className="text-red-500">*</span>
                                     </label>
                                     <input
                                         type="text"
                                         value={formData.name}
                                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                        className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all disabled:bg-gray-50 disabled:text-gray-500"
+                                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all disabled:bg-slate-50 disabled:text-slate-500"
                                         placeholder="ตัวอย่าง: สมชาย ใจดี"
                                         required
                                         disabled={readOnly}
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1.5">อีเมล</label>
+                                    <label className="block text-sm font-semibold text-slate-800 mb-1">อีเมล</label>
                                     <input
                                         type="email"
                                         value={formData.email}
                                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                        className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all disabled:bg-gray-50 disabled:text-gray-500"
+                                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all disabled:bg-slate-50 disabled:text-slate-500"
                                         placeholder="user@example.com"
                                         disabled={readOnly}
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                                    <label className="block text-sm font-semibold text-slate-800 mb-1">
                                         เบอร์โทรศัพท์ <span className="text-red-500">*</span>
                                     </label>
                                     <input
                                         type="tel"
                                         value={formData.phone}
                                         onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                                        className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all disabled:bg-gray-50 disabled:text-gray-500"
+                                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all disabled:bg-slate-50 disabled:text-slate-500"
                                         placeholder="08x-xxx-xxxx"
                                         required
                                         disabled={readOnly}
@@ -236,30 +242,30 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
 
                         {/* 2. ข้อมูลการทำงาน (Employment Details) */}
                         <section>
-                            <div className="flex items-center gap-2 mb-4 text-orange-800">
+                            <div className="flex items-center gap-2 mb-3 text-orange-800">
                                 <span className="bg-orange-100 p-1.5 rounded-lg"><div className="w-2 h-2 rounded-full bg-orange-600" /></span>
                                 <h3 className="text-sm font-semibold uppercase tracking-wider">ข้อมูลการจ้างงาน</h3>
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-3">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1.5">รหัสพนักงาน</label>
+                                    <label className="block text-sm font-semibold text-slate-800 mb-1">รหัสพนักงาน</label>
                                     <input
                                         type="text"
                                         value={formData.employeeId}
                                         onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })}
-                                        className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all disabled:bg-gray-50 disabled:text-gray-500 font-mono"
+                                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all disabled:bg-slate-50 disabled:text-slate-500 font-mono"
                                         placeholder="EMP-XXXX"
                                         disabled={readOnly}
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                                    <label className="block text-sm font-semibold text-slate-800 mb-1">
                                         สถานะ <span className="text-red-500">*</span>
                                     </label>
                                     <select
                                         value={formData.status}
                                         onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-                                        className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all disabled:bg-gray-50 disabled:text-gray-500"
+                                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all disabled:bg-slate-50 disabled:text-slate-500"
                                         required
                                         disabled={readOnly}
                                     >
@@ -269,37 +275,37 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                                    <label className="block text-sm font-semibold text-slate-800 mb-1">
                                         ตำแหน่ง <span className="text-red-500">*</span>
                                     </label>
                                     <input
                                         type="text"
                                         value={formData.position}
                                         onChange={(e) => setFormData({ ...formData, position: e.target.value })}
-                                        className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all disabled:bg-gray-50 disabled:text-gray-500"
+                                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all disabled:bg-slate-50 disabled:text-slate-500"
                                         required
                                         disabled={readOnly}
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1.5">แผนก/สังกัด</label>
+                                    <label className="block text-sm font-semibold text-slate-800 mb-1">แผนก/สังกัด</label>
                                     <input
                                         type="text"
                                         value={formData.department}
                                         onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                                        className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all disabled:bg-gray-50 disabled:text-gray-500"
+                                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all disabled:bg-slate-50 disabled:text-slate-500"
                                         placeholder="ตัวอย่าง: IT, HR, Sales"
                                         disabled={readOnly}
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                                    <label className="block text-sm font-semibold text-slate-800 mb-1">
                                         รูปแบบสัญญาจ้าง <span className="text-red-500">*</span>
                                     </label>
                                     <select
                                         value={formData.employmentType}
                                         onChange={(e) => setFormData({ ...formData, employmentType: e.target.value as any })}
-                                        className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all disabled:bg-gray-50 disabled:text-gray-500"
+                                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all disabled:bg-slate-50 disabled:text-slate-500"
                                         required
                                         disabled={readOnly}
                                     >
@@ -309,14 +315,14 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
                                 </div>
                                 {((formData.status as string) !== "ทำงาน" || formData.type === "ชั่วคราว" || formData.employmentType === "ชั่วคราว") && (
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                                        <label className="block text-sm font-semibold text-slate-800 mb-1">
                                             วันที่สิ้นสุด <span className="text-red-500">*</span>
                                         </label>
                                         <input
                                             type="date"
                                             value={formData.endDate ? new Date(formData.endDate).toISOString().split('T')[0] : ""}
                                             onChange={(e) => setFormData({ ...formData, endDate: e.target.value ? new Date(e.target.value) : undefined })}
-                                            className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                                             required
                                             disabled={readOnly}
                                         />
@@ -329,19 +335,19 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
 
                         {/* 3. การจ่ายเงินและกะเวลา (Payroll & Shift) */}
                         <section>
-                            <div className="flex items-center gap-2 mb-4 text-purple-800">
+                            <div className="flex items-center gap-2 mb-3 text-purple-800">
                                 <span className="bg-purple-100 p-1.5 rounded-lg"><div className="w-2 h-2 rounded-full bg-purple-600" /></span>
                                 <h3 className="text-sm font-semibold uppercase tracking-wider">บัญชีและเวลาทำงาน</h3>
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-3">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                                    <label className="block text-sm font-semibold text-slate-800 mb-1">
                                         ประเภทการจ่าย <span className="text-red-500">*</span>
                                     </label>
                                     <select
                                         value={formData.type}
                                         onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
-                                        className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all disabled:bg-gray-50 disabled:text-gray-500"
+                                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all disabled:bg-slate-50 disabled:text-slate-500"
                                         required
                                         disabled={readOnly}
                                     >
@@ -350,7 +356,7 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                                    <label className="block text-sm font-semibold text-slate-800 mb-1">
                                         {formData.type === "รายวัน" ? "ค่าจ้างรายวัน (บาท)" : "เงินเดือน (บาท)"}
                                     </label>
                                     <input
@@ -358,18 +364,18 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
                                         min="0"
                                         value={formData.baseSalary}
                                         onChange={(e) => setFormData({ ...formData, baseSalary: Number(e.target.value) })}
-                                        className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all disabled:bg-gray-50 disabled:text-gray-500 font-mono"
+                                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all disabled:bg-slate-50 disabled:text-slate-500 font-mono"
                                         disabled={readOnly}
                                     />
                                 </div>
                                 <div className="col-span-1 md:col-span-2">
-                                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                                    <label className="block text-sm font-semibold text-slate-800 mb-1">
                                         กะเวลาทำงาน (Work Shift)
                                     </label>
                                     <select
                                         value={formData.shiftId}
                                         onChange={(e) => setFormData({ ...formData, shiftId: e.target.value })}
-                                        className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all disabled:bg-gray-50 disabled:text-gray-500"
+                                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all disabled:bg-slate-50 disabled:text-slate-500"
                                         disabled={readOnly}
                                     >
                                         <option value="">⚙️ ใช้ค่าเริ่มต้นของระบบ (Default System Settings)</option>
@@ -381,8 +387,23 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
                                     </select>
                                 </div>
 
-                                <div className="col-span-1 md:col-span-2">
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">วันหยุดประจำสัปดาห์</label>
+                                <div className={`col-span-1 md:col-span-2 ${!useIndividualHolidays ? 'opacity-40 pointer-events-none' : ''}`}>
+                                    <div className="flex items-center justify-between mb-1.5">
+                                        <label className="block text-sm font-semibold text-slate-800">
+                                            วันหยุดประจำสัปดาห์
+                                        </label>
+                                        {useIndividualHolidays ? (
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-700">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                                โหมดรายบุคคล
+                                            </span>
+                                        ) : (
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-500">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                                                โหมดวันหยุดกลาง (ตั้งค่าใน Settings)
+                                            </span>
+                                        )}
+                                    </div>
                                     <div className="flex flex-wrap gap-2">
                                         {[
                                             { day: 1, label: "จันทร์" },
@@ -399,7 +420,7 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
                                                     key={day}
                                                     type="button"
                                                     onClick={() => {
-                                                        if (readOnly) return;
+                                                        if (readOnly || !useIndividualHolidays) return;
                                                         setFormData(prev => ({
                                                             ...prev,
                                                             weeklyHolidays: isSelected
@@ -407,11 +428,11 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
                                                                 : [...prev.weeklyHolidays, day].sort()
                                                         }));
                                                     }}
-                                                    disabled={readOnly}
-                                                    className={`px-4 py-2 text-xs font-medium rounded-lg border transition-all ${isSelected
+                                                    disabled={readOnly || !useIndividualHolidays}
+                                                    className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-all ${isSelected
                                                         ? "bg-gray-800 text-white border-gray-800 shadow-sm"
                                                         : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
-                                                        } ${readOnly ? "opacity-60 cursor-not-allowed" : ""}`}
+                                                        } ${(readOnly || !useIndividualHolidays) ? "opacity-60 cursor-not-allowed" : ""}`}
                                                 >
                                                     {label}
                                                 </button>
@@ -420,8 +441,13 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
                                     </div>
                                 </div>
 
-                                <div className="col-span-1 md:col-span-2">
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Work Locations</label>
+                                <div className={`col-span-1 md:col-span-2 ${!locationEnabled ? 'opacity-40 pointer-events-none' : ''}`}>
+                                    <label className="block text-sm font-semibold text-slate-800 mb-1.5">
+                                        Work Locations
+                                        {!locationEnabled && (
+                                            <span className="ml-2 text-xs font-normal text-gray-400">(ปิดใช้งาน GPS ใน Settings)</span>
+                                        )}
+                                    </label>
                                     {availableLocations.length > 0 ? (
                                         <>
                                             <div className="flex flex-wrap gap-2">
@@ -432,7 +458,7 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
                                                             key={location.id}
                                                             type="button"
                                                             onClick={() => {
-                                                                if (readOnly) return;
+                                                                if (readOnly || !locationEnabled) return;
                                                                 setFormData(prev => ({
                                                                     ...prev,
                                                                     allowedLocationIds: isSelected
@@ -440,11 +466,11 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
                                                                         : [...prev.allowedLocationIds, location.id]
                                                                 }));
                                                             }}
-                                                            disabled={readOnly}
-                                                            className={`px-4 py-2 text-xs font-medium rounded-lg border transition-all ${isSelected
+                                                            disabled={readOnly || !locationEnabled}
+                                                            className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-all ${isSelected
                                                                 ? "bg-blue-600 text-white border-blue-600 shadow-sm"
                                                                 : "bg-white text-gray-600 border-gray-200 hover:border-blue-300"
-                                                                } ${readOnly ? "opacity-60 cursor-not-allowed" : ""}`}
+                                                                } ${(readOnly || !locationEnabled) ? "opacity-60 cursor-not-allowed" : ""}`}
                                                         >
                                                             {location.name}
                                                             <span className="ml-2 text-[10px] opacity-80">{location.radius}m</span>
@@ -469,13 +495,13 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
 
                         {/* 4. สิทธิ์การลา (Leave Quotas) */}
                         <section>
-                            <div className="flex items-center gap-2 mb-4 text-teal-800">
+                            <div className="flex items-center gap-2 mb-3 text-teal-800">
                                 <span className="bg-teal-100 p-1.5 rounded-lg"><div className="w-2 h-2 rounded-full bg-teal-600" /></span>
                                 <h3 className="text-sm font-semibold uppercase tracking-wider">โควต้าวันลา (ต่อปี)</h3>
                             </div>
                             <div className="grid grid-cols-3 gap-4">
-                                <div className="p-3 bg-gray-50 rounded-xl border border-gray-100 text-center">
-                                    <label className="block text-xs font-medium text-gray-500 mb-1">ลากิจ</label>
+                                <div className="p-2.5 bg-slate-50 rounded-lg border border-gray-100 text-center">
+                                    <label className="block text-xs font-semibold text-slate-600 mb-0.5">ลากิจ</label>
                                     <input
                                         type="number"
                                         value={formData.leaveQuota.personal}
@@ -488,8 +514,8 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
                                     />
                                     <span className="text-[10px] text-gray-400">วัน</span>
                                 </div>
-                                <div className="p-3 bg-gray-50 rounded-xl border border-gray-100 text-center">
-                                    <label className="block text-xs font-medium text-gray-500 mb-1">ลาป่วย</label>
+                                <div className="p-2.5 bg-slate-50 rounded-lg border border-gray-100 text-center">
+                                    <label className="block text-xs font-semibold text-slate-600 mb-0.5">ลาป่วย</label>
                                     <input
                                         type="number"
                                         value={formData.leaveQuota.sick}
@@ -502,8 +528,8 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
                                     />
                                     <span className="text-[10px] text-gray-400">วัน</span>
                                 </div>
-                                <div className="p-3 bg-gray-50 rounded-xl border border-gray-100 text-center">
-                                    <label className="block text-xs font-medium text-gray-500 mb-1">พักร้อน</label>
+                                <div className="p-2.5 bg-slate-50 rounded-lg border border-gray-100 text-center">
+                                    <label className="block text-xs font-semibold text-slate-600 mb-0.5">พักร้อน</label>
                                     <input
                                         type="number"
                                         value={formData.leaveQuota.vacation}
@@ -538,7 +564,7 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
                                         type="text"
                                         value={formData.lineUserId || "ยังไม่ได้ผูกบัญชี LINE"}
                                         readOnly
-                                        className="flex-1 bg-white px-3 py-2 border border-gray-200 rounded-lg text-xs font-mono text-gray-500"
+                                        className="flex-1 bg-white px-3 py-2 border border-slate-300 rounded-md shadow-sm text-xs font-mono text-gray-500"
                                     />
                                     {formData.lineUserId && !readOnly && (
                                         <button

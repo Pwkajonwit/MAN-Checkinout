@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -96,6 +96,7 @@ export default function SettingsPage() {
         type: "info"
     });
     const [showIndexModal, setShowIndexModal] = useState(false);
+    const [showResetConfirm, setShowResetConfirm] = useState(false);
 
     const [departments, setDepartments] = useState<string[]>([]);
     const [positions, setPositions] = useState<string[]>([]);
@@ -348,6 +349,10 @@ export default function SettingsPage() {
     };
 
     const handleReset = () => {
+        setShowResetConfirm(true);
+    };
+
+    const confirmReset = () => {
         setSettings({
             checkInHour: 9,
             checkInMinute: 0,
@@ -381,6 +386,7 @@ export default function SettingsPage() {
             },
             swapAdvanceDays: 3
         });
+        setShowResetConfirm(false);
     };
 
     if (initialLoading) {
@@ -1268,6 +1274,39 @@ export default function SettingsPage() {
                                         }, null, 2)}
                                     </pre>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Reset Confirmation Modal */}
+            {showResetConfirm && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-6 flex flex-col items-center text-center">
+                            <div className="mb-4 p-3 rounded-full bg-orange-50">
+                                <AlertCircle className="w-12 h-12 text-orange-500" />
+                            </div>
+                            <h3 className="text-xl font-bold text-gray-900 mb-2">
+                                ยืนยันคืนค่าเริ่มต้น?
+                            </h3>
+                            <p className="text-gray-500 mb-6 leading-relaxed">
+                                การตั้งค่าทั้งหมดจะถูกรีเซ็ตกลับไปเป็นค่าเริ่มต้นของระบบ คุณแน่ใจหรือไม่?
+                            </p>
+                            <div className="flex gap-3 w-full">
+                                <button
+                                    onClick={() => setShowResetConfirm(false)}
+                                    className="flex-1 py-3 rounded-xl font-semibold border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors active:scale-95"
+                                >
+                                    ยกเลิก
+                                </button>
+                                <button
+                                    onClick={confirmReset}
+                                    className="flex-1 py-3 rounded-xl text-white font-semibold shadow-lg bg-orange-500 hover:bg-orange-600 transition-transform active:scale-95"
+                                >
+                                    ยืนยัน
+                                </button>
                             </div>
                         </div>
                     </div>

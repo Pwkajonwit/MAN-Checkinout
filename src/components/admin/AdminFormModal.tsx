@@ -106,45 +106,45 @@ export function AdminFormModal({ isOpen, onClose, admin, onSuccess }: AdminFormM
     };
 
     return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-                <div className="sticky top-0 bg-white border-b border-gray-100 p-6 flex items-center justify-between rounded-t-3xl">
-                    <h2 className="text-2xl font-bold text-gray-800">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+            <div className="bg-white border border-slate-100 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+                <div className="sticky top-0 bg-white/95 backdrop-blur-md border-b border-slate-100 p-6 flex items-center justify-between ">
+                    <h2 className="text-xl font-semibold text-slate-900">
                         {admin ? "แก้ไขผู้ดูแลระบบ" : "เพิ่มผู้ดูแลระบบ"}
                     </h2>
                     <button
                         onClick={onClose}
-                        className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
+                        className="p-2 hover:bg-slate-100 rounded-xl transition-colors text-slate-400 hover:text-slate-600"
                     >
-                        <X className="w-6 h-6 text-gray-500" />
+                        <X className="w-5 h-5" />
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-6 space-y-6">
+                <form onSubmit={handleSubmit} className="p-6 space-y-4">
                     <div className="space-y-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm font-medium text-slate-700 mb-1">
                                 ชื่อ-นามสกุล <span className="text-red-500">*</span>
                             </label>
                             <input
                                 type="text"
                                 value={formData.name}
                                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#EBDACA] focus:border-transparent"
+                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-md shadow-sm text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#009966]/20 focus:border-[#009966] transition-all placeholder:text-slate-400"
                                 placeholder="กรอกชื่อ-นามสกุล"
                                 required
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm font-medium text-slate-700 mb-1">
                                 อีเมล <span className="text-red-500">*</span>
                             </label>
                             <input
                                 type="email"
                                 value={formData.email}
                                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#EBDACA] focus:border-transparent"
+                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-md shadow-sm text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#009966]/20 focus:border-[#009966] transition-all placeholder:text-slate-400 disabled:opacity-50 disabled:bg-slate-50"
                                 placeholder="example@email.com"
                                 required
                                 disabled={!!admin} // Disable email edit for existing admins
@@ -153,7 +153,7 @@ export function AdminFormModal({ isOpen, onClose, admin, onSuccess }: AdminFormM
 
                         {!admin && (
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                <label className="block text-sm font-medium text-slate-700 mb-1">
                                     รหัสผ่าน <span className="text-red-500">*</span>
                                 </label>
                                 <div className="relative">
@@ -161,7 +161,7 @@ export function AdminFormModal({ isOpen, onClose, admin, onSuccess }: AdminFormM
                                         type={showPassword ? "text" : "password"}
                                         value={formData.password}
                                         onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#EBDACA] focus:border-transparent pr-12"
+                                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-md shadow-sm text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#009966]/20 focus:border-[#009966] transition-all placeholder:text-slate-400 pr-12"
                                         placeholder="ตั้งรหัสผ่านอย่างน้อย 6 ตัวอักษร"
                                         required
                                         minLength={6}
@@ -169,7 +169,7 @@ export function AdminFormModal({ isOpen, onClose, admin, onSuccess }: AdminFormM
                                     <button
                                         type="button"
                                         onClick={() => setShowPassword(!showPassword)}
-                                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
                                     >
                                         {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                                     </button>
@@ -178,13 +178,13 @@ export function AdminFormModal({ isOpen, onClose, admin, onSuccess }: AdminFormM
                         )}
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm font-medium text-slate-700 mb-1">
                                 บทบาท <span className="text-red-500">*</span>
                             </label>
                             <select
                                 value={formData.role}
                                 onChange={(e) => setFormData({ ...formData, role: e.target.value as any })}
-                                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#EBDACA] focus:border-transparent"
+                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-md shadow-sm text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#009966]/20 focus:border-[#009966] transition-all"
                                 required
                             >
                                 <option value="admin">Admin</option>
@@ -193,38 +193,37 @@ export function AdminFormModal({ isOpen, onClose, admin, onSuccess }: AdminFormM
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm font-medium text-slate-700 mb-1">
                                 LINE User ID
-                                <span className="text-gray-400 text-xs ml-2">(สำหรับ Auto Login ผ่าน LINE)</span>
+                                <span className="text-slate-400 text-xs ml-2">(สำหรับ Auto Login ผ่าน LINE)</span>
                             </label>
                             <input
                                 type="text"
                                 value={formData.lineUserId}
                                 onChange={(e) => setFormData({ ...formData, lineUserId: e.target.value })}
-                                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#EBDACA] focus:border-transparent"
+                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-md shadow-sm text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#009966]/20 focus:border-[#009966] transition-all placeholder:text-slate-400"
                                 placeholder="U1234567890abcdef..."
                             />
-                            <p className="text-xs text-gray-400 mt-1">ใส่ LINE User ID เพื่อให้ Admin สามารถ Login อัตโนมัติเมื่อเปิดผ่าน LINE</p>
+                            <p className="text-xs text-slate-400 mt-1">ใส่ LINE User ID เพื่อให้ Admin สามารถ Login อัตโนมัติเมื่อเปิดผ่าน LINE</p>
                         </div>
                     </div>
 
-                    <div className="flex gap-3 pt-4">
-                        <Button
+                    <div className="flex gap-3 pt-4 border-t border-slate-100 mt-6">
+                        <button
                             type="button"
                             onClick={onClose}
-                            variant="outline"
-                            className="flex-1 h-12 rounded-xl"
+                            className="flex-1 h-10 rounded-md text-sm font-medium border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
                             disabled={loading}
                         >
                             ยกเลิก
-                        </Button>
-                        <Button
+                        </button>
+                        <button
                             type="submit"
-                            className="flex-1 h-12 bg-primary-dark hover:bg-primary-dark/90 text-white rounded-xl"
+                            className="flex-1 h-10 bg-[#009966] hover:bg-[#008f60] text-white rounded-md text-sm font-medium transition-all shadow-md shadow-[#009966]/20 disabled:opacity-50 disabled:cursor-not-allowed"
                             disabled={loading}
                         >
                             {loading ? "กำลังบันทึก..." : admin ? "บันทึกการแก้ไข" : "เพิ่มผู้ดูแลระบบ"}
-                        </Button>
+                        </button>
                     </div>
                 </form>
             </div>
