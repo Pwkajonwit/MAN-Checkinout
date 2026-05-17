@@ -3,11 +3,10 @@
 import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { employeeService, attendanceService, otService, swapService, systemConfigService, type Employee, type Attendance, type OTRequest, type SwapRequest, type SystemConfig } from "@/lib/firestore";
-import { Search, Calendar, DollarSign, Download, Filter } from "lucide-react";
-import { format, startOfWeek, endOfWeek } from "date-fns";
+import { Calendar, DollarSign, Download, Filter } from "lucide-react";
+import { format } from "date-fns";
 import { th } from "date-fns/locale";
 import { getLateMinutes } from "@/lib/workTime";
-import { generatePayslipPDF } from "@/lib/pdfGenerator";
 
 interface PayrollItem {
     employeeId: string;
@@ -25,10 +24,39 @@ interface PayrollItem {
     otPaySpecial: number;
     customHolidayWorkHours: number; // Hours worked on custom holidays (workday pay)
     customHolidayWorkPay: number;   // Pay for working on custom holidays
+    payrollBaseIncome: number;      // Auto-calculated income before manual extras
+    attendanceAllowance: number;    // เบี้ยขยัน
+    specialAllowance: number;       // เงินพิเศษ
+    bonus: number;                  // โบนัส
     totalIncome: number;
     totalDeduction: number;
     netTotal: number;
 }
+
+type ExtraIncomeField = "attendanceAllowance" | "specialAllowance" | "bonus";
+
+const toNumber = (value: number | undefined) => Number.isFinite(value) ? Number(value) : 0;
+
+const normalizePayrollItem = (item: PayrollItem): PayrollItem => {
+    const attendanceAllowance = toNumber(item.attendanceAllowance);
+    const specialAllowance = toNumber(item.specialAllowance);
+    const bonus = toNumber(item.bonus);
+    const extraIncome = attendanceAllowance + specialAllowance + bonus;
+    const payrollBaseIncome = toNumber(item.payrollBaseIncome) || Math.max(0, toNumber(item.totalIncome) - extraIncome);
+    const totalDeduction = toNumber(item.totalDeduction);
+    const totalIncome = payrollBaseIncome + extraIncome;
+
+    return {
+        ...item,
+        payrollBaseIncome,
+        attendanceAllowance,
+        specialAllowance,
+        bonus,
+        totalIncome,
+        totalDeduction,
+        netTotal: totalIncome - totalDeduction,
+    };
+};
 
 export default function PayrollPage() {
     const [loading, setLoading] = useState(false);
@@ -74,8 +102,24 @@ export default function PayrollPage() {
         }
     };
 
+    const updateExtraIncome = (employeeId: string, field: ExtraIncomeField, value: string) => {
+        const amount = Math.max(0, Number(value) || 0);
+
+        setPayrollData(currentData => currentData.map(item => {
+            if (item.employeeId !== employeeId) return item;
+
+            const updatedItem = {
+                ...item,
+                [field]: amount,
+            };
+            return normalizePayrollItem(updatedItem);
+        }));
+    };
+
     const handlePrint = () => {
-        const selectedData = payrollData.filter(item => selectedIds.includes(item.employeeId));
+        const selectedData = payrollData
+            .filter(item => selectedIds.includes(item.employeeId))
+            .map(normalizePayrollItem);
         if (selectedData.length === 0) return;
 
         const printWindow = window.open('', '_blank');
@@ -272,8 +316,26 @@ export default function PayrollPage() {
                                     <td></td>
                                     <td class="amount"></td>
                                 </tr>
+                                <tr>
+                                    <td>เบี้ยขยัน</td>
+                                    <td class="amount">${item.attendanceAllowance > 0 ? item.attendanceAllowance.toLocaleString() : "-"}</td>
+                                    <td></td>
+                                    <td class="amount"></td>
+                                </tr>
+                                <tr>
+                                    <td>เงินพิเศษ</td>
+                                    <td class="amount">${item.specialAllowance > 0 ? item.specialAllowance.toLocaleString() : "-"}</td>
+                                    <td></td>
+                                    <td class="amount"></td>
+                                </tr>
+                                <tr>
+                                    <td>โบนัส</td>
+                                    <td class="amount">${item.bonus > 0 ? item.bonus.toLocaleString() : "-"}</td>
+                                    <td></td>
+                                    <td class="amount"></td>
+                                </tr>
                                 <!-- Add more rows if needed -->
-                                <tr style="height: 100px;">
+                                <tr style="height: 60px;">
                                     <td></td><td></td><td></td><td></td>
                                 </tr>
                                 <tr class="total-row">
@@ -398,12 +460,12 @@ export default function PayrollPage() {
             const results: PayrollItem[] = [];
 
             // Use config values or defaults
-            const otMultiplier = config?.otMultiplier ?? 1.5;
-            const otMultiplierHoliday = config?.otMultiplierHoliday ?? 3.0;
+            const otMultiplier = toNumber(config?.otMultiplier) || 1.5;
+            const otMultiplierHoliday = toNumber(config?.otMultiplierHoliday) || 3.0;
             const globalHolidays = config?.weeklyHolidays ?? [0, 6];
             const useIndividualHolidays = config?.useIndividualHolidays ?? false;
             const lateDeductionType = config?.lateDeductionType ?? "pro-rated";
-            const lateDeductionRate = config?.lateDeductionRate ?? 0;
+            const lateDeductionRate = toNumber(config?.lateDeductionRate);
 
             for (const emp of targetEmployees) {
                 if (!emp.id) continue;
@@ -453,7 +515,7 @@ export default function PayrollPage() {
                 });
 
                 // Calculate Pay
-                const baseSalary = emp.baseSalary || 0;
+                const baseSalary = toNumber(emp.baseSalary);
                 let income = 0;
                 let deduction = 0;
 
@@ -494,8 +556,7 @@ export default function PayrollPage() {
                 dailyAttendance.forEach((records, dateKey) => {
                     // Check if this date is a custom holiday
                     const customHoliday = customHolidays.find(h => {
-                        const hDate = h.date instanceof Date ? h.date : (h.date as any).toDate();
-                        return format(hDate, "yyyy-MM-dd") === dateKey;
+                        return format(h.date, "yyyy-MM-dd") === dateKey;
                     });
 
                     if (customHoliday) {
@@ -507,8 +568,9 @@ export default function PayrollPage() {
                         // Calculate extra pay based on multiplier
                         // Note: Base pay (1x) is already included in salary/daily wage
                         // So we add the extra portion: (multiplier - 1)
-                        if (customHoliday.workdayMultiplier > 1) {
-                            const extraMultiplier = customHoliday.workdayMultiplier - 1;
+                        const workdayMultiplier = toNumber(customHoliday.workdayMultiplier);
+                        if (workdayMultiplier > 1) {
+                            const extraMultiplier = workdayMultiplier - 1;
                             customHolidayWorkPay += hours * hourlyRate * extraMultiplier;
                         }
                     }
@@ -557,14 +619,13 @@ export default function PayrollPage() {
                         const otDateStr = format(ot.date, "yyyy-MM-dd");
                         const customHolidays = config?.customHolidays ?? [];
                         const customHoliday = customHolidays.find(h => {
-                            const hDate = h.date instanceof Date ? h.date : (h.date as any).toDate();
-                            return format(hDate, "yyyy-MM-dd") === otDateStr;
+                            return format(h.date, "yyyy-MM-dd") === otDateStr;
                         });
 
                         if (customHoliday) {
                             // Custom holiday (ตามที่กำหนดใน settings)
                             otHoursSpecial += hours;
-                            otPaySpecial += hours * hourlyRate * customHoliday.otMultiplier;
+                            otPaySpecial += hours * hourlyRate * toNumber(customHoliday.otMultiplier);
                         } else {
                             const dayOfWeek = ot.date.getDay();
                             // Use individual or global holidays based on setting
@@ -638,6 +699,10 @@ export default function PayrollPage() {
                     otPaySpecial,
                     customHolidayWorkHours: customHolidayWorkHours,
                     customHolidayWorkPay: customHolidayWorkPay,
+                    payrollBaseIncome: income,
+                    attendanceAllowance: 0,
+                    specialAllowance: 0,
+                    bonus: 0,
                     totalIncome: income,
                     totalDeduction: deduction,
                     netTotal: income - deduction
@@ -667,19 +732,19 @@ export default function PayrollPage() {
 
             <div className="px-6 pb-8 space-y-6">
                 {/* Controls */}
-                <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-                    <div className="flex flex-col xl:flex-row gap-6 justify-between items-start xl:items-end">
+                <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-4 py-4">
+                    <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_150px] xl:items-end">
                         {/* Filters Grid */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 w-full xl:max-w-[85%]">
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-[minmax(230px,1.15fr)_minmax(190px,0.95fr)_minmax(210px,1fr)_minmax(220px,1fr)]">
                             {/* Employee Type */}
-                            <div className="space-y-2">
+                            <div className="space-y-1">
                                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">ประเภทพนักงาน</label>
-                                <div className="flex bg-gray-50 p-1 rounded-lg border border-gray-100">
+                                <div className="grid grid-cols-3 bg-gray-50 p-1 rounded-lg border border-gray-100">
                                     {(["ประจำ - รายเดือน", "ประจำ - รายวัน", "ชั่วคราว"] as const).map((type) => (
                                         <button
                                             key={type}
                                             onClick={() => setEmployeeType(type)}
-                                            className={`flex-1 px-2 py-1.5 rounded-md text-[11px] font-medium transition-all text-center whitespace-nowrap ${employeeType === type
+                                            className={`h-8 px-1.5 rounded-md text-[11px] font-medium transition-all text-center whitespace-nowrap ${employeeType === type
                                                 ? "bg-white text-blue-700 shadow-sm ring-1 ring-black/5"
                                                 : "text-gray-500 hover:text-gray-700"
                                                 }`}
@@ -691,12 +756,12 @@ export default function PayrollPage() {
                             </div>
 
                             {/* Department */}
-                            <div className="space-y-2">
+                            <div className="space-y-1">
                                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">แผนก/สังกัด</label>
                                 <select
                                     value={selectedDepartment}
                                     onChange={(e) => setSelectedDepartment(e.target.value)}
-                                    className="h-10 w-full px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white hover:border-blue-400 transition-colors"
+                                    className="h-9 w-full px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white hover:border-blue-400 transition-colors"
                                 >
                                     <option value="all">ทั้งหมด</option>
                                     {departments.map((dept) => (
@@ -708,12 +773,12 @@ export default function PayrollPage() {
                             </div>
 
                             {/* Calculation Period */}
-                            <div className="space-y-2">
+                            <div className="space-y-1">
                                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">รูปแบบการคำนวณ</label>
-                                <div className="flex gap-2 h-10">
+                                <div className="grid grid-cols-2 gap-2 h-9">
                                     <button
                                         onClick={() => setCalculationPeriod("month")}
-                                        className={`flex-1 px-3 rounded-lg text-sm transition-all border font-medium ${calculationPeriod === "month"
+                                        className={`px-2 rounded-lg text-sm transition-all border font-medium whitespace-nowrap ${calculationPeriod === "month"
                                             ? "bg-blue-50 border-blue-200 text-blue-700"
                                             : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
                                             }`}
@@ -722,7 +787,7 @@ export default function PayrollPage() {
                                     </button>
                                     <button
                                         onClick={() => setCalculationPeriod("custom")}
-                                        className={`flex-1 px-3 rounded-lg text-sm transition-all border font-medium ${calculationPeriod === "custom"
+                                        className={`px-2 rounded-lg text-sm transition-all border font-medium whitespace-nowrap ${calculationPeriod === "custom"
                                             ? "bg-blue-50 border-blue-200 text-blue-700"
                                             : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
                                             }`}
@@ -733,13 +798,13 @@ export default function PayrollPage() {
                             </div>
 
                             {/* Date Picker */}
-                            <div className="space-y-2">
+                            <div className="space-y-1">
                                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
                                     {calculationPeriod === "month" ? "ประจำเดือน" : "ช่วงวันที่"}
                                 </label>
 
                                 {calculationPeriod === "month" ? (
-                                    <div className="relative h-10">
+                                    <div className="relative h-9">
                                         <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500" />
                                         <input
                                             type="month"
@@ -748,11 +813,11 @@ export default function PayrollPage() {
                                                 const [y, m] = e.target.value.split('-').map(Number);
                                                 setSelectedDate(new Date(y, m - 1, 1));
                                             }}
-                                            className="h-full w-full pl-10 pr-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-blue-400 transition-colors"
+                                            className="h-full w-full pl-9 pr-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-blue-400 transition-colors"
                                         />
                                     </div>
                                 ) : (
-                                    <div className="flex items-center gap-2 h-10">
+                                    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 h-9">
                                         <input
                                             type="date"
                                             value={format(customRange.start, "yyyy-MM-dd")}
@@ -760,7 +825,7 @@ export default function PayrollPage() {
                                                 const [y, m, d] = e.target.value.split('-').map(Number);
                                                 setCustomRange({ ...customRange, start: new Date(y, m - 1, d) });
                                             }}
-                                            className="h-full flex-1 min-w-0 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-blue-400 transition-colors"
+                                            className="h-full min-w-0 px-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-blue-400 transition-colors"
                                         />
                                         <span className="text-gray-400">-</span>
                                         <input
@@ -770,7 +835,7 @@ export default function PayrollPage() {
                                                 const [y, m, d] = e.target.value.split('-').map(Number);
                                                 setCustomRange({ ...customRange, end: new Date(y, m - 1, d) });
                                             }}
-                                            className="h-full flex-1 min-w-0 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-blue-400 transition-colors"
+                                            className="h-full min-w-0 px-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-blue-400 transition-colors"
                                         />
                                     </div>
                                 )}
@@ -778,11 +843,11 @@ export default function PayrollPage() {
                         </div>
 
                         {/* Actions */}
-                        <div className="flex flex-row xl:flex-col items-end justify-end gap-3 w-full xl:w-auto mt-4 xl:mt-0 pt-4 xl:pt-0 border-t xl:border-t-0 border-gray-100">
+                        <div className="grid grid-cols-2 gap-2 border-t border-gray-100 pt-3 sm:flex sm:justify-end xl:grid xl:grid-cols-1 xl:border-t-0 xl:pt-0">
                             <button
                                 onClick={calculatePayroll}
                                 disabled={loading}
-                                className="h-10 px-6 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm font-medium w-full xl:w-auto min-w-[140px]"
+                                className="h-10 px-3 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm font-medium whitespace-nowrap"
                             >
                                 <DollarSign className="w-4 h-4" />
                                 {loading ? "กำลังคำนวณ..." : "คำนวณเงินเดือน"}
@@ -792,7 +857,7 @@ export default function PayrollPage() {
                                 <button
                                     onClick={handlePrint}
                                     disabled={selectedIds.length === 0}
-                                    className="h-10 px-6 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm rounded-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-sm w-full xl:w-auto min-w-[140px]"
+                                    className="h-9 px-3 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm rounded-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-sm whitespace-nowrap"
                                 >
                                     <Download className="w-4 h-4" />
                                     พิมพ์สลิป ({selectedIds.length})
@@ -852,109 +917,158 @@ export default function PayrollPage() {
                 {/* Results */}
                 {payrollData.length > 0 && (
                     <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50/50">
-                            <div className="flex items-center gap-2">
-                                <DollarSign className="w-5 h-5 text-emerald-600" />
-                                <h3 className="font-semibold text-gray-900">สรุปรายการจ่ายเงินเดือน</h3>
-                            </div>
-                            <div className="text-sm">
-                                <span className="text-gray-500 mr-2">รวมจ่ายสุทธิทั้งหมด:</span>
-                                <span className="text-emerald-600 font-bold text-lg">
-                                    ฿{payrollData.reduce((sum, item) => sum + item.netTotal, 0).toLocaleString()}
-                                </span>
-                            </div>
-                        </div>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm text-left">
-                                <thead className="bg-gray-100 text-xs uppercase text-gray-500 font-semibold">
-                                    <tr>
-                                        <th className="px-6 py-3 w-10">
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedIds.length === payrollData.length && payrollData.length > 0}
-                                                onChange={handleSelectAll}
-                                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                                            />
-                                        </th>
-                                        <th className="px-6 py-3 min-w-[200px]">พนักงาน</th>
-                                        <th className="px-6 py-3 text-center">วันทำงาน</th>
-                                        <th className="px-6 py-3 text-right">ฐานเงินเดือน</th>
-                                        <th className="px-6 py-3 text-right">OT ปกติ</th>
-                                        <th className="px-6 py-3 text-right">OT วันหยุด</th>
-                                        <th className="px-6 py-3 text-right">OT พิเศษ</th>
-                                        <th className="px-6 py-3 text-right">วันหยุดพิเศษ</th>
-                                        <th className="px-6 py-3 text-right text-red-600">สาย (นาที)</th>
-                                        <th className="px-6 py-3 text-right text-emerald-600">รายรับรวม</th>
-                                        <th className="px-6 py-3 text-right text-red-600">หัก</th>
-                                        <th className="px-6 py-3 text-right font-bold text-gray-900">สุทธิ</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100">
-                                    {payrollData.map((item) => (
-                                        <tr key={item.employeeId} className="hover:bg-blue-50/30 transition-colors group">
-                                            <td className="px-6 py-4">
+                        {(() => {
+                            const normalizedPayroll = payrollData.map(normalizePayrollItem);
+                            const totalBaseIncome = normalizedPayroll.reduce((sum, item) => sum + toNumber(item.payrollBaseIncome), 0);
+                            const totalExtraIncome = normalizedPayroll.reduce((sum, item) => sum + toNumber(item.attendanceAllowance) + toNumber(item.specialAllowance) + toNumber(item.bonus), 0);
+                            const totalDeduction = normalizedPayroll.reduce((sum, item) => sum + toNumber(item.totalDeduction), 0);
+                            const totalNet = normalizedPayroll.reduce((sum, item) => sum + toNumber(item.netTotal), 0);
+
+                            return (
+                                <>
+                                    <div className="px-6 py-5 border-b border-gray-200 bg-gray-50/50">
+                                        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <DollarSign className="w-5 h-5 text-emerald-600" />
+                                                <h3 className="font-semibold text-gray-900">สรุปรายการจ่ายเงินเดือน</h3>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:min-w-[620px]">
+                                                <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                                                    <div className="text-[11px] font-medium text-slate-500">รายได้คำนวณ</div>
+                                                    <div className="mt-1 text-sm font-bold text-slate-900">฿{totalBaseIncome.toLocaleString()}</div>
+                                                </div>
+                                                <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2">
+                                                    <div className="text-[11px] font-medium text-blue-600">เงินเพิ่ม</div>
+                                                    <div className="mt-1 text-sm font-bold text-blue-700">฿{totalExtraIncome.toLocaleString()}</div>
+                                                </div>
+                                                <div className="rounded-lg border border-red-100 bg-red-50 px-3 py-2">
+                                                    <div className="text-[11px] font-medium text-red-600">รายการหัก</div>
+                                                    <div className="mt-1 text-sm font-bold text-red-700">฿{totalDeduction.toLocaleString()}</div>
+                                                </div>
+                                                <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2">
+                                                    <div className="text-[11px] font-medium text-emerald-600">รวมจ่ายสุทธิ</div>
+                                                    <div className="mt-1 text-lg font-bold text-emerald-700">฿{totalNet.toLocaleString()}</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="divide-y divide-gray-100">
+                                        <div className="hidden grid-cols-[40px_minmax(150px,1fr)_minmax(220px,1.25fr)_minmax(230px,1.25fr)_minmax(150px,0.75fr)] items-center gap-4 bg-gray-100 px-5 py-3 text-xs font-semibold uppercase text-gray-500 xl:grid">
+                                            <div>
                                                 <input
                                                     type="checkbox"
-                                                    checked={selectedIds.includes(item.employeeId)}
-                                                    onChange={() => handleSelectOne(item.employeeId)}
+                                                    checked={selectedIds.length === payrollData.length && payrollData.length > 0}
+                                                    onChange={handleSelectAll}
                                                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                                                 />
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="font-semibold text-gray-900 group-hover:text-blue-700 transition-colors">{item.name}</div>
-                                                <div className="text-xs text-gray-400 font-mono">{item.employeeId}</div>
-                                                <div className="mt-1 flex gap-1">
-                                                    <span className={`text-[10px] px-2 py-0.5 rounded-full ${item.type === 'รายเดือน'
-                                                        ? 'bg-blue-50 text-blue-600 border border-blue-100'
-                                                        : 'bg-orange-50 text-orange-600 border border-orange-100'
-                                                        }`}>
-                                                        {item.type}
-                                                    </span>
+                                            </div>
+                                            <div>พนักงาน</div>
+                                            <div>สรุปการคำนวณ</div>
+                                            <div>เงินเพิ่ม</div>
+                                            <div className="text-right">ยอดสุทธิ</div>
+                                        </div>
+
+                                        {normalizedPayroll.map((item) => {
+                                            const extraTotal = toNumber(item.attendanceAllowance) + toNumber(item.specialAllowance) + toNumber(item.bonus);
+                                            const totalOtHours = toNumber(item.otHoursNormal) + toNumber(item.otHoursHoliday) + toNumber(item.otHoursSpecial);
+
+                                            return (
+                                                <div key={item.employeeId} className="grid grid-cols-1 items-start gap-4 px-5 py-4 hover:bg-blue-50/30 md:grid-cols-[40px_1fr] xl:grid-cols-[40px_minmax(150px,1fr)_minmax(220px,1.25fr)_minmax(230px,1.25fr)_minmax(150px,0.75fr)]">
+                                                    <div className="pt-1 md:row-span-4 xl:row-span-1">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedIds.includes(item.employeeId)}
+                                                            onChange={() => handleSelectOne(item.employeeId)}
+                                                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                                        />
+                                                    </div>
+
+                                                    <div className="min-w-0">
+                                                        <div className="font-semibold text-gray-900">{item.name}</div>
+                                                        <div className="text-xs text-gray-400 font-mono">{item.employeeId}</div>
+                                                        <span className={`mt-2 inline-flex text-[10px] px-2 py-0.5 rounded-full ${item.type === 'รายเดือน'
+                                                            ? 'bg-blue-50 text-blue-600 border border-blue-100'
+                                                            : 'bg-orange-50 text-orange-600 border border-orange-100'
+                                                            }`}>
+                                                            {item.type}
+                                                        </span>
+                                                    </div>
+
+                                                    <div className="grid grid-cols-2 gap-2 text-xs">
+                                                        <div className="rounded-md bg-slate-50 px-3 py-2">
+                                                            <div className="text-slate-500">วันทำงาน</div>
+                                                            <div className="mt-0.5 font-semibold text-slate-900">{item.workDays} วัน</div>
+                                                        </div>
+                                                        <div className="rounded-md bg-slate-50 px-3 py-2">
+                                                            <div className="text-slate-500">ฐานเงินเดือน</div>
+                                                            <div className="mt-0.5 font-semibold text-slate-900">฿{toNumber(item.baseSalary).toLocaleString()}</div>
+                                                        </div>
+                                                        <div className="rounded-md bg-slate-50 px-3 py-2">
+                                                            <div className="text-slate-500">OT รวม</div>
+                                                            <div className="mt-0.5 font-semibold text-slate-900">{totalOtHours > 0 ? `${totalOtHours.toFixed(1)} ชม.` : "-"}</div>
+                                                        </div>
+                                                        <div className="rounded-md bg-slate-50 px-3 py-2">
+                                                            <div className="text-slate-500">สาย</div>
+                                                            <div className={`mt-0.5 font-semibold ${item.lateMinutes > 0 ? "text-red-600" : "text-slate-900"}`}>
+                                                                {item.lateMinutes > 0 ? `${item.lateMinutes} นาที` : "-"}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="grid grid-cols-3 gap-2">
+                                                        <label className="block">
+                                                            <span className="mb-1 block text-[11px] font-medium text-gray-500">เบี้ยขยัน</span>
+                                                            <input
+                                                                type="number"
+                                                                min="0"
+                                                                value={toNumber(item.attendanceAllowance) || ""}
+                                                                onChange={(e) => updateExtraIncome(item.employeeId, "attendanceAllowance", e.target.value)}
+                                                                className="h-9 w-full rounded-md border border-gray-200 px-2 text-right text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                                placeholder="0"
+                                                            />
+                                                        </label>
+                                                        <label className="block">
+                                                            <span className="mb-1 block text-[11px] font-medium text-gray-500">เงินพิเศษ</span>
+                                                            <input
+                                                                type="number"
+                                                                min="0"
+                                                                value={toNumber(item.specialAllowance) || ""}
+                                                                onChange={(e) => updateExtraIncome(item.employeeId, "specialAllowance", e.target.value)}
+                                                                className="h-9 w-full rounded-md border border-gray-200 px-2 text-right text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                                placeholder="0"
+                                                            />
+                                                        </label>
+                                                        <label className="block">
+                                                            <span className="mb-1 block text-[11px] font-medium text-gray-500">โบนัส</span>
+                                                            <input
+                                                                type="number"
+                                                                min="0"
+                                                                value={toNumber(item.bonus) || ""}
+                                                                onChange={(e) => updateExtraIncome(item.employeeId, "bonus", e.target.value)}
+                                                                className="h-9 w-full rounded-md border border-gray-200 px-2 text-right text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                                placeholder="0"
+                                                            />
+                                                        </label>
+                                                        <div className="col-span-3 text-right text-xs text-blue-700">
+                                                            รวมเงินเพิ่ม ฿{extraTotal.toLocaleString()}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="text-right">
+                                                        <div className="text-xs text-gray-500">รายรับ ฿{toNumber(item.totalIncome).toLocaleString()}</div>
+                                                        <div className="text-xs text-red-600">หัก {toNumber(item.totalDeduction) > 0 ? `฿${toNumber(item.totalDeduction).toLocaleString()}` : "-"}</div>
+                                                        <div className="mt-2 inline-flex rounded-md border border-emerald-100 bg-emerald-50 px-3 py-1.5 font-mono text-base font-bold text-emerald-700">
+                                                            ฿{toNumber(item.netTotal).toLocaleString()}
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                            </td>
-                                            <td className="px-6 py-4 text-center text-gray-600">{item.workDays}</td>
-                                            <td className="px-6 py-4 text-right text-gray-600 font-mono">
-                                                {item.baseSalary.toLocaleString()}
-                                            </td>
-                                            <td className="px-6 py-4 text-right text-gray-600 font-mono">
-                                                {item.otHoursNormal > 0 ? (
-                                                    <span className="text-gray-900">{item.otHoursNormal.toFixed(1)} <span className="text-gray-400 text-xs">ชม.</span></span>
-                                                ) : "-"}
-                                            </td>
-                                            <td className="px-6 py-4 text-right text-gray-600 font-mono">
-                                                {item.otHoursHoliday > 0 ? (
-                                                    <span className="text-gray-900">{item.otHoursHoliday.toFixed(1)} <span className="text-gray-400 text-xs">ชม.</span></span>
-                                                ) : "-"}
-                                            </td>
-                                            <td className="px-6 py-4 text-right text-gray-600 font-mono">
-                                                {item.otHoursSpecial > 0 ? (
-                                                    <span className="text-gray-900">{item.otHoursSpecial.toFixed(1)} <span className="text-gray-400 text-xs">ชม.</span></span>
-                                                ) : "-"}
-                                            </td>
-                                            <td className="px-6 py-4 text-right text-gray-600 font-mono">
-                                                {item.customHolidayWorkHours > 0 ? (
-                                                    <span className="text-gray-900">{item.customHolidayWorkHours.toFixed(1)} <span className="text-gray-400 text-xs">ชม.</span></span>
-                                                ) : "-"}
-                                            </td>
-                                            <td className="px-6 py-4 text-right text-red-500 font-mono">
-                                                {item.lateMinutes > 0 ? item.lateMinutes : "-"}
-                                            </td>
-                                            <td className="px-6 py-4 text-right text-emerald-600 font-medium font-mono">
-                                                {item.totalIncome.toLocaleString()}
-                                            </td>
-                                            <td className="px-6 py-4 text-right text-red-600 font-medium font-mono">
-                                                {item.totalDeduction > 0 ? item.totalDeduction.toLocaleString() : "-"}
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <span className="font-bold text-gray-900 bg-emerald-50 px-2 py-1 rounded border border-emerald-100 font-mono">
-                                                    ฿{item.netTotal.toLocaleString()}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                                            );
+                                        })}
+                                    </div>
+                                </>
+                            );
+                        })()}
                     </div>
                 )}
             </div>

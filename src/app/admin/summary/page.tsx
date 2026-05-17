@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { attendanceService, employeeService, swapService, systemConfigService, type Attendance, type Employee, type SwapRequest } from "@/lib/firestore";
+import { attendanceService, employeeService, swapService, systemConfigService, type Employee } from "@/lib/firestore";
 import { useAdmin } from "@/components/auth/AuthProvider";
-import { Users, Calendar, Clock, CheckCircle, XCircle, AlertTriangle, Download, Search } from "lucide-react";
+import { Users, Calendar, Download, Search, Send } from "lucide-react";
 import { formatMinutesToHours } from "@/lib/workTime";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from "date-fns";
-import { th } from "date-fns/locale";
+import { format } from "date-fns";
 
 interface DailySummary {
     date: Date;
@@ -24,8 +23,8 @@ export default function DailySummaryPage() {
     const { user } = useAdmin();
     const [loading, setLoading] = useState(true);
     const [employees, setEmployees] = useState<Employee[]>([]);
-    const [attendances, setAttendances] = useState<Attendance[]>([]);
     const [summaries, setSummaries] = useState<DailySummary[]>([]);
+    const [sendingNotification, setSendingNotification] = useState(false);
 
     const [selectedDate, setSelectedDate] = useState(() => {
         return format(new Date(), "yyyy-MM-dd");
@@ -34,13 +33,7 @@ export default function DailySummaryPage() {
     const [selectedEmployee, setSelectedEmployee] = useState<string>("all");
     const [searchQuery, setSearchQuery] = useState("");
 
-    useEffect(() => {
-        if (user) {
-            loadData();
-        }
-    }, [user, selectedDate]);
-
-    const loadData = async () => {
+    const loadData = useCallback(async () => {
         setLoading(true);
         try {
             const date = new Date(selectedDate);
@@ -58,7 +51,6 @@ export default function DailySummaryPage() {
 
             const activeEmployees = empData.filter(e => e.status === "ทำงาน");
             setEmployees(activeEmployees);
-            setAttendances(attData);
 
             const dateStr = format(date, "yyyy-MM-dd");
 
@@ -138,7 +130,13 @@ export default function DailySummaryPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [selectedDate]);
+
+    useEffect(() => {
+        if (user) {
+            loadData();
+        }
+    }, [user, loadData]);
 
     const formatTime = (date?: Date | null) => {
         if (!date) return "-";
@@ -198,6 +196,25 @@ export default function DailySummaryPage() {
         link.click();
     };
 
+    const sendDailyReportNotification = async () => {
+        setSendingNotification(true);
+        try {
+            const response = await fetch(`/api/cron/daily-report?date=${encodeURIComponent(selectedDate)}`);
+            const result = await response.json().catch(() => null);
+
+            if (!response.ok || result?.success === false) {
+                throw new Error(result?.message || "ส่งแจ้งเตือนไม่สำเร็จ");
+            }
+
+            alert("ส่งแจ้งเตือนสรุปรายวันแล้ว");
+        } catch (error) {
+            console.error("Error sending daily report notification:", error);
+            alert(error instanceof Error ? error.message : "ส่งแจ้งเตือนไม่สำเร็จ");
+        } finally {
+            setSendingNotification(false);
+        }
+    };
+
     if (!user) {
         return <div className="p-8 text-center">กรุณาเข้าสู่ระบบ</div>;
     }
@@ -253,6 +270,15 @@ export default function DailySummaryPage() {
                 >
                     <Download className="w-4 h-4" />
                     Export CSV
+                </button>
+
+                <button
+                    onClick={sendDailyReportNotification}
+                    disabled={sendingNotification || loading}
+                    className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    <Send className="w-4 h-4" />
+                    {sendingNotification ? "กำลังส่ง..." : "ส่งแจ้งเตือน"}
                 </button>
             </div>
 
