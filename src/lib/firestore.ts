@@ -972,6 +972,55 @@ export const systemConfigService = {
     },
 };
 
+export interface SavedPayrollRecord {
+    id?: string;
+    periodType: "month" | "custom";
+    periodLabel: string;
+    startDate: Date;
+    endDate: Date;
+    employeeType: string;
+    selectedDepartment: string;
+    totals: {
+        baseIncome: number;
+        extraIncome: number;
+        deduction: number;
+        net: number;
+    };
+    items: unknown[];
+    createdAt: Date;
+}
+
+export const payrollService = {
+    async create(record: Omit<SavedPayrollRecord, "id">) {
+        const docRef = await addDoc(collection(db, "payrollRuns"), {
+            ...record,
+            startDate: Timestamp.fromDate(record.startDate),
+            endDate: Timestamp.fromDate(record.endDate),
+            createdAt: Timestamp.fromDate(record.createdAt),
+        });
+        return docRef.id;
+    },
+
+    async getAll() {
+        const q = query(collection(db, "payrollRuns"), orderBy("createdAt", "desc"));
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                ...data,
+                startDate: data.startDate?.toDate(),
+                endDate: data.endDate?.toDate(),
+                createdAt: data.createdAt?.toDate(),
+            };
+        }) as SavedPayrollRecord[];
+    },
+
+    async delete(id: string) {
+        await deleteDoc(doc(db, "payrollRuns", id));
+    },
+};
+
 // Admin types
 export interface Admin {
     id?: string;

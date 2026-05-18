@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { employeeService, attendanceService, otService, swapService, systemConfigService, type Employee, type Attendance, type OTRequest, type SwapRequest, type SystemConfig } from "@/lib/firestore";
-import { Calendar, DollarSign, Download, Filter } from "lucide-react";
+import { employeeService, attendanceService, otService, swapService, systemConfigService, payrollService, type Employee, type Attendance, type OTRequest, type SwapRequest, type SystemConfig, type SavedPayrollRecord } from "@/lib/firestore";
+import { Calendar, DollarSign, Download, Filter, History, Plus, Save, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
 import { getLateMinutes } from "@/lib/workTime";
@@ -28,22 +27,70 @@ interface PayrollItem {
     attendanceAllowance: number;    // เบี้ยขยัน
     specialAllowance: number;       // เงินพิเศษ
     bonus: number;                  // โบนัส
+    manualIncomes: ManualIncome[];
+    payrollBaseDeduction: number;   // Auto-calculated deductions before manual deductions
+    manualDeductions: ManualDeduction[];
     totalIncome: number;
     totalDeduction: number;
     netTotal: number;
 }
 
-type ExtraIncomeField = "attendanceAllowance" | "specialAllowance" | "bonus";
+interface ManualIncome {
+    id: string;
+    label: string;
+    amount: number;
+}
+
+interface ManualDeduction {
+    id: string;
+    label: string;
+    amount: number;
+}
+
+type ManualIncomeField = "label" | "amount";
+type ManualDeductionField = "label" | "amount";
 
 const toNumber = (value: number | undefined) => Number.isFinite(value) ? Number(value) : 0;
+const hasValidNumber = (value: number | undefined) => Number.isFinite(value);
+
+const escapeHtml = (value: string) =>
+    value
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
 
 const normalizePayrollItem = (item: PayrollItem): PayrollItem => {
     const attendanceAllowance = toNumber(item.attendanceAllowance);
     const specialAllowance = toNumber(item.specialAllowance);
     const bonus = toNumber(item.bonus);
-    const extraIncome = attendanceAllowance + specialAllowance + bonus;
-    const payrollBaseIncome = toNumber(item.payrollBaseIncome) || Math.max(0, toNumber(item.totalIncome) - extraIncome);
-    const totalDeduction = toNumber(item.totalDeduction);
+    const legacyExtraIncome = attendanceAllowance + specialAllowance + bonus;
+    const hasManualIncomeState = Array.isArray(item.manualIncomes);
+    const manualIncomes = hasManualIncomeState
+        ? item.manualIncomes.map((income) => ({
+            ...income,
+            label: income.label || "",
+            amount: toNumber(income.amount),
+        }))
+        : [];
+    const manualIncomeTotal = manualIncomes.reduce((sum, income) => sum + toNumber(income.amount), 0);
+    const extraIncome = hasManualIncomeState ? manualIncomeTotal : legacyExtraIncome;
+    const payrollBaseIncome = hasValidNumber(item.payrollBaseIncome)
+        ? toNumber(item.payrollBaseIncome)
+        : Math.max(0, toNumber(item.totalIncome) - extraIncome);
+    const manualDeductions = Array.isArray(item.manualDeductions)
+        ? item.manualDeductions.map((deduction) => ({
+            ...deduction,
+            label: deduction.label || "",
+            amount: toNumber(deduction.amount),
+        }))
+        : [];
+    const manualDeductionTotal = manualDeductions.reduce((sum, deduction) => sum + toNumber(deduction.amount), 0);
+    const payrollBaseDeduction = hasValidNumber(item.payrollBaseDeduction)
+        ? toNumber(item.payrollBaseDeduction)
+        : Math.max(0, toNumber(item.totalDeduction) - manualDeductionTotal);
+    const totalDeduction = payrollBaseDeduction + manualDeductionTotal;
     const totalIncome = payrollBaseIncome + extraIncome;
 
     return {
@@ -52,6 +99,9 @@ const normalizePayrollItem = (item: PayrollItem): PayrollItem => {
         attendanceAllowance,
         specialAllowance,
         bonus,
+        manualIncomes,
+        payrollBaseDeduction,
+        manualDeductions,
         totalIncome,
         totalDeduction,
         netTotal: totalIncome - totalDeduction,
@@ -72,6 +122,20 @@ export default function PayrollPage() {
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [departments, setDepartments] = useState<string[]>([]);
     const [selectedDepartment, setSelectedDepartment] = useState<string>("all");
+    const [savedPayrolls, setSavedPayrolls] = useState<SavedPayrollRecord[]>([]);
+    const [selectedSavedPayrollId, setSelectedSavedPayrollId] = useState("");
+    const [savingPayroll, setSavingPayroll] = useState(false);
+    const [bulkEntry, setBulkEntry] = useState<{
+        type: "income" | "deduction";
+        label: string;
+        amount: string;
+        target: "all" | "selected";
+    }>({
+        type: "income",
+        label: "",
+        amount: "",
+        target: "all",
+    });
 
     useEffect(() => {
         const loadData = async () => {
@@ -82,9 +146,35 @@ export default function PayrollPage() {
             const employees = await employeeService.getAll();
             const uniqueDepts = Array.from(new Set(employees.map(e => e.department).filter(Boolean))) as string[];
             setDepartments(uniqueDepts.sort());
+
+            const savedRecords = await payrollService.getAll();
+            setSavedPayrolls(savedRecords);
         };
         loadData();
     }, []);
+
+    const getCurrentPeriodMeta = () => {
+        if (calculationPeriod === "month") {
+            const startDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+            const endDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+            return {
+                startDate,
+                endDate,
+                periodLabel: `เดือน ${format(selectedDate, "MMMM yyyy", { locale: th })}`,
+            };
+        }
+
+        const startDate = new Date(customRange.start);
+        startDate.setHours(0, 0, 0, 0);
+        const endDate = new Date(customRange.end);
+        endDate.setHours(23, 59, 59, 999);
+
+        return {
+            startDate,
+            endDate,
+            periodLabel: `ช่วงวันที่ ${format(startDate, "d MMM", { locale: th })} - ${format(endDate, "d MMM yyyy", { locale: th })}`,
+        };
+    };
 
     const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.checked) {
@@ -102,18 +192,237 @@ export default function PayrollPage() {
         }
     };
 
-    const updateExtraIncome = (employeeId: string, field: ExtraIncomeField, value: string) => {
-        const amount = Math.max(0, Number(value) || 0);
-
+    const addManualIncome = (employeeId: string) => {
         setPayrollData(currentData => currentData.map(item => {
             if (item.employeeId !== employeeId) return item;
 
-            const updatedItem = {
+            return normalizePayrollItem({
                 ...item,
-                [field]: amount,
-            };
-            return normalizePayrollItem(updatedItem);
+                manualIncomes: [
+                    ...(item.manualIncomes || []),
+                    {
+                        id: `${employeeId}-income-${Date.now()}`,
+                        label: "",
+                        amount: 0,
+                    },
+                ],
+            });
         }));
+    };
+
+    const updateManualIncome = (
+        employeeId: string,
+        incomeId: string,
+        field: ManualIncomeField,
+        value: string
+    ) => {
+        setPayrollData(currentData => currentData.map(item => {
+            if (item.employeeId !== employeeId) return item;
+
+            const manualIncomes = (item.manualIncomes || []).map((income) => {
+                if (income.id !== incomeId) return income;
+
+                return {
+                    ...income,
+                    [field]: field === "amount" ? Math.max(0, Number(value) || 0) : value,
+                };
+            });
+
+            return normalizePayrollItem({
+                ...item,
+                manualIncomes,
+            });
+        }));
+    };
+
+    const removeManualIncome = (employeeId: string, incomeId: string) => {
+        setPayrollData(currentData => currentData.map(item => {
+            if (item.employeeId !== employeeId) return item;
+
+            return normalizePayrollItem({
+                ...item,
+                manualIncomes: (item.manualIncomes || []).filter((income) => income.id !== incomeId),
+            });
+        }));
+    };
+
+    const addManualDeduction = (employeeId: string) => {
+        setPayrollData(currentData => currentData.map(item => {
+            if (item.employeeId !== employeeId) return item;
+
+            return normalizePayrollItem({
+                ...item,
+                manualDeductions: [
+                    ...(item.manualDeductions || []),
+                    {
+                        id: `${employeeId}-${Date.now()}`,
+                        label: "",
+                        amount: 0,
+                    },
+                ],
+            });
+        }));
+    };
+
+    const updateManualDeduction = (
+        employeeId: string,
+        deductionId: string,
+        field: ManualDeductionField,
+        value: string
+    ) => {
+        setPayrollData(currentData => currentData.map(item => {
+            if (item.employeeId !== employeeId) return item;
+
+            const manualDeductions = (item.manualDeductions || []).map((deduction) => {
+                if (deduction.id !== deductionId) return deduction;
+
+                return {
+                    ...deduction,
+                    [field]: field === "amount" ? Math.max(0, Number(value) || 0) : value,
+                };
+            });
+
+            return normalizePayrollItem({
+                ...item,
+                manualDeductions,
+            });
+        }));
+    };
+
+    const removeManualDeduction = (employeeId: string, deductionId: string) => {
+        setPayrollData(currentData => currentData.map(item => {
+            if (item.employeeId !== employeeId) return item;
+
+            return normalizePayrollItem({
+                ...item,
+                manualDeductions: (item.manualDeductions || []).filter((deduction) => deduction.id !== deductionId),
+            });
+        }));
+    };
+
+    const applyBulkEntry = () => {
+        const label = bulkEntry.label.trim();
+        const amount = Math.max(0, Number(bulkEntry.amount) || 0);
+        if (!label || amount <= 0) return;
+
+        const targetIds = bulkEntry.target === "selected" ? selectedIds : payrollData.map(item => item.employeeId);
+        if (targetIds.length === 0) return;
+
+        const timestamp = Date.now();
+
+        setPayrollData(currentData => currentData.map(item => {
+            if (!targetIds.includes(item.employeeId)) return item;
+
+            if (bulkEntry.type === "income") {
+                return normalizePayrollItem({
+                    ...item,
+                    manualIncomes: [
+                        ...(item.manualIncomes || []),
+                        {
+                            id: `${item.employeeId}-bulk-income-${timestamp}`,
+                            label,
+                            amount,
+                        },
+                    ],
+                });
+            }
+
+            return normalizePayrollItem({
+                ...item,
+                manualDeductions: [
+                    ...(item.manualDeductions || []),
+                    {
+                        id: `${item.employeeId}-bulk-deduction-${timestamp}`,
+                        label,
+                        amount,
+                    },
+                ],
+            });
+        }));
+
+        setBulkEntry(current => ({
+            ...current,
+            label: "",
+            amount: "",
+        }));
+    };
+
+    const handleSavePayroll = async () => {
+        const normalizedPayroll = payrollData.map(normalizePayrollItem);
+        if (normalizedPayroll.length === 0) return;
+
+        setSavingPayroll(true);
+        try {
+            const { startDate, endDate, periodLabel } = getCurrentPeriodMeta();
+            const totals = {
+                baseIncome: normalizedPayroll.reduce((sum, item) => sum + toNumber(item.payrollBaseIncome), 0),
+                extraIncome: normalizedPayroll.reduce((sum, item) => {
+                    const manualIncomeTotal = (item.manualIncomes || []).reduce((incomeSum, income) => incomeSum + toNumber(income.amount), 0);
+                    const legacyIncomeTotal = toNumber(item.attendanceAllowance) + toNumber(item.specialAllowance) + toNumber(item.bonus);
+                    return sum + (Array.isArray(item.manualIncomes) ? manualIncomeTotal : legacyIncomeTotal);
+                }, 0),
+                deduction: normalizedPayroll.reduce((sum, item) => sum + toNumber(item.totalDeduction), 0),
+                net: normalizedPayroll.reduce((sum, item) => sum + toNumber(item.netTotal), 0),
+            };
+
+            await payrollService.create({
+                periodType: calculationPeriod,
+                periodLabel,
+                startDate,
+                endDate,
+                employeeType,
+                selectedDepartment,
+                totals,
+                items: normalizedPayroll,
+                createdAt: new Date(),
+            });
+
+            const savedRecords = await payrollService.getAll();
+            setSavedPayrolls(savedRecords);
+            alert(`บันทึกเงินเดือน${periodLabel}แล้ว`);
+        } catch (error) {
+            console.error("Error saving payroll:", error);
+            alert("บันทึกเงินเดือนไม่สำเร็จ");
+        } finally {
+            setSavingPayroll(false);
+        }
+    };
+
+    const handleLoadSavedPayroll = () => {
+        const selectedRecord = savedPayrolls.find(record => record.id === selectedSavedPayrollId);
+        if (!selectedRecord) return;
+
+        const restoredItems = (selectedRecord.items as PayrollItem[]).map(normalizePayrollItem);
+        setPayrollData(restoredItems);
+        setSelectedIds(restoredItems.map(item => item.employeeId));
+        setEmployeeType(selectedRecord.employeeType as "ประจำ - รายเดือน" | "ประจำ - รายวัน" | "ชั่วคราว");
+        setSelectedDepartment(selectedRecord.selectedDepartment || "all");
+        setCalculationPeriod(selectedRecord.periodType);
+        setCustomRange({
+            start: selectedRecord.startDate,
+            end: selectedRecord.endDate,
+        });
+        if (selectedRecord.periodType === "month") {
+            setSelectedDate(selectedRecord.startDate);
+        }
+    };
+
+    const handleDeleteSavedPayroll = async () => {
+        const selectedRecord = savedPayrolls.find(record => record.id === selectedSavedPayrollId);
+        if (!selectedRecord?.id) return;
+
+        const confirmed = window.confirm(`ต้องการลบประวัติเงินเดือน "${selectedRecord.periodLabel}" ใช่ไหม?`);
+        if (!confirmed) return;
+
+        try {
+            await payrollService.delete(selectedRecord.id);
+            const savedRecords = await payrollService.getAll();
+            setSavedPayrolls(savedRecords);
+            setSelectedSavedPayrollId("");
+        } catch (error) {
+            console.error("Error deleting saved payroll:", error);
+            alert("ลบประวัติเงินเดือนไม่สำเร็จ");
+        }
     };
 
     const handlePrint = () => {
@@ -290,8 +599,18 @@ export default function PayrollPage() {
                                     <td>เงินเดือน / ค่าจ้าง</td>
                                     <td class="amount">${item.baseSalary.toLocaleString()}</td>
                                     <td>หักมาสาย (${item.lateMinutes} นาที)</td>
-                                    <td class="amount">${item.totalDeduction > 0 ? item.totalDeduction.toLocaleString() : "-"}</td>
+                                    <td class="amount">${item.payrollBaseDeduction > 0 ? item.payrollBaseDeduction.toLocaleString() : "-"}</td>
                                 </tr>
+                                ${(item.manualDeductions || [])
+                                    .filter(deduction => deduction.label || deduction.amount > 0)
+                                    .map(deduction => `
+                                        <tr>
+                                            <td></td>
+                                            <td class="amount"></td>
+                                            <td>${escapeHtml(deduction.label || "รายการหักเพิ่มเติม")}</td>
+                                            <td class="amount">${deduction.amount > 0 ? deduction.amount.toLocaleString() : "-"}</td>
+                                        </tr>
+                                    `).join('')}
                                 <tr>
                                     <td>ค่าล่วงเวลา ปกติ (${item.otHoursNormal.toFixed(0)} ชม.)</td>
                                     <td class="amount">${item.otPayNormal > 0 ? item.otPayNormal.toLocaleString() : "-"}</td>
@@ -316,24 +635,16 @@ export default function PayrollPage() {
                                     <td></td>
                                     <td class="amount"></td>
                                 </tr>
-                                <tr>
-                                    <td>เบี้ยขยัน</td>
-                                    <td class="amount">${item.attendanceAllowance > 0 ? item.attendanceAllowance.toLocaleString() : "-"}</td>
-                                    <td></td>
-                                    <td class="amount"></td>
-                                </tr>
-                                <tr>
-                                    <td>เงินพิเศษ</td>
-                                    <td class="amount">${item.specialAllowance > 0 ? item.specialAllowance.toLocaleString() : "-"}</td>
-                                    <td></td>
-                                    <td class="amount"></td>
-                                </tr>
-                                <tr>
-                                    <td>โบนัส</td>
-                                    <td class="amount">${item.bonus > 0 ? item.bonus.toLocaleString() : "-"}</td>
-                                    <td></td>
-                                    <td class="amount"></td>
-                                </tr>
+                                ${(item.manualIncomes || [])
+                                    .filter(income => income.label || income.amount > 0)
+                                    .map(income => `
+                                        <tr>
+                                            <td>${escapeHtml(income.label || "เงินเพิ่ม")}</td>
+                                            <td class="amount">${income.amount > 0 ? income.amount.toLocaleString() : "-"}</td>
+                                            <td></td>
+                                            <td class="amount"></td>
+                                        </tr>
+                                    `).join('')}
                                 <!-- Add more rows if needed -->
                                 <tr style="height: 60px;">
                                     <td></td><td></td><td></td><td></td>
@@ -703,6 +1014,9 @@ export default function PayrollPage() {
                     attendanceAllowance: 0,
                     specialAllowance: 0,
                     bonus: 0,
+                    manualIncomes: [],
+                    payrollBaseDeduction: deduction,
+                    manualDeductions: [],
                     totalIncome: income,
                     totalDeduction: deduction,
                     netTotal: income - deduction
@@ -723,13 +1037,6 @@ export default function PayrollPage() {
 
     return (
         <div className="space-y-6">
-            <div className="bg-white border-b border-gray-200 px-6 py-4">
-                <PageHeader
-                    title="ระบบคำนวณเงินเดือน (Payroll)"
-                    subtitle="จัดการและคำนวณเงินเดือนพนักงาน ค่าล่วงเวลา และรายการหักต่างๆ"
-                />
-            </div>
-
             <div className="px-6 pb-8 space-y-6">
                 {/* Controls */}
                 <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-4 py-4">
@@ -853,19 +1160,56 @@ export default function PayrollPage() {
                                 {loading ? "กำลังคำนวณ..." : "คำนวณเงินเดือน"}
                             </button>
 
-                            {payrollData.length > 0 && (
-                                <button
-                                    onClick={handlePrint}
-                                    disabled={selectedIds.length === 0}
-                                    className="h-9 px-3 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm rounded-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-sm whitespace-nowrap"
-                                >
-                                    <Download className="w-4 h-4" />
-                                    พิมพ์สลิป ({selectedIds.length})
-                                </button>
-                            )}
                         </div>
                     </div>
                 </div>
+
+                {savedPayrolls.length > 0 && (
+                    <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 px-4 py-3 shadow-sm">
+                        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                            <div className="flex items-start gap-3">
+                                <div className="mt-0.5 rounded-lg bg-white p-2 text-indigo-600 shadow-sm ring-1 ring-indigo-100">
+                                    <History className="h-4 w-4" />
+                                </div>
+                                <div>
+                                    <div className="text-sm font-semibold text-indigo-950">ประวัติเงินเดือนที่บันทึกไว้</div>
+                                    <div className="mt-0.5 text-xs text-indigo-600">เลือกงวดที่เคยบันทึกไว้เพื่อโหลดกลับมาดูหรือพิมพ์ย้อนหลัง</div>
+                                </div>
+                            </div>
+                            <div className="grid gap-2 sm:grid-cols-[minmax(240px,1fr)_120px_90px] lg:min-w-[620px]">
+                                <select
+                                    value={selectedSavedPayrollId}
+                                    onChange={(e) => setSelectedSavedPayrollId(e.target.value)}
+                                    className="h-10 rounded-lg border border-indigo-100 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                                >
+                                    <option value="">เลือกงวดที่บันทึกไว้</option>
+                                    {savedPayrolls.map((record) => (
+                                        <option key={record.id} value={record.id}>
+                                            {record.periodLabel} - สุทธิ ฿{toNumber(record.totals?.net).toLocaleString()}
+                                        </option>
+                                    ))}
+                                </select>
+                                <button
+                                    type="button"
+                                    onClick={handleLoadSavedPayroll}
+                                    disabled={!selectedSavedPayrollId}
+                                    className="h-10 rounded-lg bg-indigo-600 px-3 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    โหลดดูย้อนหลัง
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleDeleteSavedPayroll}
+                                    disabled={!selectedSavedPayrollId}
+                                    className="inline-flex h-10 items-center justify-center gap-1 rounded-lg border border-red-200 bg-white px-3 text-sm font-semibold text-red-600 shadow-sm hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    <Trash2 className="h-4 w-4" />
+                                    ลบ
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Config Summary */}
                 {config && (
@@ -920,19 +1264,43 @@ export default function PayrollPage() {
                         {(() => {
                             const normalizedPayroll = payrollData.map(normalizePayrollItem);
                             const totalBaseIncome = normalizedPayroll.reduce((sum, item) => sum + toNumber(item.payrollBaseIncome), 0);
-                            const totalExtraIncome = normalizedPayroll.reduce((sum, item) => sum + toNumber(item.attendanceAllowance) + toNumber(item.specialAllowance) + toNumber(item.bonus), 0);
+                            const totalExtraIncome = normalizedPayroll.reduce((sum, item) => {
+                                const manualIncomeTotal = (item.manualIncomes || []).reduce((incomeSum, income) => incomeSum + toNumber(income.amount), 0);
+                                const legacyIncomeTotal = toNumber(item.attendanceAllowance) + toNumber(item.specialAllowance) + toNumber(item.bonus);
+                                return sum + (Array.isArray(item.manualIncomes) ? manualIncomeTotal : legacyIncomeTotal);
+                            }, 0);
                             const totalDeduction = normalizedPayroll.reduce((sum, item) => sum + toNumber(item.totalDeduction), 0);
                             const totalNet = normalizedPayroll.reduce((sum, item) => sum + toNumber(item.netTotal), 0);
 
                             return (
                                 <>
                                     <div className="px-6 py-5 border-b border-gray-200 bg-gray-50/50">
-                                        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                                            <div className="flex items-center gap-2">
-                                                <DollarSign className="w-5 h-5 text-emerald-600" />
-                                                <h3 className="font-semibold text-gray-900">สรุปรายการจ่ายเงินเดือน</h3>
+                                        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                                                <div className="flex items-center gap-2">
+                                                    <DollarSign className="w-5 h-5 text-emerald-600" />
+                                                    <h3 className="font-semibold text-gray-900">สรุปรายการจ่ายเงินเดือน</h3>
+                                                </div>
+                                                <div className="flex flex-wrap gap-2">
+                                                    <button
+                                                        onClick={handleSavePayroll}
+                                                        disabled={payrollData.length === 0 || savingPayroll}
+                                                        className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white shadow-md shadow-emerald-600/20 transition-all hover:bg-emerald-700 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
+                                                    >
+                                                        <Save className="w-4 h-4" />
+                                                        {savingPayroll ? "กำลังบันทึก..." : "บันทึกงวดนี้"}
+                                                    </button>
+                                                    <button
+                                                        onClick={handlePrint}
+                                                        disabled={selectedIds.length === 0}
+                                                        className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white shadow-md shadow-slate-900/20 transition-all hover:bg-slate-800 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
+                                                    >
+                                                        <Download className="w-4 h-4" />
+                                                        พิมพ์สลิป {selectedIds.length > 0 ? `(${selectedIds.length})` : ""}
+                                                    </button>
+                                                </div>
                                             </div>
-                                            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:min-w-[620px]">
+                                            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:min-w-[680px]">
                                                 <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
                                                     <div className="text-[11px] font-medium text-slate-500">รายได้คำนวณ</div>
                                                     <div className="mt-1 text-sm font-bold text-slate-900">฿{totalBaseIncome.toLocaleString()}</div>
@@ -953,8 +1321,62 @@ export default function PayrollPage() {
                                         </div>
                                     </div>
 
+                                    <div className="border-b border-gray-200 bg-white px-4 py-3">
+                                        <div className="flex flex-col gap-2 xl:flex-row xl:items-end xl:justify-between">
+                                            <div>
+                                                <div className="text-xs font-semibold text-gray-900">เพิ่มรายการแบบกลุ่ม</div>
+                                                <div className="mt-0.5 text-[11px] text-gray-500">กรอกครั้งเดียวแล้วใช้กับทุกคน หรือเฉพาะพนักงานที่เลือก</div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2 sm:grid-cols-[120px_minmax(180px,1fr)_120px_130px_120px] xl:min-w-[760px]">
+                                                <select
+                                                    value={bulkEntry.type}
+                                                    onChange={(e) => setBulkEntry(current => ({ ...current, type: e.target.value as "income" | "deduction" }))}
+                                                    className="h-9 rounded-md border border-gray-200 bg-white px-2 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                >
+                                                    <option value="income">เงินเพิ่ม</option>
+                                                    <option value="deduction">รายการหัก</option>
+                                                </select>
+                                                <input
+                                                    type="text"
+                                                    value={bulkEntry.label}
+                                                    onChange={(e) => setBulkEntry(current => ({ ...current, label: e.target.value }))}
+                                                    className="h-9 rounded-md border border-gray-200 px-3 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    placeholder="ชื่อรายการ เช่น ค่าอาหาร"
+                                                />
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    value={bulkEntry.amount}
+                                                    onChange={(e) => setBulkEntry(current => ({ ...current, amount: e.target.value }))}
+                                                    className="h-9 rounded-md border border-gray-200 px-3 text-right text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    placeholder="0"
+                                                />
+                                                <select
+                                                    value={bulkEntry.target}
+                                                    onChange={(e) => setBulkEntry(current => ({ ...current, target: e.target.value as "all" | "selected" }))}
+                                                    className="h-9 rounded-md border border-gray-200 bg-white px-2 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                >
+                                                    <option value="all">ทุกคน</option>
+                                                    <option value="selected">ที่เลือก ({selectedIds.length})</option>
+                                                </select>
+                                                <button
+                                                    type="button"
+                                                    onClick={applyBulkEntry}
+                                                    disabled={!bulkEntry.label.trim() || !(Number(bulkEntry.amount) > 0) || (bulkEntry.target === "selected" && selectedIds.length === 0)}
+                                                    className={`inline-flex h-9 items-center justify-center gap-1 rounded-md px-3 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 ${bulkEntry.type === "income"
+                                                        ? "bg-blue-600 hover:bg-blue-700"
+                                                        : "bg-red-600 hover:bg-red-700"
+                                                        }`}
+                                                >
+                                                    <Plus className="h-3.5 w-3.5" />
+                                                    ใช้รายการ
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <div className="divide-y divide-gray-100">
-                                        <div className="hidden grid-cols-[40px_minmax(150px,1fr)_minmax(220px,1.25fr)_minmax(230px,1.25fr)_minmax(150px,0.75fr)] items-center gap-4 bg-gray-100 px-5 py-3 text-xs font-semibold uppercase text-gray-500 xl:grid">
+                                        <div className="hidden grid-cols-[36px_minmax(140px,0.85fr)_minmax(210px,1fr)_minmax(250px,1.15fr)_minmax(260px,1.15fr)_minmax(132px,0.65fr)] items-center gap-3 bg-gray-100 px-4 py-3 text-xs font-semibold uppercase text-gray-500 xl:grid">
                                             <div>
                                                 <input
                                                     type="checkbox"
@@ -966,15 +1388,19 @@ export default function PayrollPage() {
                                             <div>พนักงาน</div>
                                             <div>สรุปการคำนวณ</div>
                                             <div>เงินเพิ่ม</div>
+                                            <div>รายการหักเพิ่ม</div>
                                             <div className="text-right">ยอดสุทธิ</div>
                                         </div>
 
                                         {normalizedPayroll.map((item) => {
-                                            const extraTotal = toNumber(item.attendanceAllowance) + toNumber(item.specialAllowance) + toNumber(item.bonus);
+                                            const manualIncomeTotal = (item.manualIncomes || []).reduce((sum, income) => sum + toNumber(income.amount), 0);
+                                            const legacyIncomeTotal = toNumber(item.attendanceAllowance) + toNumber(item.specialAllowance) + toNumber(item.bonus);
+                                            const extraTotal = Array.isArray(item.manualIncomes) ? manualIncomeTotal : legacyIncomeTotal;
+                                            const manualDeductionTotal = (item.manualDeductions || []).reduce((sum, deduction) => sum + toNumber(deduction.amount), 0);
                                             const totalOtHours = toNumber(item.otHoursNormal) + toNumber(item.otHoursHoliday) + toNumber(item.otHoursSpecial);
 
                                             return (
-                                                <div key={item.employeeId} className="grid grid-cols-1 items-start gap-4 px-5 py-4 hover:bg-blue-50/30 md:grid-cols-[40px_1fr] xl:grid-cols-[40px_minmax(150px,1fr)_minmax(220px,1.25fr)_minmax(230px,1.25fr)_minmax(150px,0.75fr)]">
+                                                <div key={item.employeeId} className="grid grid-cols-1 items-start gap-4 px-4 py-4 hover:bg-blue-50/30 md:grid-cols-[40px_1fr] xl:grid-cols-[36px_minmax(140px,0.85fr)_minmax(210px,1fr)_minmax(250px,1.15fr)_minmax(260px,1.15fr)_minmax(132px,0.65fr)] xl:gap-3">
                                                     <div className="pt-1 md:row-span-4 xl:row-span-1">
                                                         <input
                                                             type="checkbox"
@@ -996,19 +1422,19 @@ export default function PayrollPage() {
                                                     </div>
 
                                                     <div className="grid grid-cols-2 gap-2 text-xs">
-                                                        <div className="rounded-md bg-slate-50 px-3 py-2">
+                                                        <div className="rounded-md bg-slate-50 px-2.5 py-2">
                                                             <div className="text-slate-500">วันทำงาน</div>
                                                             <div className="mt-0.5 font-semibold text-slate-900">{item.workDays} วัน</div>
                                                         </div>
-                                                        <div className="rounded-md bg-slate-50 px-3 py-2">
+                                                        <div className="rounded-md bg-slate-50 px-2.5 py-2">
                                                             <div className="text-slate-500">ฐานเงินเดือน</div>
                                                             <div className="mt-0.5 font-semibold text-slate-900">฿{toNumber(item.baseSalary).toLocaleString()}</div>
                                                         </div>
-                                                        <div className="rounded-md bg-slate-50 px-3 py-2">
+                                                        <div className="rounded-md bg-slate-50 px-2.5 py-2">
                                                             <div className="text-slate-500">OT รวม</div>
                                                             <div className="mt-0.5 font-semibold text-slate-900">{totalOtHours > 0 ? `${totalOtHours.toFixed(1)} ชม.` : "-"}</div>
                                                         </div>
-                                                        <div className="rounded-md bg-slate-50 px-3 py-2">
+                                                        <div className="rounded-md bg-slate-50 px-2.5 py-2">
                                                             <div className="text-slate-500">สาย</div>
                                                             <div className={`mt-0.5 font-semibold ${item.lateMinutes > 0 ? "text-red-600" : "text-slate-900"}`}>
                                                                 {item.lateMinutes > 0 ? `${item.lateMinutes} นาที` : "-"}
@@ -1016,48 +1442,120 @@ export default function PayrollPage() {
                                                         </div>
                                                     </div>
 
-                                                    <div className="grid grid-cols-3 gap-2">
-                                                        <label className="block">
-                                                            <span className="mb-1 block text-[11px] font-medium text-gray-500">เบี้ยขยัน</span>
-                                                            <input
-                                                                type="number"
-                                                                min="0"
-                                                                value={toNumber(item.attendanceAllowance) || ""}
-                                                                onChange={(e) => updateExtraIncome(item.employeeId, "attendanceAllowance", e.target.value)}
-                                                                className="h-9 w-full rounded-md border border-gray-200 px-2 text-right text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                                placeholder="0"
-                                                            />
-                                                        </label>
-                                                        <label className="block">
-                                                            <span className="mb-1 block text-[11px] font-medium text-gray-500">เงินพิเศษ</span>
-                                                            <input
-                                                                type="number"
-                                                                min="0"
-                                                                value={toNumber(item.specialAllowance) || ""}
-                                                                onChange={(e) => updateExtraIncome(item.employeeId, "specialAllowance", e.target.value)}
-                                                                className="h-9 w-full rounded-md border border-gray-200 px-2 text-right text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                                placeholder="0"
-                                                            />
-                                                        </label>
-                                                        <label className="block">
-                                                            <span className="mb-1 block text-[11px] font-medium text-gray-500">โบนัส</span>
-                                                            <input
-                                                                type="number"
-                                                                min="0"
-                                                                value={toNumber(item.bonus) || ""}
-                                                                onChange={(e) => updateExtraIncome(item.employeeId, "bonus", e.target.value)}
-                                                                className="h-9 w-full rounded-md border border-gray-200 px-2 text-right text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                                placeholder="0"
-                                                            />
-                                                        </label>
-                                                        <div className="col-span-3 text-right text-xs text-blue-700">
+                                                    <div className="rounded-lg border border-blue-100 bg-blue-50/50 p-2">
+                                                        <div className="mb-2 flex items-center justify-between gap-2">
+                                                            <span className="text-[11px] font-semibold text-blue-700">เงินเพิ่ม</span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => addManualIncome(item.employeeId)}
+                                                                className="inline-flex h-7 items-center gap-1 rounded-md border border-blue-200 bg-white px-2 text-[11px] font-medium text-blue-700 hover:bg-blue-50"
+                                                            >
+                                                                <Plus className="h-3 w-3" />
+                                                                เพิ่ม
+                                                            </button>
+                                                        </div>
+
+                                                        {(item.manualIncomes || []).length === 0 ? (
+                                                            <div className="rounded-md border border-dashed border-blue-100 bg-white/60 px-2 py-2 text-center text-[11px] text-blue-400">
+                                                                ยังไม่มีเงินเพิ่ม
+                                                            </div>
+                                                        ) : (
+                                                            <div className="space-y-1.5">
+                                                                {(item.manualIncomes || []).map((income) => (
+                                                                    <div key={income.id} className="grid grid-cols-[1fr_86px_26px] gap-1.5">
+                                                                        <input
+                                                                            type="text"
+                                                                            value={income.label}
+                                                                            onChange={(e) => updateManualIncome(item.employeeId, income.id, "label", e.target.value)}
+                                                                            className="h-8 min-w-0 rounded-md border border-blue-100 bg-white px-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-200"
+                                                                            placeholder="ชื่อรายการ"
+                                                                        />
+                                                                        <input
+                                                                            type="number"
+                                                                            min="0"
+                                                                            value={toNumber(income.amount) || ""}
+                                                                            onChange={(e) => updateManualIncome(item.employeeId, income.id, "amount", e.target.value)}
+                                                                            className="h-8 min-w-0 rounded-md border border-blue-100 bg-white px-2 text-right text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-200"
+                                                                            placeholder="0"
+                                                                        />
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => removeManualIncome(item.employeeId, income.id)}
+                                                                            className="flex h-8 w-6 items-center justify-center rounded-md text-blue-500 hover:bg-blue-100"
+                                                                            aria-label="ลบเงินเพิ่ม"
+                                                                        >
+                                                                            <Trash2 className="h-3.5 w-3.5" />
+                                                                        </button>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+
+                                                        <div className="mt-2 text-right text-xs text-blue-700">
                                                             รวมเงินเพิ่ม ฿{extraTotal.toLocaleString()}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="rounded-lg border border-red-100 bg-red-50/40 p-2">
+                                                        <div className="mb-2 flex items-center justify-between gap-2">
+                                                            <span className="text-[11px] font-semibold text-red-700">รายการหักเพิ่มเติม</span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => addManualDeduction(item.employeeId)}
+                                                                className="inline-flex h-7 items-center gap-1 rounded-md border border-red-200 bg-white px-2 text-[11px] font-medium text-red-700 hover:bg-red-50"
+                                                            >
+                                                                <Plus className="h-3 w-3" />
+                                                                เพิ่ม
+                                                            </button>
+                                                        </div>
+
+                                                        {(item.manualDeductions || []).length === 0 ? (
+                                                            <div className="rounded-md border border-dashed border-red-100 bg-white/60 px-2 py-2 text-center text-[11px] text-red-400">
+                                                                ยังไม่มีรายการหักเพิ่ม
+                                                            </div>
+                                                        ) : (
+                                                            <div className="space-y-1.5">
+                                                                {(item.manualDeductions || []).map((deduction) => (
+                                                                    <div key={deduction.id} className="grid grid-cols-[1fr_86px_26px] gap-1.5">
+                                                                        <input
+                                                                            type="text"
+                                                                            value={deduction.label}
+                                                                            onChange={(e) => updateManualDeduction(item.employeeId, deduction.id, "label", e.target.value)}
+                                                                            className="h-8 min-w-0 rounded-md border border-red-100 bg-white px-2 text-xs focus:outline-none focus:ring-2 focus:ring-red-200"
+                                                                            placeholder="ชื่อรายการ"
+                                                                        />
+                                                                        <input
+                                                                            type="number"
+                                                                            min="0"
+                                                                            value={toNumber(deduction.amount) || ""}
+                                                                            onChange={(e) => updateManualDeduction(item.employeeId, deduction.id, "amount", e.target.value)}
+                                                                            className="h-8 min-w-0 rounded-md border border-red-100 bg-white px-2 text-right text-xs font-mono focus:outline-none focus:ring-2 focus:ring-red-200"
+                                                                            placeholder="0"
+                                                                        />
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => removeManualDeduction(item.employeeId, deduction.id)}
+                                                                            className="flex h-8 w-6 items-center justify-center rounded-md text-red-500 hover:bg-red-100"
+                                                                            aria-label="ลบรายการหัก"
+                                                                        >
+                                                                            <Trash2 className="h-3.5 w-3.5" />
+                                                                        </button>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+
+                                                        <div className="mt-2 text-right text-xs text-red-700">
+                                                            รวมหักเพิ่ม ฿{manualDeductionTotal.toLocaleString()}
                                                         </div>
                                                     </div>
 
                                                     <div className="text-right">
                                                         <div className="text-xs text-gray-500">รายรับ ฿{toNumber(item.totalIncome).toLocaleString()}</div>
                                                         <div className="text-xs text-red-600">หัก {toNumber(item.totalDeduction) > 0 ? `฿${toNumber(item.totalDeduction).toLocaleString()}` : "-"}</div>
+                                                        {manualDeductionTotal > 0 && (
+                                                            <div className="text-[11px] text-red-400">รวมรายการหักเพิ่ม ฿{manualDeductionTotal.toLocaleString()}</div>
+                                                        )}
                                                         <div className="mt-2 inline-flex rounded-md border border-emerald-100 bg-emerald-50 px-3 py-1.5 font-mono text-base font-bold text-emerald-700">
                                                             ฿{toNumber(item.netTotal).toLocaleString()}
                                                         </div>

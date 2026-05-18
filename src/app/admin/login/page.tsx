@@ -1,22 +1,23 @@
 "use client";
 
 import { signInWithEmailAndPassword } from "firebase/auth";
+import { FirebaseError } from "firebase/app";
 import { auth } from "@/lib/firebase";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Lock, Mail, AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle, Eye, EyeOff, Loader2 } from "lucide-react";
 import { adminService } from "@/lib/firestore";
 import useAdminLiffAuth from "@/hooks/useAdminLiffAuth";
 
 export default function AdminLoginPage() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
     const router = useRouter();
 
-    // LINE Auto Login hook
     const {
         loading: liffLoading,
         error: liffError,
@@ -24,10 +25,9 @@ export default function AdminLoginPage() {
         adminProfile,
         needsLink,
         linkProfile,
-        loginWithLine
+        loginWithLine,
     } = useAdminLiffAuth();
 
-    // Auto redirect if logged in via LINE
     useEffect(() => {
         if (adminProfile && !liffLoading) {
             console.log("Admin logged in via LINE:", adminProfile);
@@ -43,23 +43,23 @@ export default function AdminLoginPage() {
         try {
             await signInWithEmailAndPassword(auth, email, password);
 
-            // Update last login
             const admin = await adminService.getByEmail(email);
             if (admin && admin.id) {
                 await adminService.update(admin.id, { lastLogin: new Date() });
             }
 
             router.push("/admin");
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error("Login error:", err);
-            if (err.code === "auth/invalid-credential") {
+            const errorCode = err instanceof FirebaseError ? err.code : "";
+            if (errorCode === "auth/invalid-credential") {
                 setError("อีเมลหรือรหัสผ่านไม่ถูกต้อง");
-            } else if (err.code === "auth/user-not-found") {
-                setError("ไม่พบผู้ใช้งานนี้");
-            } else if (err.code === "auth/wrong-password") {
+            } else if (errorCode === "auth/user-not-found") {
+                setError("ไม่พบบัญชีผู้ใช้นี้");
+            } else if (errorCode === "auth/wrong-password") {
                 setError("รหัสผ่านไม่ถูกต้อง");
             } else {
-                setError("เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง");
+                setError("เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
             }
         } finally {
             setLoading(false);
@@ -67,202 +67,187 @@ export default function AdminLoginPage() {
     };
 
     const handleLineLogin = async () => {
+        setError("");
         setLoading(true);
         try {
             await loginWithLine();
-        } catch (err) {
+        } catch {
             setError("ไม่สามารถเชื่อมต่อ LINE ได้");
             setLoading(false);
         }
     };
 
-    // Show loading while LIFF is initializing (only in LINE browser)
     if (isInLineApp && liffLoading) {
         return (
-            <div className="min-h-screen bg-[#F8F9FA] flex items-center justify-center p-4">
+            <div className="flex min-h-screen items-center justify-center bg-white px-6">
                 <div className="text-center">
-                    <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-slate-200 border border-gray-100">
-                        <Loader2 className="w-8 h-8 text-slate-900 animate-spin" />
-                    </div>
-                    <h2 className="text-lg font-semibold text-gray-900 mb-2">Connecting...</h2>
-                    <p className="text-gray-500 text-sm">Please wait while we log you in via LINE</p>
+                    <Loader2 className="mx-auto h-7 w-7 animate-spin text-zinc-900" />
+                    <h2 className="mt-4 text-base font-semibold text-zinc-950">กำลังเชื่อมต่อ LINE</h2>
+                    <p className="mt-1 text-sm text-zinc-500">ระบบกำลังตรวจสอบสิทธิ์ผู้ดูแล</p>
                 </div>
             </div>
         );
     }
 
-    // Show message if LINE account is not linked to any admin
     if (isInLineApp && needsLink) {
         return (
-            <div className="min-h-screen bg-[#F8F9FA] flex items-center justify-center p-4 font-sans">
-                <div className="w-full max-w-[400px]">
-                    <div className="bg-white rounded-2xl shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_10px_20px_-2px_rgba(0,0,0,0.04)] border border-gray-100 p-8">
-                        <div className="text-center mb-6">
-                            <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-amber-100">
-                                <AlertCircle className="w-8 h-8 text-amber-600" />
-                            </div>
-                            <h2 className="text-lg font-bold text-gray-900 mb-2">Account Not Linked</h2>
-                            <p className="text-gray-500 text-sm">
-                                This LINE account ({linkProfile?.displayName || 'Unknown'}) is not linked to any admin user.
-                            </p>
-                        </div>
-
-                        <div className="bg-gray-50 rounded-xl p-4 mb-6 border border-gray-100 text-center">
-                            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                                Your LINE User ID
-                            </p>
-                            <code className="text-xs bg-white px-3 py-2 rounded-lg border border-gray-200 font-mono text-slate-700 break-all block shadow-sm">
-                                {linkProfile?.lineId || '-'}
-                            </code>
-                        </div>
-
-                        <p className="text-xs text-gray-500 text-center mb-4 leading-relaxed">
-                            Please contact a Super Admin to add this LINE User ID to your admin profile.
-                        </p>
-
-                        <div className="border-t border-gray-100 pt-4 mt-6">
-                            <p className="text-xs text-gray-400 text-center">
-                                Or try logging in with Email/Password via a standard browser.
-                            </p>
-                        </div>
+            <div className="flex min-h-screen items-center justify-center bg-white px-6">
+                <div className="w-full max-w-sm">
+                    <div className="mb-5 flex h-10 w-10 items-center justify-center rounded-full bg-amber-50 text-amber-600">
+                        <AlertCircle className="h-5 w-5" />
                     </div>
+                    <h1 className="text-2xl font-semibold text-zinc-950">ยังไม่ได้เชื่อมบัญชี</h1>
+                    <p className="mt-2 text-sm text-zinc-500">
+                        LINE: {linkProfile?.displayName || "Unknown"}
+                    </p>
+
+                    <div className="mt-6 rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+                        <p className="text-xs font-medium text-zinc-500">LINE User ID</p>
+                        <code className="mt-2 block break-all text-xs text-zinc-800">
+                            {linkProfile?.lineId || "-"}
+                        </code>
+                    </div>
+
+                    <p className="mt-5 text-sm leading-6 text-zinc-600">
+                        กรุณาแจ้งผู้ดูแลระบบให้เพิ่ม LINE User ID นี้ในบัญชีแอดมินก่อนเข้าใช้งาน
+                    </p>
                 </div>
             </div>
         );
     }
 
-    // Normal Login page (works in both LINE browser and normal browser)
     return (
-        <div className="min-h-screen bg-[#F8F9FA] flex items-center justify-center p-4 font-sans">
-            <div className="w-full max-w-[400px]">
+        <main className="flex min-h-screen items-center justify-center bg-zinc-100 px-4 py-8 font-sans text-zinc-950">
+            <div className="w-full max-w-[760px] overflow-hidden rounded-[18px] bg-white shadow-[0_24px_80px_rgba(24,24,27,0.14)] ring-1 ring-zinc-200/70 md:grid md:grid-cols-[46%_54%]">
+                <section className="relative h-36 overflow-hidden bg-[#071321] md:h-auto" aria-label="Office building visual">
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(71,113,150,0.38),transparent_34%),linear-gradient(135deg,#050b12_0%,#0e2942_45%,#163d5d_100%)]" />
+                    <div className="absolute inset-0 opacity-90">
+                        <div className="absolute left-[-16%] top-[-10%] h-[92%] w-[64%] skew-x-[-17deg] border-r border-white/15 bg-[#0b1e31]/80 shadow-2xl" />
+                        <div className="absolute left-[12%] top-[-16%] h-[126%] w-[38%] skew-x-[-17deg] border-x border-white/12 bg-[#133453]/75" />
+                        <div className="absolute left-[44%] top-[-18%] h-[132%] w-[24%] skew-x-[-17deg] border-x border-white/10 bg-[#244f74]/55" />
+                        <div className="absolute left-[58%] top-[-14%] h-[126%] w-[34%] skew-x-[-17deg] border-l border-white/15 bg-[#102a43]/60" />
+                        <div className="absolute bottom-[-28%] left-[-10%] h-[62%] w-[90%] rotate-[-18deg] border-t border-white/15 bg-white/5" />
+                        <div className="absolute left-[4%] top-[38%] h-px w-[88%] rotate-[-18deg] bg-white/18" />
+                        <div className="absolute left-[0%] top-[62%] h-px w-[72%] rotate-[-18deg] bg-white/14" />
+                        <div className="absolute left-[24%] top-[-18%] h-[145%] w-px rotate-[13deg] bg-white/12" />
+                        <div className="absolute left-[54%] top-[-18%] h-[145%] w-px rotate-[13deg] bg-white/15" />
+                    </div>
+                    <div className="absolute left-5 top-4 text-[9px] font-semibold uppercase tracking-[0.24em] text-white/70">
+                        Check In-Out
+                    </div>
+                </section>
 
-
-                {/* Login Card */}
-                <div className="bg-white rounded-2xl shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_10px_20px_-2px_rgba(0,0,0,0.04)] border border-gray-100 p-8">
-                    {/* LINE Login Button */}
-                    {isInLineApp && (
+                <section className="px-7 py-8 sm:px-9">
+                    <div className="mx-auto w-full max-w-[340px]">
                         <div className="mb-6">
-                            <Button
-                                type="button"
-                                onClick={handleLineLogin}
-                                disabled={loading}
-                                className="w-full h-11 bg-[#06C755] hover:bg-[#05b34c] text-white rounded-lg font-medium text-sm transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                            >
-                                {loading ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                                        <path d="M19.365 9.863c.349 0 .63.285.631.631 0 .345-.282.631-.631.631h-2.466v1.457h2.466c.349 0 .631.283.631.63 0 .349-.282.631-.631.631h-3.096c-.349 0-.63-.282-.63-.631V8.102c0-.349.281-.631.63-.631h3.096c.349 0 .631.282.631.631 0 .346-.282.631-.631.631h-2.466v1.13h2.466zm-6.171 3.349c.018.349-.263.635-.612.635-.175 0-.335-.064-.458-.186l-3.106-3.423v2.908c0 .349-.282.631-.631.631-.349 0-.631-.282-.631-.631V8.102c0-.349.282-.631.631-.631.163 0 .31.061.424.166l3.117 3.434V8.102c0-.349.282-.631.631-.631.349 0 .631.282.631.631v5.11h.004zm-6.844.635c-.349 0-.631-.282-.631-.631V8.102c0-.349.282-.631.631-.631.349 0 .631.282.631.631v5.114c0 .349-.282.631-.631.631zm-2.035-.631V8.102c0-.349.282-.631.631-.631.349 0 .631.282.631.631v5.114c0 .349-.282.631-.631.631h-3.096c-.349 0-.631-.282-.631-.631 0-.349.282-.631.631-.631h2.465zM24 11.4C24 5.103 18.627 0 12 0S0 5.103 0 11.4c0 5.636 4.998 10.358 11.753 11.26.458.099 1.081.303 1.238.694.141.356.093.914.046 1.273l-.199 1.2c-.061.374-.284 1.466 1.285.799 1.569-.666 8.475-4.994 11.565-8.548l-.001.001C23.28 15.2 24 13.378 24 11.4z" />
-                                    </svg>
-                                )}
-                                <span className="font-semibold">Log in with LINE</span>
-                            </Button>
-
-                            <div className="relative my-6">
-                                <div className="absolute inset-0 flex items-center">
-                                    <span className="w-full border-t border-gray-100"></span>
-                                </div>
-                                <div className="relative flex justify-center text-xs uppercase">
-                                    <span className="bg-white px-2 text-gray-400 font-medium">Or continue with</span>
-                                </div>
-                            </div>
+                            <h1 className="text-2xl font-semibold leading-tight tracking-[-0.02em] text-zinc-950">
+                                Welcome Back!
+                            </h1>
+                            <p className="mt-1.5 text-xs text-zinc-500">
+                                Log in to start controlling everything modern with ease.
+                            </p>
                         </div>
-                    )}
 
-                    <form onSubmit={handleLogin} className="space-y-5">
-                        {/* Error Message */}
-                        {(error || liffError) && (
-                            <div className="bg-red-50 border border-red-100 rounded-lg p-3 flex items-start gap-3">
-                                <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
-                                <p className="text-xs font-medium text-red-600">{error || liffError}</p>
+                        {isInLineApp && (
+                            <div className="mb-6">
+                                <Button
+                                    type="button"
+                                    onClick={handleLineLogin}
+                                    disabled={loading}
+                                    className="h-10 w-full rounded-full bg-[#06C755] text-xs font-medium text-white hover:bg-[#05b34c]"
+                                >
+                                    {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                    Login with LINE
+                                </Button>
+                                <div className="my-5 flex items-center gap-3">
+                                    <span className="h-px flex-1 bg-zinc-200" />
+                                    <span className="text-xs text-zinc-400">or</span>
+                                    <span className="h-px flex-1 bg-zinc-200" />
+                                </div>
                             </div>
                         )}
 
-                        {/* Email Input */}
-                        <div className="space-y-1.5">
-                            <label htmlFor="email" className="block text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                                Email
-                            </label>
-                            <div className="relative group">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <Mail className="h-4 w-4 text-gray-400 group-focus-within:text-slate-600 transition-colors" />
+                        <form onSubmit={handleLogin} className="space-y-3.5">
+                            {(error || liffError) && (
+                                <div className="flex items-start gap-2 rounded-md border border-red-100 bg-red-50 px-3 py-2.5">
+                                    <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-red-600" />
+                                    <p className="text-sm leading-5 text-red-700">{error || liffError}</p>
                                 </div>
+                            )}
+
+                            <div>
+                                <label htmlFor="email" className="mb-1.5 block text-xs font-medium text-zinc-900">
+                                    Email
+                                </label>
                                 <input
                                     id="email"
                                     type="email"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
-                                    className="block w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 placeholder-gray-400 transition-all font-medium text-gray-900"
-                                    placeholder="name@company.com"
+                                    className="h-10 w-full rounded-md border border-zinc-200 bg-white px-3.5 text-xs text-zinc-950 outline-none transition placeholder:text-zinc-400 focus:border-zinc-400 focus:ring-4 focus:ring-zinc-950/5"
+                                    placeholder="Input your email"
+                                    autoComplete="email"
                                     required
                                 />
                             </div>
-                        </div>
 
-                        {/* Password Input */}
-                        <div className="space-y-1.5">
-                            <label htmlFor="password" className="block text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                                Password
-                            </label>
-                            <div className="relative group">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <Lock className="h-4 w-4 text-gray-400 group-focus-within:text-slate-600 transition-colors" />
-                                </div>
-                                <input
-                                    id="password"
-                                    type="password"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    className="block w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 placeholder-gray-400 transition-all font-medium text-gray-900"
-                                    placeholder="••••••••"
-                                    required
-                                />
-                            </div>
-                        </div>
-
-                        {/* Actions */}
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center">
-                                <input
-                                    id="remember-me"
-                                    name="remember-me"
-                                    type="checkbox"
-                                    className="h-4 w-4 text-slate-900 focus:ring-slate-900 border-gray-300 rounded"
-                                />
-                                <label htmlFor="remember-me" className="ml-2 block text-xs text-gray-600">
-                                    Remember me
+                            <div>
+                                <label htmlFor="password" className="mb-1.5 block text-xs font-medium text-zinc-900">
+                                    Password
                                 </label>
-                            </div>
-                            <div className="text-xs">
-                                <a href="#" className="font-medium text-slate-900 hover:text-slate-700">
-                                    Forgot password?
-                                </a>
-                            </div>
-                        </div>
-
-                        {/* Login Button */}
-                        <Button
-                            type="submit"
-                            disabled={loading}
-                            className="w-full h-11 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-semibold text-sm shadow-md shadow-slate-900/10 transition-all disabled:opacity-50"
-                        >
-                            {loading ? (
-                                <div className="flex items-center gap-2">
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                    <span>Signing in...</span>
+                                <div className="relative">
+                                    <input
+                                        id="password"
+                                        type={showPassword ? "text" : "password"}
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        className="h-10 w-full rounded-md border border-zinc-200 bg-white px-3.5 pr-10 text-xs text-zinc-950 outline-none transition placeholder:text-zinc-400 focus:border-zinc-400 focus:ring-4 focus:ring-zinc-950/5"
+                                        placeholder="Input your password"
+                                        autoComplete="current-password"
+                                        required
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword((value) => !value)}
+                                        className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
+                                        aria-label={showPassword ? "Hide password" : "Show password"}
+                                    >
+                                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                    </button>
                                 </div>
-                            ) : (
-                                "Sign in"
-                            )}
-                        </Button>
-                    </form>
-                </div>
+                            </div>
 
-                {/* Footer */}
-                <p className="text-center text-xs text-gray-400 mt-8">
-                    &copy; {new Date().getFullYear()} Check In-Out System. All rights reserved.
-                </p>
+                            <div className="flex items-center justify-between pt-0.5 text-[11px] text-zinc-500">
+                                <label className="flex items-center gap-2">
+                                    <input
+                                        type="checkbox"
+                                        className="h-3.5 w-3.5 rounded border-zinc-300 text-zinc-950"
+                                    />
+                                    Remember Me
+                                </label>
+                                <button type="button" className="hover:text-zinc-950">
+                                    Forgot Password?
+                                </button>
+                            </div>
+
+                            <Button
+                                type="submit"
+                                disabled={loading}
+                                className="mt-2 h-10 w-full rounded-full bg-zinc-950 text-xs font-medium text-white shadow-none hover:bg-zinc-800 disabled:opacity-60"
+                            >
+                                {loading ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Logging in
+                                    </>
+                                ) : (
+                                    "Login"
+                                )}
+                            </Button>
+                        </form>
+                    </div>
+                </section>
             </div>
-        </div>
+        </main>
     );
 }
