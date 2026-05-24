@@ -548,7 +548,6 @@ export function AnalyticsCharts() {
     return (
         <div className="space-y-6">
             {/* Filters Toolbar */}
-            {/* Filters Toolbar */}
             <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
                 <div className="flex flex-col xl:flex-row gap-4 justify-between items-end xl:items-center">
                     <div className="flex flex-col md:flex-row gap-4 w-full xl:w-auto">

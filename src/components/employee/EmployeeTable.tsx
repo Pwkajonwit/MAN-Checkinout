@@ -1,8 +1,8 @@
 import { cn } from "@/lib/utils";
 import { type Employee } from "@/lib/firestore";
 import { Pencil, Trash2, Copy, Check, Eye } from "lucide-react";
-import { format } from "date-fns";
 import { useState } from "react";
+import { formatLeaveDayHourUnits } from "@/lib/leaveUtils";
 
 interface EmployeeTableProps {
     employees: Employee[];
@@ -34,6 +34,7 @@ export function EmployeeTable({ employees, onEdit, onDelete, onView, canManage =
                         <th className="py-4 px-6 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">พนักงาน</th>
                         <th className="py-4 px-6 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">รหัส / ตำแหน่ง</th>
                         <th className="py-4 px-6 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">รูปแบบการจ้าง</th>
+                        <th className="py-4 px-6 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">สิทธิ์ลา</th>
                         <th className="py-4 px-6 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">สถานะ</th>
                         <th className="py-4 px-6 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">LINE ID</th>
                         <th className="py-4 px-6 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">จัดการ</th>
@@ -42,7 +43,7 @@ export function EmployeeTable({ employees, onEdit, onDelete, onView, canManage =
                 <tbody className="divide-y divide-gray-100">
                     {employees.length === 0 ? (
                         <tr>
-                            <td colSpan={6} className="py-12 text-center text-gray-500">
+                            <td colSpan={7} className="py-12 text-center text-gray-500">
                                 ไม่พบข้อมูลพนักงาน
                             </td>
                         </tr>
@@ -83,6 +84,17 @@ export function EmployeeTable({ employees, onEdit, onDelete, onView, canManage =
                                                 (ชั่วคราว)
                                             </span>
                                         )}
+                                    </div>
+                                </td>
+                                <td className="py-4 px-6">
+                                    <div className="space-y-1 text-xs text-gray-600">
+                                        <div>
+                                            <span className="font-semibold text-blue-700">ลากิจ:</span>{" "}
+                                            {formatLeaveDayHourUnits(employee.leaveQuota?.personal || 0)}
+                                        </div>
+                                        <div className="text-gray-400">
+                                            ป่วย {employee.leaveQuota?.sick || 0} วัน / พักร้อน {employee.leaveQuota?.vacation || 0} วัน
+                                        </div>
                                     </div>
                                 </td>
                                 <td className="py-4 px-6">

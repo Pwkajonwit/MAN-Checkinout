@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { employeeService, attendanceService, otService, swapService, systemConfigService, payrollService, type Employee, type Attendance, type OTRequest, type SwapRequest, type SystemConfig, type SavedPayrollRecord } from "@/lib/firestore";
+import { employeeService, attendanceService, otService, swapService, leaveService, systemConfigService, payrollService, type Employee, type Attendance, type OTRequest, type SwapRequest, type LeaveRequest, type SystemConfig, type SavedPayrollRecord } from "@/lib/firestore";
 import { Calendar, DollarSign, Download, Filter, History, Plus, Save, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
 import { getLateMinutes } from "@/lib/workTime";
+import { formatLeaveDayHourUnits, getLeaveDayUnits } from "@/lib/leaveUtils";
 
 interface PayrollItem {
     employeeId: string;
@@ -13,6 +14,7 @@ interface PayrollItem {
     type: string;
     baseSalary: number;
     workDays: number;
+    leaveDays: number;
     lateMinutes: number;
     otHours: number;
     otHoursNormal: number;
@@ -61,6 +63,34 @@ const escapeHtml = (value: string) =>
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
 
+const getPayrollLeaveDays = (leaves: LeaveRequest[], attendedDateKeys: Set<string>) => {
+    return leaves.reduce((sum, leave) => {
+        const start = leave.startDate instanceof Date ? leave.startDate : new Date(leave.startDate);
+
+        if (leave.durationUnit === "hour") {
+            return attendedDateKeys.has(format(start, "yyyy-MM-dd"))
+                ? sum
+                : sum + getLeaveDayUnits(leave);
+        }
+
+        const end = leave.endDate instanceof Date ? leave.endDate : new Date(leave.endDate);
+        let leaveDays = 0;
+        const cursor = new Date(start);
+        cursor.setHours(0, 0, 0, 0);
+        const last = new Date(end);
+        last.setHours(0, 0, 0, 0);
+
+        while (cursor <= last) {
+            if (!attendedDateKeys.has(format(cursor, "yyyy-MM-dd"))) {
+                leaveDays += 1;
+            }
+            cursor.setDate(cursor.getDate() + 1);
+        }
+
+        return sum + leaveDays;
+    }, 0);
+};
+
 const normalizePayrollItem = (item: PayrollItem): PayrollItem => {
     const attendanceAllowance = toNumber(item.attendanceAllowance);
     const specialAllowance = toNumber(item.specialAllowance);
@@ -95,6 +125,7 @@ const normalizePayrollItem = (item: PayrollItem): PayrollItem => {
 
     return {
         ...item,
+        leaveDays: toNumber(item.leaveDays),
         payrollBaseIncome,
         attendanceAllowance,
         specialAllowance,
@@ -726,10 +757,11 @@ export default function PayrollPage() {
 
             // 3. Fetch ALL Data ONCE (fix N+1 query problem)
             // Instead of querying per employee, fetch all attendance, OT, and swap requests in the date range
-            const [allAttendance, allOTRequests, allSwapRequests] = await Promise.all([
+            const [allAttendance, allOTRequests, allSwapRequests, allLeaveRequests] = await Promise.all([
                 attendanceService.getByDateRange(startDate, endDate),
                 otService.getByDateRange(startDate, endDate),
-                swapService.getAll() // Get all swap requests and filter later
+                swapService.getAll(), // Get all swap requests and filter later
+                leaveService.getByDateRange(startDate, endDate),
             ]);
 
             // Filter only approved swap requests that affect the date range
@@ -757,6 +789,16 @@ export default function PayrollPage() {
                 }
                 otByEmployee.get(ot.employeeId)?.push(ot);
             });
+
+            const leaveByEmployee = new Map<string, LeaveRequest[]>();
+            allLeaveRequests
+                .filter(leave => leave.status === "อนุมัติ")
+                .forEach(leave => {
+                    if (!leaveByEmployee.has(leave.employeeId)) {
+                        leaveByEmployee.set(leave.employeeId, []);
+                    }
+                    leaveByEmployee.get(leave.employeeId)?.push(leave);
+                });
 
             // Group swap requests by employee ID
             const swapsByEmployee = new Map<string, SwapRequest[]>();
@@ -790,6 +832,7 @@ export default function PayrollPage() {
                 // Get attendance and OT from pre-fetched data (no database query!)
                 const attendance = attendanceByEmployee.get(emp.id) || [];
                 const otRequests = otByEmployee.get(emp.id) || [];
+                const leaveRequests = leaveByEmployee.get(emp.id) || [];
 
                 // Filter OT by status
                 const approvedOT = otRequests.filter(ot => ot.status === "อนุมัติ");
@@ -806,7 +849,9 @@ export default function PayrollPage() {
                     }
                 });
 
-                const workDays = dailyAttendance.size;
+                const attendanceWorkDays = dailyAttendance.size;
+                const leaveDays = getPayrollLeaveDays(leaveRequests, new Set(dailyAttendance.keys()));
+                const workDays = attendanceWorkDays + leaveDays;
                 let totalLateMinutes = 0;
 
                 dailyAttendance.forEach((records) => {
@@ -1000,6 +1045,7 @@ export default function PayrollPage() {
                     type: emp.type || "",
                     baseSalary,
                     workDays,
+                    leaveDays,
                     lateMinutes: totalLateMinutes,
                     otHours: totalOtHours,
                     otHoursNormal,
@@ -1424,7 +1470,12 @@ export default function PayrollPage() {
                                                     <div className="grid grid-cols-2 gap-2 text-xs">
                                                         <div className="rounded-md bg-slate-50 px-2.5 py-2">
                                                             <div className="text-slate-500">วันทำงาน</div>
-                                                            <div className="mt-0.5 font-semibold text-slate-900">{item.workDays} วัน</div>
+                                                            <div className="mt-0.5 font-semibold text-slate-900">{item.workDays.toFixed(2).replace(/\.?0+$/, "")} วัน</div>
+                                                            {item.leaveDays > 0 && (
+                                                                <div className="mt-0.5 text-[10px] font-medium text-blue-600">
+                                                                    รวมลา {formatLeaveDayHourUnits(item.leaveDays)}
+                                                                </div>
+                                                            )}
                                                         </div>
                                                         <div className="rounded-md bg-slate-50 px-2.5 py-2">
                                                             <div className="text-slate-500">ฐานเงินเดือน</div>

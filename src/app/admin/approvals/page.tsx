@@ -3,10 +3,14 @@
 import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { leaveService, otService, swapService, type LeaveRequest, type OTRequest, type SwapRequest } from "@/lib/firestore";
-import { CheckCircle, XCircle, Clock, FileText, Calendar, Image as ImageIcon, X, ArrowRight } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Calendar, Image as ImageIcon, X, ArrowRight } from "lucide-react";
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
 import { CustomAlert } from "@/components/ui/custom-alert";
+import { formatLeaveDateRange, formatLeaveDuration, formatLeaveDayHourUnits, getLeaveDayUnits } from "@/lib/leaveUtils";
+
+const formatApprovalLeaveDuration = (leave: LeaveRequest) =>
+    leave.leaveType === "ลากิจ" ? formatLeaveDayHourUnits(getLeaveDayUnits(leave)) : formatLeaveDuration(leave);
 
 export default function ApprovalsPage() {
     const [activeTab, setActiveTab] = useState<"leave" | "ot" | "swap">("leave");
@@ -221,9 +225,12 @@ export default function ApprovalsPage() {
                                                     {req.leaveType}
                                                 </span>
                                             </div>
-                                            <div className="flex items-center gap-2 text-sm text-gray-500">
+                                            <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500">
                                                 <Calendar className="w-4 h-4" />
-                                                {format(req.startDate instanceof Date ? req.startDate : (req.startDate as any).toDate(), "d MMM yy", { locale: th })} - {format(req.endDate instanceof Date ? req.endDate : (req.endDate as any).toDate(), "d MMM yy", { locale: th })}
+                                                <span>{formatLeaveDateRange(req)}</span>
+                                                <span className="rounded-md bg-gray-50 px-2 py-0.5 text-xs font-medium text-gray-700">
+                                                    {formatApprovalLeaveDuration(req)}
+                                                </span>
                                             </div>
                                             <div className="text-sm text-gray-600">
                                                 เหตุผล: {req.reason}

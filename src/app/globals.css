@@ -6,16 +6,16 @@
   /* Zinc-100 */
   --primary: #009966;
   /* Zinc-900 (Nearly Black) */
-  --primary-dark: #565656;
+  --primary-dark: #080e21;
   /* Zinc-950 */
 
   --secondary: #FFFFFF;
   --accent: #71717A;
   /* Zinc-500 */
 
-  --text: #18181B;
+  --text: #080e21;
   /* Main Text (Zinc-900) */
-  --subtext: #52525B;
+  --subtext: #2e2e2e;
   /* Sub Text (Zinc-600) */
 
   --border: #E4E4E7;
@@ -45,12 +45,12 @@
     /* Zinc-50 */
     --card: #ffffff;
     /* Zinc-900 */
-    --border: #cfcfcf;
+    --border: #e4e4e4;
     /* Zinc-800 */
 
     --primary: #009966;
     --primary-light: #ebfff7;
-    --primary-dark: #565656;
+    --primary-dark: #080e21;
 
     --text: #FAFAFA;
     --subtext: #A1A1AA;
@@ -70,7 +70,7 @@ body {
 }
 
 .border {
-  border: 0.5px solid var(--border);
+  border: 0.2px solid var(--border);
 }
 
 .glass-card {

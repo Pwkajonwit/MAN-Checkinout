@@ -5,8 +5,9 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { attendanceService, leaveService, otService, employeeService, type Attendance, type LeaveRequest, type OTRequest, type Employee } from "@/lib/firestore";
 import { useAdmin } from "@/components/auth/AuthProvider";
 import { FileText, Clock, CalendarX, AlertTriangle } from "lucide-react";
-import { format, startOfMonth, endOfMonth, differenceInMinutes, differenceInDays } from "date-fns";
+import { format, startOfMonth, endOfMonth, differenceInMinutes } from "date-fns";
 import { th } from "date-fns/locale";
+import { formatLeaveDateRange, formatLeaveDuration, formatLeaveDayHourUnits, getLeaveDayUnits } from "@/lib/leaveUtils";
 
 export default function ReportsPage() {
     const { user } = useAdmin();
@@ -294,14 +295,14 @@ export default function ReportsPage() {
                                         <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">พนักงาน</th>
                                         <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">ประเภท</th>
                                         <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">ช่วงวันที่</th>
-                                        <th className="px-6 py-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">รวม (วัน)</th>
+                                        <th className="px-6 py-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">ระยะเวลา</th>
                                         <th className="px-6 py-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">สถิติปีนี้</th>
                                         <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">เหตุผล</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
                                     {leaveData.map((leave, idx) => {
-                                        const days = differenceInDays(new Date(leave.endDate), new Date(leave.startDate)) + 1;
+                                        const days = getLeaveDayUnits(leave);
                                         const count = getLeaveCountOfYear(leave.employeeId, leave.leaveType, new Date(leave.startDate));
                                         const total = getTotalLeaveCountOfYear(leave.employeeId, leave.leaveType);
 
@@ -321,10 +322,12 @@ export default function ReportsPage() {
                                                     </span>
                                                 </td>
                                                 <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
-                                                    {format(new Date(leave.startDate), "d MMM", { locale: th })} - {format(new Date(leave.endDate), "d MMM yyyy", { locale: th })}
+                                                    {formatLeaveDateRange(leave)}
                                                 </td>
                                                 <td className="px-6 py-4 text-center">
-                                                    <span className="text-sm font-semibold text-gray-700">{days}</span>
+                                                    <span className="text-sm font-semibold text-gray-700">
+                                                        {leave.leaveType === "ลากิจ" ? formatLeaveDayHourUnits(days) : formatLeaveDuration(leave)}
+                                                    </span>
                                                 </td>
                                                 <td className="px-6 py-4 text-center">
                                                     <div className="inline-flex flex-col text-xs text-gray-500">

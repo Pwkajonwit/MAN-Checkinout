@@ -1,5 +1,6 @@
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
+import { formatLeaveDateRange, formatLeaveDuration, formatLeaveDayHourUnits, getLeaveDayUnits } from "@/lib/leaveUtils";
 import { getLateMinutes } from "@/lib/workTime";
 
 export const generateAttendanceCSV = (
@@ -77,20 +78,15 @@ export const generateAttendanceCSV = (
 
     // Leave History
     csvContent += "\nประวัติการลา\n";
-    csvContent += "วันที่ยื่น,ประเภท,วันที่ลา,จำนวนวัน,เหตุผล,สถานะ\n";
+    csvContent += "วันที่ยื่น,ประเภท,วันที่ลา,ระยะเวลา,เหตุผล,สถานะ\n";
     leaves.forEach(l => {
-        const start = l.startDate instanceof Date ? l.startDate : new Date(l.startDate);
-        const end = l.endDate instanceof Date ? l.endDate : new Date(l.endDate);
         const created = l.createdAt ? (l.createdAt instanceof Date ? l.createdAt : (l.createdAt as any).toDate()) : null;
-
-        // Calculate days
-        const days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
 
         csvContent += [
             created ? format(created, "d MMM yyyy", { locale: th }) : "-",
             l.leaveType,
-            `${format(start, "d MMM yyyy", { locale: th })} - ${format(end, "d MMM yyyy", { locale: th })}`,
-            days,
+            formatLeaveDateRange(l),
+            l.leaveType === "ลากิจ" ? formatLeaveDayHourUnits(getLeaveDayUnits(l)) : formatLeaveDuration(l),
             `"${l.reason || "-"}"`,
             l.status
         ].join(",") + "\n";

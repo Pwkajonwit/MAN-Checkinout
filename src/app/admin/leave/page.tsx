@@ -6,11 +6,12 @@ import { StatsCard } from "@/components/dashboard/StatsCard";
 import { LeaveTable } from "@/components/leave/LeaveTable";
 import { LeaveFormModal } from "@/components/leave/LeaveFormModal";
 import { Button } from "@/components/ui/button";
-import { Pencil, Plus, Clock, CheckCircle, XCircle, FileText } from "lucide-react";
+import { Plus, Clock, CheckCircle, XCircle, FileText } from "lucide-react";
 import { leaveService, type LeaveRequest, employeeService, adminService } from "@/lib/firestore";
 import { sendPushMessage } from "@/app/actions/line";
 import { auth } from "@/lib/firebase";
 import { CustomAlert } from "@/components/ui/custom-alert";
+import { formatLeaveDateRange, formatLeaveDuration } from "@/lib/leaveUtils";
 
 export default function LeavePage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -100,9 +101,7 @@ export default function LeavePage() {
                     const color = isApproved ? "#1DB446" : "#D32F2F";
                     const title = isApproved ? "อนุมัติคำขอลา" : "ไม่อนุมัติคำขอลา";
 
-                    const startDate = request.startDate instanceof Date ? request.startDate : new Date(request.startDate);
-                    const endDate = request.endDate instanceof Date ? request.endDate : new Date(request.endDate);
-                    const dateStr = `${startDate.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })} - ${endDate.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+                    const dateStr = `${formatLeaveDateRange(request)} (${formatLeaveDuration(request)})`;
 
                     await sendPushMessage(employee.lineUserId, [
                         {

@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { X } from "lucide-react";
 import { employeeService, shiftService, systemConfigService, type Employee, type Shift, type WorkLocation } from "@/lib/firestore";
+import { HOURS_PER_LEAVE_DAY, formatLeaveDayHourUnits } from "@/lib/leaveUtils";
 
 interface EmployeeFormModalProps {
     isOpen: boolean;
@@ -19,6 +19,15 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
     const [availableLocations, setAvailableLocations] = useState<WorkLocation[]>([]);
     const [locationEnabled, setLocationEnabled] = useState(false);
     const [useIndividualHolidays, setUseIndividualHolidays] = useState(false);
+
+    const parseQuota = (value: string) => {
+        const quota = parseFloat(value);
+        return Number.isFinite(quota) ? quota : 0;
+    };
+
+    type EmployeeStatus = Employee["status"];
+    type EmployeeType = Employee["type"];
+    type EmploymentType = NonNullable<Employee["employmentType"]>;
 
 
     const [formData, setFormData] = useState({
@@ -264,7 +273,7 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
                                     </label>
                                     <select
                                         value={formData.status}
-                                        onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+                                        onChange={(e) => setFormData({ ...formData, status: e.target.value as EmployeeStatus })}
                                         className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all disabled:bg-slate-50 disabled:text-slate-500"
                                         required
                                         disabled={readOnly}
@@ -304,7 +313,7 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
                                     </label>
                                     <select
                                         value={formData.employmentType}
-                                        onChange={(e) => setFormData({ ...formData, employmentType: e.target.value as any })}
+                                        onChange={(e) => setFormData({ ...formData, employmentType: e.target.value as EmploymentType })}
                                         className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all disabled:bg-slate-50 disabled:text-slate-500"
                                         required
                                         disabled={readOnly}
@@ -346,7 +355,7 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
                                     </label>
                                     <select
                                         value={formData.type}
-                                        onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
+                                        onChange={(e) => setFormData({ ...formData, type: e.target.value as EmployeeType })}
                                         className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all disabled:bg-slate-50 disabled:text-slate-500"
                                         required
                                         disabled={readOnly}
@@ -499,50 +508,86 @@ export function EmployeeFormModal({ isOpen, onClose, employee, onSuccess, readOn
                                 <span className="bg-teal-100 p-1.5 rounded-lg"><div className="w-2 h-2 rounded-full bg-teal-600" /></span>
                                 <h3 className="text-sm font-semibold uppercase tracking-wider">โควต้าวันลา (ต่อปี)</h3>
                             </div>
-                            <div className="grid grid-cols-3 gap-4">
-                                <div className="p-2.5 bg-slate-50 rounded-lg border border-gray-100 text-center">
-                                    <label className="block text-xs font-semibold text-slate-600 mb-0.5">ลากิจ</label>
-                                    <input
-                                        type="number"
-                                        value={formData.leaveQuota.personal}
-                                        onChange={(e) => setFormData({
-                                            ...formData,
-                                            leaveQuota: { ...formData.leaveQuota, personal: parseInt(e.target.value) || 0 }
-                                        })}
-                                        className="w-full text-center bg-transparent font-bold text-gray-900 focus:outline-none p-0"
-                                        disabled={readOnly}
-                                    />
-                                    <span className="text-[10px] text-gray-400">วัน</span>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="p-2.5 bg-blue-50 rounded-lg border border-blue-100 text-center">
+                                    <label className="block text-xs font-semibold text-blue-700 mb-0.5">ลากิจ</label>
+                                    <div className="text-lg font-bold text-blue-900 leading-tight">
+                                        {formatLeaveDayHourUnits(formData.leaveQuota.personal)}
+                                    </div>
+                                    {!readOnly && (
+                                        <div className="mt-1 flex items-center justify-center gap-1 text-[10px] text-blue-500">
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="0.125"
+                                                value={formData.leaveQuota.personal}
+                                                onChange={(e) => setFormData({
+                                                    ...formData,
+                                                    leaveQuota: { ...formData.leaveQuota, personal: parseQuota(e.target.value) }
+                                                })}
+                                                className="w-12 text-center bg-white/70 border border-blue-100 rounded font-semibold text-blue-900 focus:outline-none px-1 py-0.5"
+                                            />
+                                            <span>วัน</span>
+                                        </div>
+                                    )}
+                                    <div className="mt-1 text-[10px] text-blue-500">
+                                        ทั้งหมด {formData.leaveQuota.personal || 0} วัน
+                                    </div>
                                 </div>
                                 <div className="p-2.5 bg-slate-50 rounded-lg border border-gray-100 text-center">
                                     <label className="block text-xs font-semibold text-slate-600 mb-0.5">ลาป่วย</label>
-                                    <input
-                                        type="number"
-                                        value={formData.leaveQuota.sick}
-                                        onChange={(e) => setFormData({
-                                            ...formData,
-                                            leaveQuota: { ...formData.leaveQuota, sick: parseInt(e.target.value) || 0 }
-                                        })}
-                                        className="w-full text-center bg-transparent font-bold text-gray-900 focus:outline-none p-0"
-                                        disabled={readOnly}
-                                    />
-                                    <span className="text-[10px] text-gray-400">วัน</span>
+                                    <div className="text-lg font-bold text-gray-900 leading-tight">
+                                        {formData.leaveQuota.sick || 0}
+                                    </div>
+                                    {!readOnly && (
+                                        <div className="mt-1 flex items-center justify-center gap-1 text-[10px] text-gray-500">
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="0.5"
+                                                value={formData.leaveQuota.sick}
+                                                onChange={(e) => setFormData({
+                                                    ...formData,
+                                                    leaveQuota: { ...formData.leaveQuota, sick: parseQuota(e.target.value) }
+                                                })}
+                                                className="w-12 text-center bg-white/70 border border-gray-200 rounded font-semibold text-gray-900 focus:outline-none px-1 py-0.5"
+                                            />
+                                            <span>วัน</span>
+                                        </div>
+                                    )}
+                                    <div className="mt-1 text-[10px] text-gray-400">
+                                        ทั้งหมด {formData.leaveQuota.sick || 0} วัน
+                                    </div>
                                 </div>
                                 <div className="p-2.5 bg-slate-50 rounded-lg border border-gray-100 text-center">
                                     <label className="block text-xs font-semibold text-slate-600 mb-0.5">พักร้อน</label>
-                                    <input
-                                        type="number"
-                                        value={formData.leaveQuota.vacation}
-                                        onChange={(e) => setFormData({
-                                            ...formData,
-                                            leaveQuota: { ...formData.leaveQuota, vacation: parseInt(e.target.value) || 0 }
-                                        })}
-                                        className="w-full text-center bg-transparent font-bold text-gray-900 focus:outline-none p-0"
-                                        disabled={readOnly}
-                                    />
-                                    <span className="text-[10px] text-gray-400">วัน</span>
+                                    <div className="text-lg font-bold text-gray-900 leading-tight">
+                                        {formData.leaveQuota.vacation || 0}
+                                    </div>
+                                    {!readOnly && (
+                                        <div className="mt-1 flex items-center justify-center gap-1 text-[10px] text-gray-500">
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="0.5"
+                                                value={formData.leaveQuota.vacation}
+                                                onChange={(e) => setFormData({
+                                                    ...formData,
+                                                    leaveQuota: { ...formData.leaveQuota, vacation: parseQuota(e.target.value) }
+                                                })}
+                                                className="w-12 text-center bg-white/70 border border-gray-200 rounded font-semibold text-gray-900 focus:outline-none px-1 py-0.5"
+                                            />
+                                            <span>วัน</span>
+                                        </div>
+                                    )}
+                                    <div className="mt-1 text-[10px] text-gray-400">
+                                        ทั้งหมด {formData.leaveQuota.vacation || 0} วัน
+                                    </div>
                                 </div>
                             </div>
+                            <p className="mt-2 text-xs text-slate-500">
+                                ลากิจรายชั่วโมงใช้โควต้าเดียวกับลากิจ โดยระบบคิด {HOURS_PER_LEAVE_DAY} ชั่วโมง = 1 วัน
+                            </p>
                         </section>
 
                         {employee && (

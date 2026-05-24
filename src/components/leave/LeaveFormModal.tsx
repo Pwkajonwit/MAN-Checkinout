@@ -5,6 +5,7 @@ import { X, Camera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { leaveService, employeeService, type LeaveRequest, type Employee } from "@/lib/firestore";
 import { compressBase64Image } from "@/lib/storage";
+import { getLeaveDayUnits, formatLeaveDuration } from "@/lib/leaveUtils";
 
 interface LeaveFormModalProps {
     isOpen: boolean;
@@ -17,12 +18,17 @@ export function LeaveFormModal({ isOpen, onClose, leave, onSuccess }: LeaveFormM
     const [loading, setLoading] = useState(false);
     const [employees, setEmployees] = useState<Employee[]>([]);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    type LeaveType = LeaveRequest["leaveType"];
+    type LeaveStatus = LeaveRequest["status"];
     const [formData, setFormData] = useState({
         employeeId: "",
         employeeName: "",
         leaveType: "ลาพักร้อน" as "ลาพักร้อน" | "ลาป่วย" | "ลากิจ",
         startDate: "",
         endDate: "",
+        durationUnit: "day" as "day" | "hour",
+        startTime: "",
+        endTime: "",
         reason: "",
         status: "รออนุมัติ" as "รออนุมัติ" | "อนุมัติ" | "ไม่อนุมัติ",
         attachment: null as string | null,
@@ -50,6 +56,9 @@ export function LeaveFormModal({ isOpen, onClose, leave, onSuccess }: LeaveFormM
                 leaveType: leave.leaveType || "ลาพักร้อน",
                 startDate: leave.startDate ? new Date(leave.startDate).toISOString().split('T')[0] : "",
                 endDate: leave.endDate ? new Date(leave.endDate).toISOString().split('T')[0] : "",
+                durationUnit: leave.durationUnit || "day",
+                startTime: leave.startTime || "",
+                endTime: leave.endTime || "",
                 reason: leave.reason || "",
                 status: leave.status || "รออนุมัติ",
                 attachment: leave.attachment || null,
@@ -61,6 +70,9 @@ export function LeaveFormModal({ isOpen, onClose, leave, onSuccess }: LeaveFormM
                 leaveType: "ลาพักร้อน",
                 startDate: "",
                 endDate: "",
+                durationUnit: "day",
+                startTime: "",
+                endTime: "",
                 reason: "",
                 status: "รออนุมัติ",
                 attachment: null,
@@ -74,11 +86,25 @@ export function LeaveFormModal({ isOpen, onClose, leave, onSuccess }: LeaveFormM
         if (formData.startDate && formData.endDate) {
             const start = new Date(formData.startDate);
             const end = new Date(formData.endDate);
-            const diffTime = Math.abs(end.getTime() - start.getTime());
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-            return diffDays;
+            if (end < start) return 0;
+            return getLeaveDayUnits({
+                durationUnit: formData.durationUnit,
+                startDate: start,
+                endDate: end,
+                totalHours: calculateTotalHours(),
+            });
         }
         return 0;
+    };
+
+    const calculateTotalHours = () => {
+        if (formData.durationUnit !== "hour" || !formData.startDate || !formData.startTime || !formData.endTime) {
+            return undefined;
+        }
+
+        const start = new Date(`${formData.startDate}T${formData.startTime}`);
+        const end = new Date(`${formData.startDate}T${formData.endTime}`);
+        return Math.max(0, (end.getTime() - start.getTime()) / (1000 * 60 * 60));
     };
 
     const handleEmployeeChange = (employeeId: string) => {
@@ -122,6 +148,27 @@ export function LeaveFormModal({ isOpen, onClose, leave, onSuccess }: LeaveFormM
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (formData.endDate < formData.startDate) {
+            alert("วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่มต้น");
+            return;
+        }
+
+        if (formData.durationUnit === "hour") {
+            if (formData.leaveType !== "ลากิจ") {
+                alert("ลารายชั่วโมงใช้ได้กับลากิจเท่านั้น");
+                return;
+            }
+            if (!formData.startTime || !formData.endTime) {
+                alert("กรุณาระบุเวลาเริ่มและเวลาสิ้นสุด");
+                return;
+            }
+            if (!calculateTotalHours()) {
+                alert("เวลาสิ้นสุดต้องหลังเวลาเริ่มต้น");
+                return;
+            }
+        }
+
         setLoading(true);
 
         try {
@@ -134,7 +181,11 @@ export function LeaveFormModal({ isOpen, onClose, leave, onSuccess }: LeaveFormM
                 employeeName: formData.employeeName,
                 leaveType: formData.leaveType,
                 startDate: new Date(sY, sM - 1, sD),
-                endDate: new Date(eY, eM - 1, eD),
+                endDate: formData.durationUnit === "hour" ? new Date(sY, sM - 1, sD) : new Date(eY, eM - 1, eD),
+                durationUnit: formData.durationUnit,
+                startTime: formData.durationUnit === "hour" ? formData.startTime : undefined,
+                endTime: formData.durationUnit === "hour" ? formData.endTime : undefined,
+                totalHours: formData.durationUnit === "hour" ? calculateTotalHours() : undefined,
                 reason: formData.reason,
                 status: formData.status,
                 attachment: formData.attachment || undefined,
@@ -206,7 +257,16 @@ export function LeaveFormModal({ isOpen, onClose, leave, onSuccess }: LeaveFormM
                         </label>
                         <select
                             value={formData.leaveType}
-                            onChange={(e) => setFormData({ ...formData, leaveType: e.target.value as any })}
+                            onChange={(e) => {
+                                const leaveType = e.target.value as LeaveType;
+                                setFormData({
+                                    ...formData,
+                                    leaveType,
+                                    durationUnit: leaveType === "ลากิจ" ? formData.durationUnit : "day",
+                                    startTime: leaveType === "ลากิจ" ? formData.startTime : "",
+                                    endTime: leaveType === "ลากิจ" ? formData.endTime : "",
+                                });
+                            }}
                             className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-[#EBDACA] focus:border-transparent"
                             required
                         >
@@ -215,6 +275,30 @@ export function LeaveFormModal({ isOpen, onClose, leave, onSuccess }: LeaveFormM
                             <option value="ลากิจ">ลากิจ</option>
                         </select>
                     </div>
+
+                    {formData.leaveType === "ลากิจ" && (
+                        <div>
+                            <label className="block text-sm font-semibold text-slate-800 mb-1">
+                                รูปแบบการลา
+                            </label>
+                            <div className="grid grid-cols-2 gap-2 rounded-md bg-slate-100 p-1">
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData({ ...formData, durationUnit: "day", startTime: "", endTime: "" })}
+                                    className={`h-9 rounded text-sm font-medium ${formData.durationUnit === "day" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
+                                >
+                                    เต็มวัน
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData({ ...formData, durationUnit: "hour", endDate: formData.startDate || formData.endDate })}
+                                    className={`h-9 rounded text-sm font-medium ${formData.durationUnit === "hour" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
+                                >
+                                    รายชั่วโมง
+                                </button>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Date Range */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -225,12 +309,17 @@ export function LeaveFormModal({ isOpen, onClose, leave, onSuccess }: LeaveFormM
                             <input
                                 type="date"
                                 value={formData.startDate}
-                                onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                                onChange={(e) => setFormData({
+                                    ...formData,
+                                    startDate: e.target.value,
+                                    endDate: formData.durationUnit === "hour" ? e.target.value : formData.endDate,
+                                })}
                                 className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-[#EBDACA] focus:border-transparent"
                                 required
                             />
                         </div>
 
+                        {formData.durationUnit === "day" && (
                         <div>
                             <label className="block text-sm font-semibold text-slate-800 mb-1">
                                 วันที่สิ้นสุด <span className="text-red-500">*</span>
@@ -244,13 +333,55 @@ export function LeaveFormModal({ isOpen, onClose, leave, onSuccess }: LeaveFormM
                                 min={formData.startDate}
                             />
                         </div>
+                        )}
                     </div>
+
+                    {formData.durationUnit === "hour" && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-800 mb-1">
+                                    เวลาเริ่ม <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                    type="time"
+                                    value={formData.startTime}
+                                    onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-[#EBDACA] focus:border-transparent"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-800 mb-1">
+                                    เวลาสิ้นสุด <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                    type="time"
+                                    value={formData.endTime}
+                                    onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-[#EBDACA] focus:border-transparent"
+                                    required
+                                />
+                            </div>
+                        </div>
+                    )}
 
                     {/* Days Display */}
                     {formData.startDate && formData.endDate && (
                         <div className="bg-blue-50 border border-blue-200 rounded-md p-3 shadow-sm">
                             <p className="text-sm text-blue-700">
-                                จำนวนวันลา: <span className="font-bold text-lg">{calculateDays()}</span> วัน
+                                ระยะเวลาลา: <span className="font-bold text-lg">
+                                    {formData.durationUnit === "hour"
+                                        ? formatLeaveDuration({
+                                            durationUnit: formData.durationUnit,
+                                            startDate: new Date(formData.startDate),
+                                            endDate: new Date(formData.startDate),
+                                            totalHours: calculateTotalHours(),
+                                        })
+                                        : `${calculateDays()} วัน`}
+                                </span>
+                                {formData.durationUnit === "hour" && (
+                                    <span className="ml-2 text-xs">({calculateDays().toFixed(2)} วันลา)</span>
+                                )}
                             </p>
                         </div>
                     )}
@@ -330,10 +461,10 @@ export function LeaveFormModal({ isOpen, onClose, leave, onSuccess }: LeaveFormM
                         </label>
                         <select
                             value={formData.status}
-                            onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+                            onChange={(e) => setFormData({ ...formData, status: e.target.value as LeaveStatus })}
                             className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-[#EBDACA] focus:border-transparent"
                         >
-                            <option value="รอการอนุมัติ">รอการอนุมัติ</option>
+                            <option value="รออนุมัติ">รออนุมัติ</option>
                             <option value="อนุมัติ">อนุมัติ</option>
                             <option value="ไม่อนุมัติ">ไม่อนุมัติ</option>
                         </select>

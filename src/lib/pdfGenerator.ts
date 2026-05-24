@@ -1,5 +1,6 @@
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
+import { formatLeaveDateRange, formatLeaveDuration, formatLeaveDayHourUnits, getLeaveDayUnits } from "@/lib/leaveUtils";
 import { getLateMinutes, formatMinutesToHours } from "@/lib/workTime";
 
 export const generatePayslipPDF = (payrollData: any[], month: Date) => {
@@ -285,24 +286,21 @@ export const generateAttendancePDF = (
                          <th style="width: 15%">วันที่ยื่น</th>
                          <th style="width: 15%">ประเภท</th>
                          <th style="width: 25%">วันที่ลา</th>
-                         <th style="width: 10%" class="center">จำนวน (วัน)</th>
+                         <th style="width: 10%" class="center">ระยะเวลา</th>
                          <th style="width: 25%">เหตุผล</th>
                          <th style="width: 10%" class="center">สถานะ</th>
                     </tr>
                 </thead>
                 <tbody>
                     ${leaves.length > 0 ? leaves.map((l: any) => {
-        const start = l.startDate instanceof Date ? l.startDate : new Date(l.startDate);
-        const end = l.endDate instanceof Date ? l.endDate : new Date(l.endDate);
         const created = l.createdAt ? (l.createdAt instanceof Date ? l.createdAt : (l.createdAt as any).toDate()) : null;
-        const days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
 
         return `
                         <tr>
                             <td>${created ? format(created, "d MMM yyyy", { locale: th }) : "-"}</td>
                             <td>${l.leaveType}</td>
-                            <td>${format(start, "d MMM yyyy", { locale: th })} - ${format(end, "d MMM yyyy", { locale: th })}</td>
-                            <td class="center">${days}</td>
+                            <td>${formatLeaveDateRange(l)}</td>
+                            <td class="center">${l.leaveType === "ลากิจ" ? formatLeaveDayHourUnits(getLeaveDayUnits(l)) : formatLeaveDuration(l)}</td>
                             <td><span class="note">${l.reason || "-"}</span></td>
                             <td class="center">${l.status}</td>
                         </tr>

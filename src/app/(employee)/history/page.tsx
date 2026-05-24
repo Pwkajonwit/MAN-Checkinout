@@ -8,6 +8,7 @@ import { th } from "date-fns/locale";
 import { EmployeeHeader } from "@/components/mobile/EmployeeHeader";
 import { useEmployee } from "@/contexts/EmployeeContext";
 import { Calendar, Clock, MapPin, FileText, Clock as ClockIcon, ChevronDown, Loader2 } from "lucide-react";
+import { formatLeaveDateRange, formatLeaveDuration, formatLeaveDayHourUnits, getLeaveDayUnits } from "@/lib/leaveUtils";
 
 // Number of days to load initially
 const INITIAL_DAYS = 30;
@@ -299,7 +300,12 @@ export default function HistoryPage() {
                                                 <div className="text-right">
                                                     <div className="text-xs text-gray-500 mb-1">วันที่ลา</div>
                                                     <div className="text-sm font-medium text-gray-800">
-                                                        {format(leave.startDate, "d MMM", { locale: th })} - {format(leave.endDate, "d MMM", { locale: th })}
+                                                        {formatLeaveDateRange(leave)}
+                                                    </div>
+                                                    <div className="text-xs text-gray-500 mt-1">
+                                                        {leave.leaveType === "ลากิจ"
+                                                            ? formatLeaveDayHourUnits(getLeaveDayUnits(leave))
+                                                            : formatLeaveDuration(leave)}
                                                     </div>
                                                 </div>
                                             </div>

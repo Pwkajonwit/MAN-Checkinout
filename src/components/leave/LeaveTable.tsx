@@ -2,8 +2,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { type LeaveRequest } from "@/lib/firestore";
 import { Check, X, Edit2, Trash2, Image as ImageIcon, X as CloseIcon } from "lucide-react";
-import { format } from "date-fns";
-import { th } from "date-fns/locale";
+import { formatLeaveDateRange, formatLeaveDuration, formatLeaveDayHourUnits, getLeaveDayUnits } from "@/lib/leaveUtils";
 
 interface LeaveTableProps {
     leaves: LeaveRequest[];
@@ -26,7 +25,7 @@ export function LeaveTable({ leaves, onStatusUpdate, onEdit, onDelete, isSuperAd
                                 <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider">พนักงาน</th>
                                 <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider">ประเภท</th>
                                 <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider">วันที่ลา</th>
-                                <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">จำนวน (วัน)</th>
+                                <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">ระยะเวลา</th>
                                 <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider">เหตุผล</th>
                                 <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">หลักฐาน</th>
                                 <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">สถานะ</th>
@@ -66,19 +65,22 @@ export function LeaveTable({ leaves, onStatusUpdate, onEdit, onDelete, isSuperAd
                                         </td>
                                         <td className="py-4 px-6">
                                             <div className="flex flex-col">
-                                                <span className="text-sm text-gray-700 font-medium">
-                                                    {leave.startDate ? format(leave.startDate, "d MMM yyyy", { locale: th }) : "-"}
-                                                </span>
-                                                <span className="text-xs text-gray-400">ถึง</span>
-                                                <span className="text-sm text-gray-700 font-medium">
-                                                    {leave.endDate ? format(leave.endDate, "d MMM yyyy", { locale: th }) : "-"}
-                                                </span>
+                                                {leave.startDate && leave.endDate ? (
+                                                    formatLeaveDateRange(leave).split(" - ").map((part, index, parts) => (
+                                                        <span key={part} className={index === 0 || parts.length === 1 ? "text-sm text-gray-700 font-medium" : "text-sm text-gray-700 font-medium"}>
+                                                            {index > 0 && <span className="block text-xs text-gray-400">ถึง</span>}
+                                                            {part}
+                                                        </span>
+                                                    ))
+                                                ) : "-"}
                                             </div>
                                         </td>
                                         <td className="py-4 px-6 text-center">
                                             <span className="text-sm font-semibold text-gray-700 bg-gray-50 px-2 py-1 rounded-md border border-gray-100">
                                                 {leave.startDate && leave.endDate
-                                                    ? Math.max(1, Math.ceil((new Date(leave.endDate).getTime() - new Date(leave.startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1)
+                                                    ? leave.leaveType === "ลากิจ"
+                                                        ? formatLeaveDayHourUnits(getLeaveDayUnits(leave))
+                                                        : formatLeaveDuration(leave)
                                                     : "-"}
                                             </span>
                                         </td>

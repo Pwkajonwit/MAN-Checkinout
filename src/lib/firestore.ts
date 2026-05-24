@@ -67,8 +67,12 @@ export interface LeaveRequest {
     employeeId: string;
     employeeName: string;
     leaveType: "ลาพักร้อน" | "ลาป่วย" | "ลากิจ";
+    durationUnit?: "day" | "hour";
     startDate: Date;
     endDate: Date;
+    startTime?: string;
+    endTime?: string;
+    totalHours?: number;
     reason: string;
     status: "รออนุมัติ" | "อนุมัติ" | "ไม่อนุมัติ";
     createdAt: Date;
@@ -364,12 +368,16 @@ export const attendanceService = {
 // Leave Request CRUD operations
 export const leaveService = {
     async create(leave: Omit<LeaveRequest, "id">) {
-        const docRef = await addDoc(collection(db, "leaveRequests"), {
+        const data = {
             ...leave,
             startDate: Timestamp.fromDate(leave.startDate),
             endDate: Timestamp.fromDate(leave.endDate),
             createdAt: Timestamp.fromDate(leave.createdAt),
-        });
+        };
+
+        Object.keys(data).forEach(key => data[key as keyof typeof data] === undefined && delete data[key as keyof typeof data]);
+
+        const docRef = await addDoc(collection(db, "leaveRequests"), data);
         return docRef.id;
     },
 

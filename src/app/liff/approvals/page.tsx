@@ -7,6 +7,13 @@ import { format } from "date-fns";
 import { th } from "date-fns/locale";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CustomAlert } from "@/components/ui/custom-alert";
+import { formatLeaveDateRange, formatLeaveDuration, formatLeaveDayHourUnits, getLeaveDayUnits } from "@/lib/leaveUtils";
+
+const formatApprovalLeaveDuration = (leave: LeaveRequest) =>
+    leave.leaveType === "ลากิจ" ? formatLeaveDayHourUnits(getLeaveDayUnits(leave)) : formatLeaveDuration(leave);
+
+const formatApprovalLeaveDetails = (leave: LeaveRequest) =>
+    `${leave.leaveType}: ${formatLeaveDateRange(leave)} (${formatApprovalLeaveDuration(leave)})`;
 
 export default function LiffApprovalsPage() {
     const [activeTab, setActiveTab] = useState<"leave" | "ot" | "swap">("leave");
@@ -134,7 +141,7 @@ export default function LiffApprovalsPage() {
                     req.employeeId,
                     "leave",
                     "อนุมัติ",
-                    `${req.leaveType}: ${format(req.startDate instanceof Date ? req.startDate : (req.startDate as any).toDate(), "d MMM", { locale: th })}`
+                    formatApprovalLeaveDetails(req)
                 );
                 showAlert("สำเร็จ", "อนุมัติคำขอลาเรียบร้อยแล้ว", "success");
                 fetchData();
@@ -154,7 +161,7 @@ export default function LiffApprovalsPage() {
                     req.employeeId,
                     "leave",
                     "ไม่อนุมัติ",
-                    `${req.leaveType}: ${format(req.startDate instanceof Date ? req.startDate : (req.startDate as any).toDate(), "d MMM", { locale: th })}`
+                    formatApprovalLeaveDetails(req)
                 );
                 showAlert("สำเร็จ", "ปฏิเสธคำขอลาเรียบร้อยแล้ว", "success");
                 fetchData();
@@ -314,9 +321,12 @@ export default function LiffApprovalsPage() {
                                             </div>
 
                                             <div className="space-y-2 mb-4">
-                                                <div className="flex items-center gap-2 text-sm text-gray-600">
+                                                <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
                                                     <Calendar className="w-4 h-4 text-gray-400" />
-                                                    {format(req.startDate instanceof Date ? req.startDate : (req.startDate as any).toDate(), "d MMM", { locale: th })} - {format(req.endDate instanceof Date ? req.endDate : (req.endDate as any).toDate(), "d MMM yy", { locale: th })}
+                                                    <span>{formatLeaveDateRange(req)}</span>
+                                                    <span className="rounded-md bg-gray-50 px-2 py-0.5 text-xs font-semibold text-gray-700">
+                                                        {formatApprovalLeaveDuration(req)}
+                                                    </span>
                                                 </div>
                                                 <div className="flex items-start gap-2 text-sm text-gray-600">
                                                     <FileText className="w-4 h-4 text-gray-400 mt-0.5" />

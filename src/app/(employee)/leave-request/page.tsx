@@ -8,15 +8,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { leaveService } from "@/lib/firestore";
 import { EmployeeHeader } from "@/components/mobile/EmployeeHeader";
 import { useEmployee } from "@/contexts/EmployeeContext";
-import { FileText, Send, CheckCircle, AlertCircle, Camera, X } from "lucide-react";
+import { FileText, Send, CheckCircle, Camera, X } from "lucide-react";
 import { compressBase64Image } from "@/lib/storage";
+import { getLeaveDayUnits, formatLeaveDateRange, formatLeaveDuration, formatLeaveDayHourUnits, formatLeaveUnitValue } from "@/lib/leaveUtils";
 
 export default function LeaveRequestPage() {
     const { employee } = useEmployee();
     type LeaveType = "ลาพักร้อน" | "ลาป่วย" | "ลากิจ";
     const [leaveType, setLeaveType] = useState<LeaveType | "">("");
+    const [durationUnit, setDurationUnit] = useState<"day" | "hour">("day");
     const [startDate, setStartDate] = useState("");
     const [endDate, setEndDate] = useState("");
+    const [startTime, setStartTime] = useState("");
+    const [endTime, setEndTime] = useState("");
     const [reason, setReason] = useState("");
     const [loading, setLoading] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
@@ -30,6 +34,13 @@ export default function LeaveRequestPage() {
         sick: { total: 0, used: 0, remaining: 0 },
         vacation: { total: 0, used: 0, remaining: 0 },
     });
+
+    const formatCompactPersonalQuota = (days: number) => {
+        const [dayText, hourText] = formatLeaveDayHourUnits(days).split(" วัน ");
+        return `${dayText} ว. ${hourText.replace(" ชั่วโมง", "")} ชม`;
+    };
+
+    const formatTotalDays = (days: number) => formatLeaveUnitValue(days);
 
     useEffect(() => {
         if (employee) {
@@ -46,14 +57,11 @@ export default function LeaveRequestPage() {
 
                     requests.forEach(req => {
                         if (req.status === "อนุมัติ" || req.status === "รออนุมัติ") {
-                            const start = new Date(req.startDate);
-                            const end = new Date(req.endDate);
-                            const diffTime = Math.abs(end.getTime() - start.getTime());
-                            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // Inclusive
+                            const leaveUnits = getLeaveDayUnits(req);
 
-                            if (req.leaveType === "ลากิจ") used.personal += diffDays;
-                            else if (req.leaveType === "ลาป่วย") used.sick += diffDays;
-                            else if (req.leaveType === "ลาพักร้อน") used.vacation += diffDays;
+                            if (req.leaveType === "ลากิจ") used.personal += leaveUnits;
+                            else if (req.leaveType === "ลาป่วย") used.sick += leaveUnits;
+                            else if (req.leaveType === "ลาพักร้อน") used.vacation += leaveUnits;
                         }
                     });
 
@@ -82,7 +90,15 @@ export default function LeaveRequestPage() {
         }
     }, [employee]);
 
-    const sendFlexMessage = async (leaveData: { type: string, start: Date, end: Date, reason: string }) => {
+    useEffect(() => {
+        if (leaveType !== "ลากิจ") {
+            setDurationUnit("day");
+            setStartTime("");
+            setEndTime("");
+        }
+    }, [leaveType]);
+
+    const sendFlexMessage = async (leaveData: { type: string, start: Date, end: Date, reason: string, dateText?: string }) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const liff = (window as any).liff;
         if (liff && liff.isInClient()) {
@@ -159,7 +175,7 @@ export default function LeaveRequestPage() {
                                                     },
                                                     {
                                                         type: "text",
-                                                        text: `${leaveData.start.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })} - ${leaveData.end.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}`,
+                                                        text: leaveData.dateText || `${leaveData.start.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })} - ${leaveData.end.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}`,
                                                         wrap: true,
                                                         color: "#666666",
                                                         size: "sm",
@@ -202,7 +218,7 @@ export default function LeaveRequestPage() {
         }
     };
 
-    const notifyAdmin = async (leaveData: { type: string, start: Date, end: Date, reason: string }) => {
+    const notifyAdmin = async (leaveData: { type: string, start: Date, end: Date, reason: string, dateText?: string }) => {
         try {
             await fetch("/api/line/notify-admin", {
                 method: "POST",
@@ -212,7 +228,7 @@ export default function LeaveRequestPage() {
                 body: JSON.stringify({
                     type: "leave",
                     employeeName: employee?.name || "Unknown",
-                    details: `${leaveData.type}: ${leaveData.start.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })} - ${leaveData.end.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}`,
+                    details: `${leaveData.type}: ${leaveData.dateText || `${leaveData.start.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })} - ${leaveData.end.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}`}`,
                     reason: leaveData.reason,
                     date: new Date().toISOString()
                 }),
@@ -227,18 +243,54 @@ export default function LeaveRequestPage() {
         if (!employee) return;
 
         // Validate Quota
+        const effectiveEndDate = durationUnit === "hour" ? startDate : endDate;
         const start = new Date(startDate);
-        const end = new Date(endDate);
-        const diffTime = Math.abs(end.getTime() - start.getTime());
-        const requestDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+        const end = new Date(effectiveEndDate);
+        if (end < start) {
+            alert("วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่มต้น");
+            return;
+        }
+
+        let totalHours: number | undefined;
+        if (durationUnit === "hour") {
+            if (leaveType !== "ลากิจ") {
+                alert("ลารายชั่วโมงใช้ได้กับลากิจเท่านั้น");
+                return;
+            }
+            if (!startTime || !endTime) {
+                alert("กรุณาระบุเวลาเริ่มและเวลาสิ้นสุด");
+                return;
+            }
+
+            const startDateTime = new Date(`${startDate}T${startTime}`);
+            const endDateTime = new Date(`${startDate}T${endTime}`);
+            totalHours = (endDateTime.getTime() - startDateTime.getTime()) / (1000 * 60 * 60);
+            if (totalHours <= 0) {
+                alert("เวลาสิ้นสุดต้องหลังเวลาเริ่มต้น");
+                return;
+            }
+        }
+
+        const requestDays = getLeaveDayUnits({
+            durationUnit,
+            startDate: start,
+            endDate: end,
+            totalHours,
+        });
 
         let currentQuota = 0;
         if (leaveType === "ลากิจ") currentQuota = quotas.personal.remaining;
         else if (leaveType === "ลาป่วย") currentQuota = quotas.sick.remaining;
         else if (leaveType === "ลาพักร้อน") currentQuota = quotas.vacation.remaining;
+        else {
+            alert("กรุณาเลือกประเภทการลา");
+            return;
+        }
 
         if (requestDays > currentQuota) {
-            alert(`วันลาคงเหลือไม่เพียงพอ (ต้องการ ${requestDays} วัน, คงเหลือ ${currentQuota} วัน)`);
+            const requiredText = leaveType === "ลากิจ" ? formatLeaveDayHourUnits(requestDays) : `${requestDays.toFixed(2)} วัน`;
+            const remainingText = leaveType === "ลากิจ" ? formatLeaveDayHourUnits(currentQuota) : `${currentQuota.toFixed(2)} วัน`;
+            alert(`วันลาคงเหลือไม่เพียงพอ (ต้องการ ${requiredText}, คงเหลือ ${remainingText})`);
             return;
         }
 
@@ -262,35 +314,53 @@ export default function LeaveRequestPage() {
                 employeeName: employee.name,
                 leaveType: leaveType as "ลาพักร้อน" | "ลาป่วย" | "ลากิจ",
                 startDate: new Date(startDate),
-                endDate: new Date(endDate),
+                endDate: new Date(effectiveEndDate),
+                durationUnit,
+                ...(durationUnit === "hour" && { startTime, endTime, totalHours }),
                 reason,
                 status: "รออนุมัติ",
                 createdAt: new Date(),
                 ...(attachmentBase64 && { attachment: attachmentBase64 }),
             });
 
+            const displayLeave = {
+                durationUnit,
+                startDate: start,
+                endDate: end,
+                startTime,
+                endTime,
+                totalHours,
+            };
+            const durationText = formatLeaveDuration(displayLeave);
+            const dateText = formatLeaveDateRange(displayLeave);
+
             // Send Flex Message (to user)
             await sendFlexMessage({
-                type: leaveType,
+                type: `${leaveType} (${durationText})`,
                 start: new Date(startDate),
-                end: new Date(endDate),
-                reason
+                end: new Date(effectiveEndDate),
+                reason,
+                dateText,
             });
 
             // Notify Admin (to group)
             await notifyAdmin({
-                type: leaveType,
+                type: `${leaveType} (${durationText})`,
                 start: new Date(startDate),
-                end: new Date(endDate),
-                reason
+                end: new Date(effectiveEndDate),
+                reason,
+                dateText,
             });
 
             setShowSuccess(true);
 
             // Reset
             setLeaveType("");
+            setDurationUnit("day");
             setStartDate("");
             setEndDate("");
+            setStartTime("");
+            setEndTime("");
             setReason("");
             setAttachment(null);
 
@@ -331,21 +401,25 @@ export default function LeaveRequestPage() {
                     </h2>
 
                     {/* Quota Cards */}
-                    <div className="grid grid-cols-3 gap-2 mb-6">
-                        <div className="bg-blue-50 p-3 rounded-xl border border-blue-100 text-center">
-                            <div className="text-xs text-blue-600 font-medium mb-1">ลากิจ</div>
-                            <div className="text-xl font-bold text-blue-700">{quotas.personal.remaining}</div>
-                            <div className="text-[10px] text-blue-400">จาก {quotas.personal.total}</div>
+                    <div className="grid grid-cols-3 gap-2.5 mb-5">
+                        <div className="h-[92px] rounded-lg border border-blue-100 bg-blue-50/80 px-2 py-3 text-center shadow-sm flex flex-col items-center justify-center">
+                            <div className="text-[10px] font-semibold text-blue-700 leading-none">ลากิจ</div>
+                            <div className="mt-1.5 whitespace-nowrap text-[18px] font-extrabold text-blue-800 leading-none tracking-normal">
+                                {formatCompactPersonalQuota(quotas.personal.remaining)}
+                            </div>
+                            <div className="mt-3 text-[9px] font-medium text-blue-400 leading-none">
+                                ทั้งหมด {formatTotalDays(quotas.personal.total)} วัน
+                            </div>
                         </div>
-                        <div className="bg-orange-50 p-3 rounded-xl border border-orange-100 text-center">
-                            <div className="text-xs text-orange-600 font-medium mb-1">ลาป่วย</div>
-                            <div className="text-xl font-bold text-orange-700">{quotas.sick.remaining}</div>
-                            <div className="text-[10px] text-orange-400">จาก {quotas.sick.total}</div>
+                        <div className="h-[92px] rounded-lg border border-orange-100 bg-orange-50/80 px-2 py-3 text-center shadow-sm flex flex-col items-center justify-center">
+                            <div className="text-[10px] font-semibold text-orange-600 leading-none">ลาป่วย</div>
+                            <div className="mt-1.5 text-[24px] font-extrabold text-orange-700 leading-none">{quotas.sick.remaining}</div>
+                            <div className="mt-3 text-[9px] font-medium text-orange-400 leading-none">จาก {quotas.sick.total}</div>
                         </div>
-                        <div className="bg-purple-50 p-3 rounded-xl border border-purple-100 text-center">
-                            <div className="text-xs text-purple-600 font-medium mb-1">พักร้อน</div>
-                            <div className="text-xl font-bold text-purple-700">{quotas.vacation.remaining}</div>
-                            <div className="text-[10px] text-purple-400">จาก {quotas.vacation.total}</div>
+                        <div className="h-[92px] rounded-lg border border-purple-100 bg-purple-50/80 px-2 py-3 text-center shadow-sm flex flex-col items-center justify-center">
+                            <div className="text-[10px] font-semibold text-purple-600 leading-none">พักร้อน</div>
+                            <div className="mt-1.5 text-[24px] font-extrabold text-purple-700 leading-none">{quotas.vacation.remaining}</div>
+                            <div className="mt-3 text-[9px] font-medium text-purple-400 leading-none">จาก {quotas.vacation.total}</div>
                         </div>
                     </div>
 
@@ -364,30 +438,105 @@ export default function LeaveRequestPage() {
                             </Select>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3">
+                        {leaveType === "ลากิจ" && (
+                            <div className="grid grid-cols-2 gap-2 rounded-xl bg-gray-100 p-1">
+                                <button
+                                    type="button"
+                                    onClick={() => setDurationUnit("day")}
+                                    className={`h-10 rounded-lg text-sm font-semibold transition-colors ${durationUnit === "day" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"}`}
+                                >
+                                    เต็มวัน
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setDurationUnit("hour");
+                                        if (startDate) setEndDate(startDate);
+                                    }}
+                                    className={`h-10 rounded-lg text-sm font-semibold transition-colors ${durationUnit === "hour" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"}`}
+                                >
+                                    รายชั่วโมง
+                                </button>
+                            </div>
+                        )}
+
+                        <div className={durationUnit === "hour" ? "grid grid-cols-1 gap-3" : "grid grid-cols-2 gap-3"}>
                             <div className="space-y-2">
-                                <label className="text-sm font-medium text-gray-700">วันที่เริ่ม</label>
+                                <label className="text-sm font-medium text-gray-700">{durationUnit === "hour" ? "วันที่ลา" : "วันที่เริ่ม"}</label>
                                 <Input
                                     type="date"
                                     value={startDate}
-                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setStartDate(e.target.value)}
+                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                        setStartDate(e.target.value);
+                                        if (durationUnit === "hour") setEndDate(e.target.value);
+                                    }}
                                     className="h-12 w-full min-w-0 rounded-xl border-gray-200 bg-gray-50/50 appearance-none"
                                     style={{ WebkitAppearance: "none" }}
                                     required
                                 />
                             </div>
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-gray-700">ถึงวันที่</label>
-                                <Input
-                                    type="date"
-                                    value={endDate}
-                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEndDate(e.target.value)}
-                                    className="h-12 w-full min-w-0 rounded-xl border-gray-200 bg-gray-50/50 appearance-none"
-                                    style={{ WebkitAppearance: "none" }}
-                                    required
-                                />
-                            </div>
+                            {durationUnit === "day" && (
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-gray-700">ถึงวันที่</label>
+                                    <Input
+                                        type="date"
+                                        value={endDate}
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEndDate(e.target.value)}
+                                        className="h-12 w-full min-w-0 rounded-xl border-gray-200 bg-gray-50/50 appearance-none"
+                                        style={{ WebkitAppearance: "none" }}
+                                        min={startDate}
+                                        required
+                                    />
+                                </div>
+                            )}
                         </div>
+
+                        {durationUnit === "hour" && (
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-gray-700">เวลาเริ่ม</label>
+                                    <Input
+                                        type="time"
+                                        value={startTime}
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setStartTime(e.target.value)}
+                                        className="h-12 rounded-xl border-gray-200 bg-gray-50/50"
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-gray-700">เวลาสิ้นสุด</label>
+                                    <Input
+                                        type="time"
+                                        value={endTime}
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEndTime(e.target.value)}
+                                        className="h-12 rounded-xl border-gray-200 bg-gray-50/50"
+                                        required
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        {startDate && (durationUnit === "hour" || endDate) && (
+                            <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+                                {formatLeaveDateRange({
+                                    durationUnit,
+                                    startDate: new Date(startDate),
+                                    endDate: new Date(durationUnit === "hour" ? startDate : endDate),
+                                    startTime,
+                                    endTime,
+                                })}
+                                {durationUnit === "hour" && startTime && endTime ? (
+                                    <span className="ml-2 font-semibold">
+                                        {formatLeaveDuration({
+                                            durationUnit,
+                                            startDate: new Date(startDate),
+                                            endDate: new Date(startDate),
+                                            totalHours: Math.max(0, (new Date(`${startDate}T${endTime}`).getTime() - new Date(`${startDate}T${startTime}`).getTime()) / (1000 * 60 * 60)),
+                                        })}
+                                    </span>
+                                ) : null}
+                            </div>
+                        )}
 
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-gray-700">เหตุผล</label>

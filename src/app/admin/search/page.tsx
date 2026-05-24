@@ -14,6 +14,7 @@ import { generateAttendancePDF } from "@/lib/pdfGenerator";
 import { generateAttendanceCSV } from "@/lib/csvGenerator";
 import { getLateMinutes, isLate, formatMinutesToHours } from "@/lib/workTime";
 import { Button } from "@/components/ui/button";
+import { formatLeaveDayHourUnits, getLeaveDayUnits } from "@/lib/leaveUtils";
 
 export default function SearchPage() {
     const [searchQuery, setSearchQuery] = useState("");
@@ -148,9 +149,7 @@ export default function SearchPage() {
         const used = { personal: 0, sick: 0, vacation: 0 };
         leaves.forEach(leave => {
             if (leave.status === "อนุมัติ") {
-                const start = leave.startDate instanceof Date ? leave.startDate : new Date(leave.startDate);
-                const end = leave.endDate instanceof Date ? leave.endDate : new Date(leave.endDate);
-                const days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+                const days = getLeaveDayUnits(leave);
 
                 if (leave.leaveType === "ลากิจ") used.personal += days;
                 else if (leave.leaveType === "ลาป่วย") used.sick += days;
@@ -324,8 +323,8 @@ export default function SearchPage() {
                             {[
                                 {
                                     label: "ลากิจ (คงเหลือ)",
-                                    value: Math.max(0, (selectedEmployee.leaveQuota?.personal || 0) - getLeaveUsed().personal),
-                                    sub: "วัน"
+                                    value: formatLeaveDayHourUnits(Math.max(0, (selectedEmployee.leaveQuota?.personal || 0) - getLeaveUsed().personal)),
+                                    sub: "",
                                 },
                                 {
                                     label: "ลาป่วย (คงเหลือ)",
@@ -342,7 +341,7 @@ export default function SearchPage() {
                                     <div className="text-sm text-slate-600 mb-1">{stat.label}</div>
                                     <div className="text-2xl font-bold text-slate-900">
                                         {stat.value}
-                                        <span className="text-sm font-normal text-slate-500 ml-1">{stat.sub}</span>
+                                        {stat.sub && <span className="text-sm font-normal text-slate-500 ml-1">{stat.sub}</span>}
                                     </div>
                                 </div>
                             ))}
@@ -419,14 +418,7 @@ export default function SearchPage() {
                                                         let leaveDays = 0;
                                                         leaves.forEach(l => {
                                                             if (l.status === "อนุมัติ") {
-                                                                // Simple overlap check logic could be added here if needed
-                                                                // For now, assume leaves are vetted
-                                                                const start = new Date(l.startDate);
-                                                                const end = new Date(l.endDate);
-                                                                // Calculate days overlapping with selected month
-                                                                // Simplified: use pre-calculated days if available or 1
-                                                                const days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
-                                                                leaveDays += days;
+                                                                leaveDays += getLeaveDayUnits(l);
                                                             }
                                                         });
 
@@ -548,7 +540,7 @@ export default function SearchPage() {
                                                                 const [year, month] = selectedMonth.split('-').map(Number);
                                                                 const daysInMonth = new Date(year, month, 0).getDate();
                                                                 const attendanceDays = attendances.filter(a => a.status === "เข้างาน" || a.status === "สาย" || a.status === "ออกงาน").length;
-                                                                let leaveDays = 0; leaves.forEach(l => { if (l.status === "อนุมัติ") leaveDays += 1; }); // Simplified
+                                                                let leaveDays = 0; leaves.forEach(l => { if (l.status === "อนุมัติ") leaveDays += getLeaveDayUnits(l); });
                                                                 const weeklyHolidays = selectedEmployee.weeklyHolidays || [0, 6];
                                                                 const now = new Date();
                                                                 const currentYear = now.getFullYear();
@@ -602,7 +594,7 @@ export default function SearchPage() {
                                                                 const [year, month] = selectedMonth.split('-').map(Number);
                                                                 const daysInMonth = new Date(year, month, 0).getDate();
                                                                 const attendanceDays = attendances.filter(a => a.status === "เข้างาน" || a.status === "สาย" || a.status === "ออกงาน").length;
-                                                                let leaveDays = 0; leaves.forEach(l => { if (l.status === "อนุมัติ") leaveDays += 1; });
+                                                                let leaveDays = 0; leaves.forEach(l => { if (l.status === "อนุมัติ") leaveDays += getLeaveDayUnits(l); });
                                                                 const weeklyHolidays = selectedEmployee.weeklyHolidays || [0, 6];
                                                                 const now = new Date();
                                                                 const currentYear = now.getFullYear();
