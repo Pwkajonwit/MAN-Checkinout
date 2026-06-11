@@ -63,6 +63,11 @@ const escapeHtml = (value: string) =>
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
 
+const escapeCsvValue = (value: string | number | null | undefined) => {
+    const text = value === null || value === undefined ? "" : String(value);
+    return `"${text.replace(/"/g, '""')}"`;
+};
+
 const getPayrollLeaveDays = (leaves: LeaveRequest[], attendedDateKeys: Set<string>) => {
     return leaves.reduce((sum, leave) => {
         const start = leave.startDate instanceof Date ? leave.startDate : new Date(leave.startDate);
@@ -719,6 +724,170 @@ export default function PayrollPage() {
         printWindow.document.close();
     };
 
+    const handleExportPayrollCsv = () => {
+        const selectedData = payrollData
+            .filter(item => selectedIds.includes(item.employeeId))
+            .map(normalizePayrollItem);
+        if (selectedData.length === 0) return;
+
+        const { periodLabel } = getCurrentPeriodMeta();
+        const headers = [
+            "งวดเงินเดือน",
+            "รหัสพนักงาน",
+            "ชื่อพนักงาน",
+            "ประเภท",
+            "ฐานเงินเดือน/ค่าจ้าง",
+            "วันทำงาน",
+            "วันลา",
+            "สาย (นาที)",
+            "OT ปกติ (ชม.)",
+            "OT วันหยุด (ชม.)",
+            "OT วันหยุดพิเศษ (ชม.)",
+            "ค่า OT ปกติ",
+            "ค่า OT วันหยุด",
+            "ค่า OT วันหยุดพิเศษ",
+            "ค่าทำงานวันหยุดพิเศษ",
+            "รายได้คำนวณ",
+            "เงินเพิ่ม",
+            "รายการเงินเพิ่ม",
+            "รายการหักคำนวณ",
+            "รายการหักเพิ่ม",
+            "รายการหักเพิ่มทั้งหมด",
+            "รวมรายได้",
+            "รวมรายการหัก",
+            "จ่ายสุทธิ",
+        ];
+
+        const rows = selectedData.map((item) => {
+            const manualIncomeTotal = (item.manualIncomes || []).reduce((sum, income) => sum + toNumber(income.amount), 0);
+            const manualDeductionTotal = (item.manualDeductions || []).reduce((sum, deduction) => sum + toNumber(deduction.amount), 0);
+            const incomeLabels = (item.manualIncomes || [])
+                .filter(income => income.label || toNumber(income.amount) > 0)
+                .map(income => `${income.label || "เงินเพิ่ม"} ${toNumber(income.amount)}`)
+                .join("; ");
+            const deductionLabels = (item.manualDeductions || [])
+                .filter(deduction => deduction.label || toNumber(deduction.amount) > 0)
+                .map(deduction => `${deduction.label || "รายการหัก"} ${toNumber(deduction.amount)}`)
+                .join("; ");
+
+            return [
+                periodLabel,
+                item.employeeId,
+                item.name,
+                item.type,
+                item.baseSalary,
+                item.workDays,
+                item.leaveDays,
+                item.lateMinutes,
+                item.otHoursNormal.toFixed(2),
+                item.otHoursHoliday.toFixed(2),
+                item.otHoursSpecial.toFixed(2),
+                item.otPayNormal,
+                item.otPayHoliday,
+                item.otPaySpecial,
+                item.customHolidayWorkPay,
+                item.payrollBaseIncome,
+                manualIncomeTotal,
+                incomeLabels,
+                item.payrollBaseDeduction,
+                manualDeductionTotal,
+                deductionLabels,
+                item.totalIncome,
+                item.totalDeduction,
+                item.netTotal,
+            ];
+        });
+
+        const totals = selectedData.reduce((summary, item) => {
+            const manualIncomeTotal = (item.manualIncomes || []).reduce((sum, income) => sum + toNumber(income.amount), 0);
+            const manualDeductionTotal = (item.manualDeductions || []).reduce((sum, deduction) => sum + toNumber(deduction.amount), 0);
+            return {
+                baseSalary: summary.baseSalary + toNumber(item.baseSalary),
+                workDays: summary.workDays + toNumber(item.workDays),
+                leaveDays: summary.leaveDays + toNumber(item.leaveDays),
+                lateMinutes: summary.lateMinutes + toNumber(item.lateMinutes),
+                otHoursNormal: summary.otHoursNormal + toNumber(item.otHoursNormal),
+                otHoursHoliday: summary.otHoursHoliday + toNumber(item.otHoursHoliday),
+                otHoursSpecial: summary.otHoursSpecial + toNumber(item.otHoursSpecial),
+                otPayNormal: summary.otPayNormal + toNumber(item.otPayNormal),
+                otPayHoliday: summary.otPayHoliday + toNumber(item.otPayHoliday),
+                otPaySpecial: summary.otPaySpecial + toNumber(item.otPaySpecial),
+                customHolidayWorkPay: summary.customHolidayWorkPay + toNumber(item.customHolidayWorkPay),
+                payrollBaseIncome: summary.payrollBaseIncome + toNumber(item.payrollBaseIncome),
+                manualIncomeTotal: summary.manualIncomeTotal + manualIncomeTotal,
+                payrollBaseDeduction: summary.payrollBaseDeduction + toNumber(item.payrollBaseDeduction),
+                manualDeductionTotal: summary.manualDeductionTotal + manualDeductionTotal,
+                totalIncome: summary.totalIncome + toNumber(item.totalIncome),
+                totalDeduction: summary.totalDeduction + toNumber(item.totalDeduction),
+                netTotal: summary.netTotal + toNumber(item.netTotal),
+            };
+        }, {
+            baseSalary: 0,
+            workDays: 0,
+            leaveDays: 0,
+            lateMinutes: 0,
+            otHoursNormal: 0,
+            otHoursHoliday: 0,
+            otHoursSpecial: 0,
+            otPayNormal: 0,
+            otPayHoliday: 0,
+            otPaySpecial: 0,
+            customHolidayWorkPay: 0,
+            payrollBaseIncome: 0,
+            manualIncomeTotal: 0,
+            payrollBaseDeduction: 0,
+            manualDeductionTotal: 0,
+            totalIncome: 0,
+            totalDeduction: 0,
+            netTotal: 0,
+        });
+
+        rows.push([
+            periodLabel,
+            "",
+            "รวม",
+            "",
+            totals.baseSalary,
+            totals.workDays,
+            totals.leaveDays,
+            totals.lateMinutes,
+            totals.otHoursNormal.toFixed(2),
+            totals.otHoursHoliday.toFixed(2),
+            totals.otHoursSpecial.toFixed(2),
+            totals.otPayNormal,
+            totals.otPayHoliday,
+            totals.otPaySpecial,
+            totals.customHolidayWorkPay,
+            totals.payrollBaseIncome,
+            totals.manualIncomeTotal,
+            "",
+            totals.payrollBaseDeduction,
+            totals.manualDeductionTotal,
+            "",
+            totals.totalIncome,
+            totals.totalDeduction,
+            totals.netTotal,
+        ]);
+
+        const csvContent = "\uFEFF" + [
+            headers.map(escapeCsvValue).join(","),
+            ...rows.map(row => row.map(escapeCsvValue).join(",")),
+        ].join("\n");
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        const filePeriod = calculationPeriod === "month"
+            ? format(selectedDate, "yyyy-MM")
+            : `${format(customRange.start, "yyyyMMdd")}-${format(customRange.end, "yyyyMMdd")}`;
+
+        link.href = url;
+        link.download = `payroll_summary_${filePeriod}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    };
+
     const calculatePayroll = async () => {
         setLoading(true);
         try {
@@ -1331,18 +1500,32 @@ export default function PayrollPage() {
                                                     <button
                                                         onClick={handleSavePayroll}
                                                         disabled={payrollData.length === 0 || savingPayroll}
-                                                        className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white shadow-md shadow-emerald-600/20 transition-all hover:bg-emerald-700 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
+                                                        className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white shadow-sm shadow-emerald-600/20 transition-all hover:bg-emerald-700 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
+                                                        title={savingPayroll ? "กำลังบันทึกงวดนี้" : "บันทึกงวดนี้"}
+                                                        aria-label={savingPayroll ? "กำลังบันทึกงวดนี้" : "บันทึกงวดนี้"}
                                                     >
-                                                        <Save className="w-4 h-4" />
-                                                        {savingPayroll ? "กำลังบันทึก..." : "บันทึกงวดนี้"}
+                                                        <Save className="h-3.5 w-3.5" />
+                                                        <span>{savingPayroll ? "บันทึก..." : "บันทึก"}</span>
                                                     </button>
                                                     <button
                                                         onClick={handlePrint}
                                                         disabled={selectedIds.length === 0}
-                                                        className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white shadow-md shadow-slate-900/20 transition-all hover:bg-slate-800 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
+                                                        className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-slate-950 px-3 text-xs font-semibold text-white shadow-sm shadow-slate-900/20 transition-all hover:bg-slate-800 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
+                                                        title={`พิมพ์สลิป${selectedIds.length > 0 ? ` (${selectedIds.length})` : ""}`}
+                                                        aria-label={`พิมพ์สลิป${selectedIds.length > 0 ? ` (${selectedIds.length})` : ""}`}
                                                     >
-                                                        <Download className="w-4 h-4" />
-                                                        พิมพ์สลิป {selectedIds.length > 0 ? `(${selectedIds.length})` : ""}
+                                                        <Download className="h-3.5 w-3.5" />
+                                                        <span>สลิป{selectedIds.length > 0 ? ` ${selectedIds.length}` : ""}</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={handleExportPayrollCsv}
+                                                        disabled={selectedIds.length === 0}
+                                                        className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-50 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
+                                                        title={`Export CSV${selectedIds.length > 0 ? ` (${selectedIds.length})` : ""}`}
+                                                        aria-label={`Export CSV${selectedIds.length > 0 ? ` (${selectedIds.length})` : ""}`}
+                                                    >
+                                                        <Download className="h-3.5 w-3.5" />
+                                                        <span>CSV{selectedIds.length > 0 ? ` ${selectedIds.length}` : ""}</span>
                                                     </button>
                                                 </div>
                                             </div>

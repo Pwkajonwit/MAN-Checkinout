@@ -103,6 +103,7 @@ export default function RegisterPage() {
             const employeeData: Omit<Employee, "id"> = {
                 name: formData.name,
                 lineUserId: lineUserId,
+                avatar: lineProfile?.pictureUrl || null,
                 employeeId: formData.employeeId,
                 email: formData.email,
                 phone: formData.phone,
@@ -163,7 +164,10 @@ export default function RegisterPage() {
             }
 
             if (employee.id) {
-                await employeeService.update(employee.id, { lineUserId });
+                await employeeService.update(employee.id, {
+                    lineUserId,
+                    avatar: lineProfile?.pictureUrl || null,
+                });
                 await refreshEmployee(); // Refresh context
                 setShowSuccess(true);
                 setTimeout(() => {

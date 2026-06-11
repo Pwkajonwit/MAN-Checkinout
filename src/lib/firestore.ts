@@ -40,6 +40,7 @@ export interface Employee {
     allowedLocationIds?: string[];
     weeklyHolidays?: number[]; // วันหยุดประจำสัปดาห์ (0=อาทิตย์, 1=จันทร์, ..., 6=เสาร์)
     shiftId?: string;           // ID ของกะเวลาทำงาน
+    useNativeCameraCapture?: boolean; // ใช้กล้อง native ของมือถือแทนกล้องในเว็บสำหรับบางอุปกรณ์
 }
 
 // Attendance types

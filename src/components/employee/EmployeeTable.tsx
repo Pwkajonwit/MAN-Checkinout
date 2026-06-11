@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 import { type Employee } from "@/lib/firestore";
 import { Pencil, Trash2, Copy, Check, Eye } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { formatLeaveDayHourUnits } from "@/lib/leaveUtils";
 
 interface EmployeeTableProps {
@@ -14,6 +14,10 @@ interface EmployeeTableProps {
 
 export function EmployeeTable({ employees, onEdit, onDelete, onView, canManage = false }: EmployeeTableProps) {
     const [copiedId, setCopiedId] = useState<string | null>(null);
+    const [avatarOverrides, setAvatarOverrides] = useState<Record<string, string | null>>({});
+    const [refreshingAvatarIds, setRefreshingAvatarIds] = useState<Set<string>>(new Set());
+    const [failedAvatarIds, setFailedAvatarIds] = useState<Set<string>>(new Set());
+    const [brokenAvatarIds, setBrokenAvatarIds] = useState<Set<string>>(new Set());
 
     const handleCopyLineId = async (lineUserId: string) => {
         try {
@@ -24,6 +28,59 @@ export function EmployeeTable({ employees, onEdit, onDelete, onView, canManage =
             console.error("Failed to copy:", err);
         }
     };
+
+    const refreshLineAvatar = useCallback(async (employee: Employee) => {
+        if (!employee.id || !employee.lineUserId || refreshingAvatarIds.has(employee.id)) return;
+
+        setRefreshingAvatarIds(prev => new Set(prev).add(employee.id!));
+
+        try {
+            const response = await fetch("/api/line/employee-avatar", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ employeeId: employee.id }),
+            });
+            const result = await response.json().catch(() => ({ success: false }));
+
+            if (response.ok && result.success) {
+                setAvatarOverrides(prev => ({
+                    ...prev,
+                    [employee.id!]: result.avatar || null,
+                }));
+                setFailedAvatarIds(prev => {
+                    const next = new Set(prev);
+                    next.delete(employee.id!);
+                    return next;
+                });
+                setBrokenAvatarIds(prev => {
+                    const next = new Set(prev);
+                    next.delete(employee.id!);
+                    return next;
+                });
+            } else {
+                setFailedAvatarIds(prev => new Set(prev).add(employee.id!));
+            }
+        } catch (error) {
+            void error;
+            setFailedAvatarIds(prev => new Set(prev).add(employee.id!));
+        } finally {
+            setRefreshingAvatarIds(prev => {
+                const next = new Set(prev);
+                next.delete(employee.id!);
+                return next;
+            });
+        }
+    }, [refreshingAvatarIds]);
+
+    useEffect(() => {
+        employees.forEach(employee => {
+            if (employee.id && employee.lineUserId && !employee.avatar && avatarOverrides[employee.id] === undefined && !failedAvatarIds.has(employee.id)) {
+                refreshLineAvatar(employee);
+            }
+        });
+    }, [employees, avatarOverrides, failedAvatarIds, refreshLineAvatar]);
 
     return (
 
@@ -48,12 +105,37 @@ export function EmployeeTable({ employees, onEdit, onDelete, onView, canManage =
                             </td>
                         </tr>
                     ) : (
-                        employees.map((employee) => (
+                        employees.map((employee) => {
+                            const avatar = employee.id && avatarOverrides[employee.id] !== undefined
+                                ? avatarOverrides[employee.id]
+                                : employee.avatar;
+                            const isRefreshingAvatar = Boolean(employee.id && refreshingAvatarIds.has(employee.id));
+                            const isBrokenAvatar = Boolean(employee.id && brokenAvatarIds.has(employee.id));
+
+                            return (
                             <tr key={employee.id} className="hover:bg-gray-50/50 transition-colors group">
                                 <td className="py-4 px-6">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-medium text-sm shadow-sm ring-2 ring-white">
-                                            {employee.name.charAt(0)}
+                                        <div className="relative w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-medium text-sm shadow-sm ring-2 ring-white overflow-hidden">
+                                            {avatar && !isBrokenAvatar ? (
+                                                <img
+                                                    key={avatar}
+                                                    src={avatar}
+                                                    alt={employee.name}
+                                                    className="h-full w-full object-cover"
+                                                    onError={() => {
+                                                        if (employee.id && !failedAvatarIds.has(employee.id)) {
+                                                            setBrokenAvatarIds(prev => new Set(prev).add(employee.id!));
+                                                            refreshLineAvatar(employee);
+                                                        }
+                                                    }}
+                                                />
+                                            ) : (
+                                                employee.name.charAt(0)
+                                            )}
+                                            {isRefreshingAvatar && (
+                                                <span className="absolute inset-0 bg-black/20" />
+                                            )}
                                         </div>
                                         <div>
                                             <div className="text-sm font-medium text-gray-900">{employee.name}</div>
@@ -167,7 +249,8 @@ export function EmployeeTable({ employees, onEdit, onDelete, onView, canManage =
                                     </div>
                                 </td>
                             </tr>
-                        ))
+                            );
+                        })
                     )}
                 </tbody>
             </table>

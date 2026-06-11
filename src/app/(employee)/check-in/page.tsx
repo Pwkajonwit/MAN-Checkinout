@@ -60,10 +60,12 @@ export default function CheckInPage() {
     // Step 2 Data (Camera)
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const nativeCameraInputRef = useRef<HTMLInputElement>(null);
     const [stream, setStream] = useState<MediaStream | null>(null);
     const [photo, setPhoto] = useState<string | null>(null);
     const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
     const [cameraActive, setCameraActive] = useState(false);
+    const [cameraReady, setCameraReady] = useState(false);
 
     // Step 3 Data (Location)
     const [location, setLocation] = useState<{ lat: number, lng: number, address: string } | null>(null);
@@ -79,6 +81,8 @@ export default function CheckInPage() {
     const [employeeShift, setEmployeeShift] = useState<Shift | null>(null);
     const [matchedWorkLocation, setMatchedWorkLocation] = useState<WorkLocation | null>(null);
     const [nearestWorkLocation, setNearestWorkLocation] = useState<WorkLocation | null>(null);
+    const isPhotoRequiredForCurrentAction = requirePhoto || checkInType === "ออกนอกพื้นที่";
+    const canUseNativeCameraCapture = employee?.useNativeCameraCapture ?? false;
 
     useEffect(() => {
         const timer = setInterval(() => {
@@ -226,23 +230,37 @@ export default function CheckInPage() {
     }, [employee?.id, systemConfig]);
 
     // --- Step 2: Camera Functions ---
+    const stopCameraStream = (mediaStream: MediaStream | null = stream) => {
+        if (mediaStream) {
+            mediaStream.getTracks().forEach(track => track.stop());
+        }
+        setStream(null);
+        setCameraActive(false);
+        setCameraReady(false);
+    };
+
     const startCamera = async () => {
         try {
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-            }
+            stopCameraStream();
             const newStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: facingMode }
+                video: {
+                    facingMode,
+                    width: { ideal: 640 },
+                    height: { ideal: 480 }
+                }
             });
             setStream(newStream);
             if (videoRef.current) {
                 videoRef.current.srcObject = newStream;
+                await videoRef.current.play();
             }
             setCameraActive(true);
+            setCameraReady(false);
             setPhoto(null);
         } catch (error) {
             console.error("Error accessing camera:", error);
             showAlert("ไม่สามารถเข้าถึงกล้องได้", "กรุณาอนุญาตให้เข้าถึงกล้องเพื่อถ่ายรูป", "error");
+            stopCameraStream();
         }
     };
 
@@ -252,40 +270,101 @@ export default function CheckInPage() {
         if (cameraActive) {
             // Small delay to allow state update
             setTimeout(() => {
-                if (stream) {
-                    stream.getTracks().forEach(track => track.stop());
-                }
+                setCameraReady(false);
+                stopCameraStream();
                 navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: facingMode === "user" ? "environment" : "user" }
-                }).then(newStream => {
+                    video: {
+                        facingMode: facingMode === "user" ? "environment" : "user",
+                        width: { ideal: 640 },
+                        height: { ideal: 480 }
+                    }
+                }).then(async newStream => {
                     setStream(newStream);
                     if (videoRef.current) {
                         videoRef.current.srcObject = newStream;
+                        await videoRef.current.play();
                     }
+                    setCameraActive(true);
                 }).catch(err => console.error("Error switching camera:", err));
             }, 100);
         }
     };
 
+    const isCanvasMostlyBlack = (context: CanvasRenderingContext2D, width: number, height: number) => {
+        const sampleSize = 10;
+        let darkPixels = 0;
+        let sampledPixels = 0;
+
+        for (let y = 0; y < sampleSize; y++) {
+            for (let x = 0; x < sampleSize; x++) {
+                const px = Math.floor((x + 0.5) * width / sampleSize);
+                const py = Math.floor((y + 0.5) * height / sampleSize);
+                const [r, g, b] = context.getImageData(px, py, 1, 1).data;
+                if (r + g + b < 30) darkPixels += 1;
+                sampledPixels += 1;
+            }
+        }
+
+        return darkPixels / sampledPixels > 0.9;
+    };
+
     const capturePhoto = () => {
         if (videoRef.current && canvasRef.current) {
             const video = videoRef.current;
+            if (!cameraReady || video.videoWidth === 0 || video.videoHeight === 0) {
+                showAlert(
+                    "กล้องยังไม่พร้อม",
+                    canUseNativeCameraCapture ? "กรุณารอสักครู่แล้วลองถ่ายใหม่ หรือใช้ปุ่มถ่ายด้วยกล้องมือถือ" : "กรุณารอสักครู่แล้วลองถ่ายใหม่",
+                    "warning"
+                );
+                return;
+            }
+
             const canvas = canvasRef.current;
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             const context = canvas.getContext('2d');
             if (context) {
                 context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                if (isCanvasMostlyBlack(context, canvas.width, canvas.height)) {
+                    showAlert(
+                        "รูปภาพมืดเกินไป",
+                        canUseNativeCameraCapture ? "กรุณาถ่ายใหม่ หรือใช้ปุ่มถ่ายด้วยกล้องมือถือ" : "กรุณาถ่ายใหม่อีกครั้ง",
+                        "warning"
+                    );
+                    return;
+                }
                 // Use JPEG with 0.8 quality to reduce file size and upload time
                 const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
                 setPhoto(dataUrl);
-                setCameraActive(false);
-                if (stream) {
-                    stream.getTracks().forEach(track => track.stop());
-                    setStream(null);
-                }
+                stopCameraStream();
             }
         }
+    };
+
+    const handleNativeCameraPhoto = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        if (!file.type.startsWith("image/")) {
+            showAlert("ไฟล์ไม่ถูกต้อง", "กรุณาถ่ายหรือเลือกไฟล์รูปภาพเท่านั้น", "warning");
+            event.target.value = "";
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = () => {
+            if (typeof reader.result === "string") {
+                setPhoto(reader.result);
+                stopCameraStream();
+            }
+            event.target.value = "";
+        };
+        reader.onerror = () => {
+            showAlert("อ่านรูปภาพไม่สำเร็จ", "กรุณาลองถ่ายรูปใหม่อีกครั้ง", "error");
+            event.target.value = "";
+        };
+        reader.readAsDataURL(file);
     };
 
     // --- Step 3: Location Functions ---
@@ -724,7 +803,7 @@ export default function CheckInPage() {
 
             // บังคับรูปสำหรับออกนอกพื้นที่ หรือตาม requirePhoto setting
             const isOffsiteType = checkInType === "ออกนอกพื้นที่";
-            const needsPhoto = requirePhoto || isOffsiteType;
+            const needsPhoto = isPhotoRequiredForCurrentAction;
 
             if (needsPhoto) {
                 if (photo && employee?.id) {
@@ -1062,6 +1141,7 @@ export default function CheckInPage() {
                                 ref={videoRef}
                                 autoPlay
                                 playsInline
+                                onCanPlay={() => setCameraReady(true)}
                                 className={`w-full h-full object-cover ${cameraActive ? 'block' : 'hidden'}`}
                             />
                             {!cameraActive && (
@@ -1075,6 +1155,16 @@ export default function CheckInPage() {
                         <img src={photo} alt="Captured" className="w-full h-full object-cover" />
                     )}
                     <canvas ref={canvasRef} className="hidden" />
+                    {canUseNativeCameraCapture && (
+                        <input
+                            ref={nativeCameraInputRef}
+                            type="file"
+                            accept="image/*"
+                            capture={facingMode}
+                            onChange={handleNativeCameraPhoto}
+                            className="hidden"
+                        />
+                    )}
                 </div>
 
                 <div className="grid grid-cols-3 gap-3">
@@ -1087,10 +1177,10 @@ export default function CheckInPage() {
                     </Button>
                     <Button
                         onClick={capturePhoto}
-                        disabled={!cameraActive}
+                        disabled={!cameraActive || !cameraReady}
                         className="h-12 bg-primary hover:bg-primary/80 text-white rounded-xl"
                     >
-                        ถ่าย
+                        {cameraActive && !cameraReady ? "รอ..." : "ถ่าย"}
                     </Button>
                     <Button
                         variant="outline"
@@ -1101,6 +1191,16 @@ export default function CheckInPage() {
                         สลับกล้อง
                     </Button>
                 </div>
+                {canUseNativeCameraCapture && (
+                    <Button
+                        variant="outline"
+                        onClick={() => nativeCameraInputRef.current?.click()}
+                        className="w-full h-12 mt-3 rounded-xl border-gray-200 text-gray-700"
+                    >
+                        <Camera className="w-4 h-4 mr-2" />
+                        ถ่ายด้วยกล้องมือถือ
+                    </Button>
+                )}
             </div>
 
             <div className="flex gap-4">
@@ -1113,10 +1213,10 @@ export default function CheckInPage() {
                 </Button>
                 <Button
                     onClick={() => setStep(3)}
-                    disabled={!photo}
+                    disabled={isPhotoRequiredForCurrentAction && !photo}
                     className="flex-1 h-14 text-lg rounded-2xl bg-primary hover:bg-primary/80 shadow-lg shadow-blue-900/20"
                 >
-                    ถัดไป
+                    {!photo && !isPhotoRequiredForCurrentAction ? "ข้าม" : "ถัดไป"}
                 </Button>
             </div>
         </div>

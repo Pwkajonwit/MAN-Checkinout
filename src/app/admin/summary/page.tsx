@@ -325,11 +325,22 @@ export default function DailySummaryPage() {
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                                 {filteredSummaries.map((summary, idx) => (
-                                    <tr key={idx} className="hover:bg-gray-50">
+                                    <tr key={summary.employee.id || idx} className="hover:bg-gray-50">
                                         <td className="px-4 py-3">
                                             <div className="flex items-center gap-2">
-                                                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-medium text-sm">
-                                                    {summary.employee.name.charAt(0)}
+                                                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-medium text-sm overflow-hidden">
+                                                    {summary.employee.avatar ? (
+                                                        <img
+                                                            src={summary.employee.avatar}
+                                                            alt={summary.employee.name}
+                                                            className="h-full w-full object-cover"
+                                                            onError={(event) => {
+                                                                event.currentTarget.style.display = "none";
+                                                            }}
+                                                        />
+                                                    ) : (
+                                                        summary.employee.name.charAt(0)
+                                                    )}
                                                 </div>
                                                 <div>
                                                     <div className="font-medium text-gray-800 text-sm">{summary.employee.name}</div>
