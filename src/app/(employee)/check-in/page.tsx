@@ -239,9 +239,18 @@ export default function CheckInPage() {
         setCameraReady(false);
     };
 
+    const markCameraReadyIfVideoHasFrame = () => {
+        const video = videoRef.current;
+        if (video && video.videoWidth > 0 && video.videoHeight > 0) {
+            setCameraReady(true);
+        }
+    };
+
     const startCamera = async () => {
         try {
             stopCameraStream();
+            setCameraReady(false);
+            setPhoto(null);
             const newStream = await navigator.mediaDevices.getUserMedia({
                 video: {
                     facingMode,
@@ -250,13 +259,12 @@ export default function CheckInPage() {
                 }
             });
             setStream(newStream);
+            setCameraActive(true);
             if (videoRef.current) {
                 videoRef.current.srcObject = newStream;
                 await videoRef.current.play();
+                markCameraReadyIfVideoHasFrame();
             }
-            setCameraActive(true);
-            setCameraReady(false);
-            setPhoto(null);
         } catch (error) {
             console.error("Error accessing camera:", error);
             showAlert("ไม่สามารถเข้าถึงกล้องได้", "กรุณาอนุญาตให้เข้าถึงกล้องเพื่อถ่ายรูป", "error");
@@ -283,6 +291,7 @@ export default function CheckInPage() {
                     if (videoRef.current) {
                         videoRef.current.srcObject = newStream;
                         await videoRef.current.play();
+                        markCameraReadyIfVideoHasFrame();
                     }
                     setCameraActive(true);
                 }).catch(err => console.error("Error switching camera:", err));
@@ -1141,7 +1150,9 @@ export default function CheckInPage() {
                                 ref={videoRef}
                                 autoPlay
                                 playsInline
+                                onLoadedMetadata={markCameraReadyIfVideoHasFrame}
                                 onCanPlay={() => setCameraReady(true)}
+                                onPlaying={markCameraReadyIfVideoHasFrame}
                                 className={`w-full h-full object-cover ${cameraActive ? 'block' : 'hidden'}`}
                             />
                             {!cameraActive && (
