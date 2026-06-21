@@ -15,22 +15,22 @@ export function StatsCard({ title, value, icon, trend, className, onClick, isAct
         <div
             onClick={onClick}
             className={cn(
-                "bg-white p-6 rounded-2xl shadow-sm border transition-all",
-                onClick ? "cursor-pointer hover:shadow-md hover:border-blue-300" : "",
-                isActive ? "border-blue-500 ring-2 ring-blue-200 bg-blue-50" : "border-gray-100",
+                "bg-white p-3 px-4 rounded-xl shadow-sm border transition-all",
+                onClick ? "cursor-pointer hover:shadow-md hover:border-blue-400" : "",
+                isActive ? "border-blue-600 ring-1 ring-blue-600 bg-blue-50/50" : "border-gray-300",
                 className
             )}
         >
-            <div className="flex items-center justify-between mb-2">
-                <h3 className={cn("text-sm font-medium", isActive ? "text-blue-600" : "text-gray-500")}>{title}</h3>
-                {icon && <div className={isActive ? "text-blue-500" : "text-gray-400"}>{icon}</div>}
+            <div className="flex items-center justify-between mb-1">
+                <h3 className={cn("text-sm font-semibold", isActive ? "text-blue-700" : "text-gray-700")}>{title}</h3>
+                {icon && <div className={cn("w-4 h-4", isActive ? "text-blue-600" : "text-gray-500")}>{icon}</div>}
             </div>
             <div className="flex items-end gap-2">
-                <span className={cn("text-3xl font-bold", isActive ? "text-blue-700" : "text-gray-800")}>{value}</span>
+                <span className={cn("text-base font-bold", isActive ? "text-blue-800" : "text-gray-900")}>{value}</span>
                 {trend && (
                     <span className={cn(
-                        "mb-1 text-xs font-medium",
-                        trend === "down" ? "text-red-500" : "text-green-500"
+                        "mb-0.5 text-[10px] font-bold",
+                        trend === "down" ? "text-red-600" : "text-green-600"
                     )}>
                         {trend === "down" ? "▼" : "▲"}
                     </span>

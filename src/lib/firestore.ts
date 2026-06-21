@@ -987,6 +987,8 @@ export interface SavedPayrollRecord {
     periodLabel: string;
     startDate: Date;
     endDate: Date;
+    payDate?: Date;
+    status?: "draft" | "reviewing" | "approved" | "paid" | "locked";
     employeeType: string;
     selectedDepartment: string;
     totals: {
@@ -997,6 +999,62 @@ export interface SavedPayrollRecord {
     };
     items: unknown[];
     createdAt: Date;
+    updatedAt?: Date;
+    approvedAt?: Date;
+    approvedBy?: string;
+    paidAt?: Date;
+    paidBy?: string;
+}
+
+export interface PayrollLineItem {
+    id?: string;
+    code: string;
+    label: string;
+    type: "income" | "deduction";
+    amount: number;
+    sourceId?: string;
+    sourceType?: "attendance" | "ot" | "leave" | "installment" | "manual" | "system";
+    note?: string;
+}
+
+export interface InstallmentPlan {
+    id?: string;
+    employeeId: string;
+    employeeCode?: string;
+    employeeName: string;
+    itemName: string;
+    itemCategory?: string;
+    description?: string;
+    principalAmount: number;
+    monthlyDeduction: number;
+    totalMonths: number;
+    paidMonths: number;
+    paidAmount: number;
+    remainingAmount: number;
+    startMonth: string;
+    endMonth?: string;
+    status: "active" | "paused" | "paid_off" | "closed" | "cancelled";
+    createdAt: Date;
+    updatedAt?: Date;
+    closedAt?: Date;
+    closedBy?: string;
+    closeReason?: string;
+    closeAmount?: number;
+    notes?: string;
+}
+
+export interface InstallmentPayment {
+    id?: string;
+    installmentId: string;
+    employeeId: string;
+    employeeName?: string;
+    payrollRunId?: string;
+    periodMonth: string;
+    amount: number;
+    type: "payroll_deduction" | "manual_payment" | "adjustment" | "waive" | "close";
+    status: "deducted" | "reversed";
+    paidAt: Date;
+    note?: string;
 }
 
 export const payrollService = {
@@ -1005,7 +1063,11 @@ export const payrollService = {
             ...record,
             startDate: Timestamp.fromDate(record.startDate),
             endDate: Timestamp.fromDate(record.endDate),
+            payDate: record.payDate ? Timestamp.fromDate(record.payDate) : null,
             createdAt: Timestamp.fromDate(record.createdAt),
+            updatedAt: record.updatedAt ? Timestamp.fromDate(record.updatedAt) : null,
+            approvedAt: record.approvedAt ? Timestamp.fromDate(record.approvedAt) : null,
+            paidAt: record.paidAt ? Timestamp.fromDate(record.paidAt) : null,
         });
         return docRef.id;
     },
@@ -1020,13 +1082,204 @@ export const payrollService = {
                 ...data,
                 startDate: data.startDate?.toDate(),
                 endDate: data.endDate?.toDate(),
+                payDate: data.payDate?.toDate(),
                 createdAt: data.createdAt?.toDate(),
+                updatedAt: data.updatedAt?.toDate(),
+                approvedAt: data.approvedAt?.toDate(),
+                paidAt: data.paidAt?.toDate(),
             };
         }) as SavedPayrollRecord[];
     },
 
+    async updateStatus(id: string, status: SavedPayrollRecord["status"], actorId?: string) {
+        const updateData: Record<string, unknown> = {
+            status,
+            updatedAt: Timestamp.fromDate(new Date()),
+        };
+
+        if (status === "approved") {
+            updateData.approvedAt = Timestamp.fromDate(new Date());
+            if (actorId) updateData.approvedBy = actorId;
+        }
+
+        if (status === "paid") {
+            updateData.paidAt = Timestamp.fromDate(new Date());
+            if (actorId) updateData.paidBy = actorId;
+        }
+
+        await updateDoc(doc(db, "payrollRuns", id), updateData);
+    },
+
     async delete(id: string) {
         await deleteDoc(doc(db, "payrollRuns", id));
+    },
+};
+
+type FirestoreDateValue = Date | { toDate?: () => Date } | null | undefined;
+
+const toDateValue = (value: FirestoreDateValue) =>
+    value instanceof Date ? value : typeof value?.toDate === "function" ? value.toDate() : undefined;
+
+const installmentPlanFromDoc = (docId: string, data: Record<string, unknown>) => ({
+    id: docId,
+    ...data,
+    createdAt: toDateValue(data.createdAt as FirestoreDateValue),
+    updatedAt: toDateValue(data.updatedAt as FirestoreDateValue),
+    closedAt: toDateValue(data.closedAt as FirestoreDateValue),
+}) as InstallmentPlan;
+
+const installmentPaymentFromDoc = (docId: string, data: Record<string, unknown>) => ({
+    id: docId,
+    ...data,
+    paidAt: toDateValue(data.paidAt as FirestoreDateValue),
+}) as InstallmentPayment;
+
+export const installmentService = {
+    async create(plan: Omit<InstallmentPlan, "id" | "paidMonths" | "paidAmount" | "remainingAmount" | "status" | "createdAt" | "updatedAt"> & Partial<Pick<InstallmentPlan, "status" | "paidMonths" | "paidAmount" | "remainingAmount" | "createdAt">>) {
+        const paidAmount = Number(plan.paidAmount || 0);
+        const data = {
+            ...plan,
+            principalAmount: Number(plan.principalAmount || 0),
+            monthlyDeduction: Number(plan.monthlyDeduction || 0),
+            totalMonths: Number(plan.totalMonths || 0),
+            paidMonths: Number(plan.paidMonths || 0),
+            paidAmount,
+            remainingAmount: Number(plan.remainingAmount ?? Math.max(0, Number(plan.principalAmount || 0) - paidAmount)),
+            status: plan.status || "active",
+            createdAt: Timestamp.fromDate(plan.createdAt || new Date()),
+            updatedAt: Timestamp.fromDate(new Date()),
+        };
+
+        Object.keys(data).forEach(key => data[key as keyof typeof data] === undefined && delete data[key as keyof typeof data]);
+        const docRef = await addDoc(collection(db, "installmentPlans"), data);
+        return docRef.id;
+    },
+
+    async getAll() {
+        const q = query(collection(db, "installmentPlans"), orderBy("createdAt", "desc"));
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(docSnap => installmentPlanFromDoc(docSnap.id, docSnap.data()));
+    },
+
+    async getActiveForPeriod(periodMonth: string) {
+        const q = query(collection(db, "installmentPlans"), where("status", "==", "active"));
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs
+            .map(docSnap => installmentPlanFromDoc(docSnap.id, docSnap.data()))
+            .filter(plan => plan.startMonth <= periodMonth && Number(plan.remainingAmount || 0) > 0);
+    },
+
+    async getPayments(installmentId: string) {
+        const q = query(
+            collection(db, "installmentPayments"),
+            where("installmentId", "==", installmentId),
+            orderBy("paidAt", "desc")
+        );
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(docSnap => installmentPaymentFromDoc(docSnap.id, docSnap.data()));
+    },
+
+    async getAllPayments() {
+        const q = query(collection(db, "installmentPayments"), orderBy("paidAt", "desc"));
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(docSnap => installmentPaymentFromDoc(docSnap.id, docSnap.data()));
+    },
+
+    async hasPaymentForPeriod(installmentId: string, periodMonth: string) {
+        const q = query(
+            collection(db, "installmentPayments"),
+            where("installmentId", "==", installmentId),
+            where("periodMonth", "==", periodMonth),
+            where("status", "==", "deducted")
+        );
+        const querySnapshot = await getDocs(q);
+        return !querySnapshot.empty;
+    },
+
+    async update(id: string, data: Partial<InstallmentPlan>) {
+        const updateData: Record<string, unknown> = {
+            ...data,
+            updatedAt: Timestamp.fromDate(new Date()),
+        };
+
+        if (data.createdAt) updateData.createdAt = Timestamp.fromDate(data.createdAt);
+        if (data.closedAt) updateData.closedAt = Timestamp.fromDate(data.closedAt);
+        Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
+        await updateDoc(doc(db, "installmentPlans", id), updateData);
+    },
+
+    async recordPayment(payment: Omit<InstallmentPayment, "id">) {
+        const existingPayment = await this.hasPaymentForPeriod(payment.installmentId, payment.periodMonth);
+        if (existingPayment && payment.type === "payroll_deduction") {
+            return null;
+        }
+
+        const docRef = await addDoc(collection(db, "installmentPayments"), {
+            ...payment,
+            paidAt: Timestamp.fromDate(payment.paidAt),
+        });
+
+        const planRef = doc(db, "installmentPlans", payment.installmentId);
+        const planSnap = await getDoc(planRef);
+        if (planSnap.exists()) {
+            const plan = installmentPlanFromDoc(planSnap.id, planSnap.data());
+            const paidAmount = Number(plan.paidAmount || 0) + Number(payment.amount || 0);
+            const remainingAmount = Math.max(0, Number(plan.principalAmount || 0) - paidAmount);
+            const nextStatus = remainingAmount <= 0 && plan.status === "active" ? "paid_off" : plan.status;
+            const updateData: Record<string, unknown> = {
+                paidAmount,
+                remainingAmount,
+                updatedAt: Timestamp.fromDate(new Date()),
+            };
+
+            if (payment.type === "payroll_deduction") {
+                updateData.paidMonths = Number(plan.paidMonths || 0) + 1;
+            }
+
+            if (nextStatus === "paid_off") {
+                updateData.status = "paid_off";
+                updateData.closedAt = Timestamp.fromDate(new Date());
+                updateData.closeReason = "paid_by_payroll";
+                updateData.closeAmount = Number(payment.amount || 0);
+            }
+
+            await updateDoc(planRef, updateData);
+        }
+
+        return docRef.id;
+    },
+
+    async close(id: string, payload: { amount: number; reason: string; closedBy?: string; note?: string; periodMonth?: string }) {
+        const planRef = doc(db, "installmentPlans", id);
+        const planSnap = await getDoc(planRef);
+        if (!planSnap.exists()) return;
+
+        const plan = installmentPlanFromDoc(planSnap.id, planSnap.data());
+        const closeAmount = Math.max(0, Number(payload.amount || 0));
+        const paidAmount = Number(plan.paidAmount || 0) + closeAmount;
+
+        await addDoc(collection(db, "installmentPayments"), {
+            installmentId: id,
+            employeeId: plan.employeeId,
+            employeeName: plan.employeeName,
+            periodMonth: payload.periodMonth || new Date().toISOString().slice(0, 7),
+            amount: closeAmount,
+            type: payload.reason === "waive" ? "waive" : "manual_payment",
+            status: "deducted",
+            paidAt: Timestamp.fromDate(new Date()),
+            note: payload.note || payload.reason,
+        });
+
+        await updateDoc(planRef, {
+            paidAmount,
+            remainingAmount: 0,
+            status: "closed",
+            closedAt: Timestamp.fromDate(new Date()),
+            closedBy: payload.closedBy || "",
+            closeReason: payload.reason,
+            closeAmount,
+            updatedAt: Timestamp.fromDate(new Date()),
+        });
     },
 };
 

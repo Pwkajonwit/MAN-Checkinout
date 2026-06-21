@@ -1,17 +1,18 @@
 import { cn } from "@/lib/utils";
-import { type OTRequest } from "@/lib/firestore";
+import { type OTRequest, type Employee } from "@/lib/firestore";
 import { Check, X, Edit2, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 
 interface OTTableProps {
     otRequests: OTRequest[];
+    employees?: Employee[];
     onStatusUpdate: (id: string, status: OTRequest["status"]) => void;
     onEdit?: (ot: OTRequest) => void;
     onDelete?: (id: string) => void;
     isSuperAdmin?: boolean;
 }
 
-export function OTTable({ otRequests, onStatusUpdate, onEdit, onDelete, isSuperAdmin = false }: OTTableProps) {
+export function OTTable({ otRequests, employees = [], onStatusUpdate, onEdit, onDelete, isSuperAdmin = false }: OTTableProps) {
     const calculateHours = (startTime: Date, endTime: Date) => {
         const diff = endTime.getTime() - startTime.getTime();
         return (diff / (1000 * 60 * 60)).toFixed(1);
@@ -22,14 +23,14 @@ export function OTTable({ otRequests, onStatusUpdate, onEdit, onDelete, isSuperA
             <div className="overflow-x-auto">
                 <table className="w-full">
                     <thead>
-                        <tr className="bg-gray-50/50 border-b border-gray-100 text-left">
-                            <th className="py-4 px-6 text-xs font-medium text-gray-400 uppercase tracking-wider">Name</th>
-                            <th className="py-4 px-6 text-xs font-medium text-gray-400 uppercase tracking-wider">วันที่</th>
-                            <th className="py-4 px-6 text-xs font-medium text-gray-400 uppercase tracking-wider">เวลา</th>
-                            <th className="py-4 px-6 text-xs font-medium text-gray-400 uppercase tracking-wider">ชั่วโมง</th>
-                            <th className="py-4 px-6 text-xs font-medium text-gray-400 uppercase tracking-wider">เหตุผล</th>
-                            <th className="py-4 px-6 text-xs font-medium text-gray-400 uppercase tracking-wider">สถานะ</th>
-                            <th className="py-4 px-6 text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+                        <tr className="bg-gray-100 border-b border-gray-200 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                            <th className="py-4 px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider">Name</th>
+                            <th className="py-4 px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider">วันที่</th>
+                            <th className="py-4 px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider">เวลา</th>
+                            <th className="py-4 px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider">ชั่วโมง</th>
+                            <th className="py-4 px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider">เหตุผล</th>
+                            <th className="py-4 px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider">สถานะ</th>
+                            <th className="py-4 px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
@@ -40,13 +41,34 @@ export function OTTable({ otRequests, onStatusUpdate, onEdit, onDelete, isSuperA
                                 </td>
                             </tr>
                         ) : (
-                            otRequests.map((ot) => (
+                            otRequests.map((ot) => {
+                                const employee = employees.find(e => e.id === ot.employeeId || e.employeeId === ot.employeeId);
+                                return (
                                 <tr key={ot.id} className="hover:bg-gray-50/50 transition-colors">
                                     <td className="py-4 px-6">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-400 to-pink-500 flex items-center justify-center text-white font-semibold text-sm">
-                                                {ot.employeeName.charAt(0)}
-                                            </div>
+                                            {employee?.avatar ? (
+                                                <div className="relative w-9 h-9 shrink-0">
+                                                    <img
+                                                        src={employee.avatar}
+                                                        alt={ot.employeeName}
+                                                        className="w-full h-full rounded-full object-cover border border-gray-200"
+                                                        onError={(e) => {
+                                                            e.currentTarget.style.display = "none";
+                                                            if (e.currentTarget.nextElementSibling) {
+                                                                (e.currentTarget.nextElementSibling as HTMLElement).style.display = "flex";
+                                                            }
+                                                        }}
+                                                    />
+                                                    <div className="hidden w-full h-full rounded-full bg-gray-100 items-center justify-center text-gray-600 font-medium text-sm border border-gray-200">
+                                                        {ot.employeeName.charAt(0)}
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="w-9 h-9 shrink-0 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 font-medium text-sm border border-gray-200">
+                                                    {ot.employeeName.charAt(0)}
+                                                </div>
+                                            )}
                                             <span className="text-sm font-medium text-gray-700">{ot.employeeName}</span>
                                         </div>
                                     </td>
@@ -81,7 +103,6 @@ export function OTTable({ otRequests, onStatusUpdate, onEdit, onDelete, isSuperA
                                     </td>
                                     <td className="py-4 px-6">
                                         <div className="flex gap-2">
-                                            {/* Approve/Reject buttons for pending requests */}
                                             {ot.status === "รออนุมัติ" && ot.id && (
                                                 <>
                                                     <button
@@ -101,7 +122,6 @@ export function OTTable({ otRequests, onStatusUpdate, onEdit, onDelete, isSuperA
                                                 </>
                                             )}
 
-                                            {/* Edit and Delete buttons for super_admin */}
                                             {isSuperAdmin && ot.id && (
                                                 <>
                                                     {onEdit && (
@@ -131,7 +151,8 @@ export function OTTable({ otRequests, onStatusUpdate, onEdit, onDelete, isSuperA
                                         </div>
                                     </td>
                                 </tr>
-                            ))
+                                );
+                            })
                         )}
                     </tbody>
                 </table>

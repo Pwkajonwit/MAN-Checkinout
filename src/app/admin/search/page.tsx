@@ -160,7 +160,7 @@ export default function SearchPage() {
     };
 
     return (
-        <div className="flex-1 w-full max-w-[1600px] mx-auto px-4 antialiased">
+        <div className="w-full antialiased">
             <PageHeader
                 title="ค้นหาและจัดการข้อมูลพนักงาน"
                 subtitle="ดูประวัติการเข้างาน, การลา, OT และจัดการข้อมูลรายบุคคล"
@@ -170,10 +170,10 @@ export default function SearchPage() {
             {!selectedEmployee && (
                 <div className="bg-white rounded-2xl border border-slate-200 p-8 mb-6 text-center">
                     <h2 className="text-2xl font-bold text-slate-900 mb-2">ค้นหาพนักงาน</h2>
-                    <p className="text-slate-600 mb-6">พิมพ์ชื่อ, รหัสพนักงาน หรืออีเมล เพื่อค้นหาข้อมูล</p>
+                    <p className="text-slate-700 mb-6">พิมพ์ชื่อ, รหัสพนักงาน หรืออีเมล เพื่อค้นหาข้อมูล</p>
 
                     <div className="relative max-w-2xl mx-auto">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-600" />
                         <input
                             type="text"
                             value={searchQuery}
@@ -197,7 +197,7 @@ export default function SearchPage() {
                                     </div>
                                     <div className="flex-1">
                                         <div className="font-semibold text-slate-900 text-lg">{employee.name}</div>
-                                        <div className="text-slate-600 flex items-center gap-2 text-sm">
+                                        <div className="text-slate-700 flex items-center gap-2 text-sm">
                                             <span>ID: {employee.employeeId || "-"}</span>
                                             <span>•</span>
                                             <span>{employee.position}</span>
@@ -210,7 +210,7 @@ export default function SearchPage() {
                     )}
 
                     {searchQuery && filteredEmployees.length === 0 && (
-                        <div className="mt-8 text-slate-500">
+                        <div className="mt-8 text-slate-700">
                             ไม่พบข้อมูลพนักงานที่ตรงกับคำค้นหา
                         </div>
                     )}
@@ -218,19 +218,19 @@ export default function SearchPage() {
                     {!searchQuery && (
                         <div className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto opacity-50">
                             <div className="p-4 bg-gray-50 rounded-xl border border-dashed border-slate-300">
-                                <Clock className="w-8 h-8 mx-auto mb-2 text-slate-500" />
+                                <Clock className="w-8 h-8 mx-auto mb-2 text-slate-600" />
                                 <div className="text-xs">ประวัติเวลา</div>
                             </div>
                             <div className="p-4 bg-gray-50 rounded-xl border border-dashed border-slate-300">
-                                <Briefcase className="w-8 h-8 mx-auto mb-2 text-slate-500" />
+                                <Briefcase className="w-8 h-8 mx-auto mb-2 text-slate-600" />
                                 <div className="text-xs">การลา</div>
                             </div>
                             <div className="p-4 bg-gray-50 rounded-xl border border-dashed border-slate-300">
-                                <FileText className="w-8 h-8 mx-auto mb-2 text-slate-500" />
+                                <FileText className="w-8 h-8 mx-auto mb-2 text-slate-600" />
                                 <div className="text-xs">โอที</div>
                             </div>
                             <div className="p-4 bg-gray-50 rounded-xl border border-dashed border-slate-300">
-                                <User className="w-8 h-8 mx-auto mb-2 text-slate-500" />
+                                <User className="w-8 h-8 mx-auto mb-2 text-slate-600" />
                                 <div className="text-xs">ข้อมูลส่วนตัว</div>
                             </div>
                         </div>
@@ -244,107 +244,126 @@ export default function SearchPage() {
                     <Button
                         variant="ghost"
                         onClick={handleBackToSearch}
-                        className="mb-2 text-slate-600 hover:text-slate-900 p-0 hover:bg-transparent"
+                        className="mb-2 text-slate-700 hover:text-slate-900 p-0 hover:bg-transparent"
                     >
                         <ArrowLeft className="w-4 h-4 mr-2" />
                         กลับไปค้นหา
                     </Button>
 
-                    <div className="bg-white rounded-2xl border border-slate-300 overflow-hidden">
-                        <div className="p-8 border-b border-slate-200 bg-gradient-to-r from-blue-50/50 to-transparent">
-                            <div className="flex flex-col md:flex-row gap-6 items-start">
-                                <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-4xl shrink-0">
-                                    {selectedEmployee.name.charAt(0)}
-                                </div>
-                                <div className="flex-1 space-y-4">
-                                    <div>
-                                        <h1 className="text-3xl font-bold text-gray-900 mb-2">{selectedEmployee.name}</h1>
-                                        <div className="flex flex-wrap gap-2">
-                                            <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
-                                                {selectedEmployee.position}
-                                            </span>
-                                            <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm font-medium">
-                                                {selectedEmployee.department || "ไม่ระบุแผนก"}
-                                            </span>
-                                            <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
-                                                {selectedEmployee.type}
-                                            </span>
+                    <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden mb-6">
+                        <div className="p-5">
+                            <div className="flex flex-col xl:flex-row gap-8 items-start xl:items-center justify-between">
+                                
+                                {/* Left Group: Avatar, Name, and Contact Info */}
+                                <div className="flex flex-col md:flex-row items-start md:items-center gap-8 w-full xl:w-auto">
+                                    {/* Avatar & Name */}
+                                    <div className="flex items-center gap-4 min-w-fit">
+                                        <div className="w-[72px] h-[72px] rounded-xl bg-gradient-to-br from-[#3b82f6] to-[#4f46e5] flex items-center justify-center text-white font-bold text-3xl shrink-0 shadow-sm overflow-hidden">
+                                        {selectedEmployee.avatar ? (
+                                            <>
+                                                <img
+                                                    src={selectedEmployee.avatar}
+                                                    alt={selectedEmployee.name}
+                                                    className="w-full h-full object-cover"
+                                                    onError={(e) => {
+                                                        e.currentTarget.style.display = "none";
+                                                        if (e.currentTarget.nextElementSibling) {
+                                                            (e.currentTarget.nextElementSibling as HTMLElement).style.display = "block";
+                                                        }
+                                                    }}
+                                                />
+                                                <span className="hidden">
+                                                    {selectedEmployee.name.charAt(0)}
+                                                </span>
+                                            </>
+                                        ) : (
+                                            <span>{selectedEmployee.name.charAt(0)}</span>
+                                        )}
+                                    </div>
+                                        <div className="flex flex-col justify-center">
+                                            <h1 className="text-xl font-bold text-slate-900">{selectedEmployee.name}</h1>
+                                            <div className="flex flex-wrap gap-1.5 mt-2">
+                                                {selectedEmployee.department && (
+                                                    <span className="px-2 py-0.5 bg-slate-50 text-slate-800 rounded-md text-[10px] font-medium">
+                                                        {selectedEmployee.department}
+                                                    </span>
+                                                )}
+                                                {selectedEmployee.type && (
+                                                    <span className="px-2 py-0.5 bg-green-50 text-green-600 rounded-md text-[10px] font-medium">
+                                                        {selectedEmployee.type}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
 
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm text-gray-600 pt-2">
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center">
-                                                <User className="w-4 h-4 text-slate-500" />
-                                            </div>
-                                            <div>
-                                                <div className="text-xs text-slate-500">รหัสพนักงาน</div>
-                                                <div className="font-medium">{selectedEmployee.employeeId || "-"}</div>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center">
-                                                <Phone className="w-4 h-4 text-slate-500" />
-                                            </div>
-                                            <div>
-                                                <div className="text-xs text-slate-500">เบอร์โทรศัพท์</div>
-                                                <div className="font-medium">{selectedEmployee.phone || "-"}</div>
+                                    {/* Contact Info */}
+                                    <div className="flex flex-wrap gap-x-8 gap-y-4 md:border-l md:border-slate-100 md:pl-8">
+                                        <div className="flex items-start gap-2.5">
+                                            <User className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                                            <div className="flex flex-col gap-0.5">
+                                                <span className="text-xs text-slate-500 leading-none">รหัสพนักงาน</span>
+                                                <span className="text-sm font-semibold text-slate-800">{selectedEmployee.employeeId || "-"}</span>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center">
-                                                <Mail className="w-4 h-4 text-slate-500" />
-                                            </div>
-                                            <div>
-                                                <div className="text-xs text-slate-500">อีเมล</div>
-                                                <div className="font-medium">{selectedEmployee.email}</div>
+                                        <div className="flex items-start gap-2.5">
+                                            <Phone className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                                            <div className="flex flex-col gap-0.5">
+                                                <span className="text-xs text-slate-500 leading-none">เบอร์โทรศัพท์</span>
+                                                <span className="text-sm font-semibold text-slate-800">{selectedEmployee.phone || "-"}</span>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center">
-                                                <Calendar className="w-4 h-4 text-slate-500" />
+                                        <div className="flex items-start gap-2.5">
+                                            <Mail className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                                            <div className="flex flex-col gap-0.5">
+                                                <span className="text-xs text-slate-500 leading-none">อีเมล</span>
+                                                <span className="text-sm font-semibold text-slate-800 truncate max-w-[120px]" title={selectedEmployee.email}>{selectedEmployee.email || "-"}</span>
                                             </div>
-                                            <div>
-                                                <div className="text-xs text-slate-500">วันที่เริ่มงาน</div>
-                                                <div className="font-medium">
+                                        </div>
+                                        <div className="flex items-start gap-2.5">
+                                            <Calendar className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                                            <div className="flex flex-col gap-0.5">
+                                                <span className="text-xs text-slate-500 leading-none">วันที่เริ่มงาน</span>
+                                                <span className="text-sm font-semibold text-slate-800">
                                                     {selectedEmployee.registeredDate
                                                         ? format(new Date(selectedEmployee.registeredDate), "d MMM yyyy", { locale: th })
                                                         : "-"}
-                                                </div>
+                                                </span>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
 
-                        {/* Stats Summary */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-gray-100 border-b border-slate-200">
-                            {[
-                                {
-                                    label: "ลากิจ (คงเหลือ)",
-                                    value: formatLeaveDayHourUnits(Math.max(0, (selectedEmployee.leaveQuota?.personal || 0) - getLeaveUsed().personal)),
-                                    sub: "",
-                                },
-                                {
-                                    label: "ลาป่วย (คงเหลือ)",
-                                    value: Math.max(0, (selectedEmployee.leaveQuota?.sick || 0) - getLeaveUsed().sick),
-                                    sub: "วัน"
-                                },
-                                {
-                                    label: "ลาพักร้อน (คงเหลือ)",
-                                    value: Math.max(0, (selectedEmployee.leaveQuota?.vacation || 0) - getLeaveUsed().vacation),
-                                    sub: "วัน"
-                                },
-                            ].map((stat, i) => (
-                                <div key={i} className="p-6 text-center hover:bg-gray-50 transition-colors">
-                                    <div className="text-sm text-slate-600 mb-1">{stat.label}</div>
-                                    <div className="text-2xl font-bold text-slate-900">
-                                        {stat.value}
-                                        {stat.sub && <span className="text-sm font-normal text-slate-500 ml-1">{stat.sub}</span>}
-                                    </div>
+                                {/* Right Group: Stats Summary */}
+                                <div className="flex divide-x divide-slate-100 bg-gray-50 rounded-xl border border-slate-100 p-2 xl:ml-auto w-full xl:w-auto overflow-x-auto mt-6 xl:mt-0">
+                                    {[
+                                        {
+                                            label: "ลากิจ (คงเหลือ)",
+                                            value: formatLeaveDayHourUnits(Math.max(0, (selectedEmployee.leaveQuota?.personal || 0) - getLeaveUsed().personal)),
+                                            sub: "",
+                                        },
+                                        {
+                                            label: "ลาป่วย (คงเหลือ)",
+                                            value: Math.max(0, (selectedEmployee.leaveQuota?.sick || 0) - getLeaveUsed().sick),
+                                            sub: "วัน"
+                                        },
+                                        {
+                                            label: "ลาพักร้อน (คงเหลือ)",
+                                            value: Math.max(0, (selectedEmployee.leaveQuota?.vacation || 0) - getLeaveUsed().vacation),
+                                            sub: "วัน"
+                                        },
+                                    ].map((stat, i) => (
+                                        <div key={i} className="py-2 px-6 text-center min-w-[120px]">
+                                            <div className="text-xs font-medium text-slate-600 mb-1">{stat.label}</div>
+                                            <div className="text-lg font-bold text-slate-900 flex items-baseline justify-center gap-1.5">
+                                                {stat.value}
+                                                {stat.sub && <span className="text-xs font-normal text-slate-600">{stat.sub}</span>}
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
-                            ))}
+
+                            </div>
                         </div>
 
                         {/* Tabs Navigation */}
@@ -353,7 +372,7 @@ export default function SearchPage() {
                                 onClick={() => setActiveTab("attendance")}
                                 className={`flex-1 py-4 text-sm font-bold text-center border-b-2 transition-colors flex items-center justify-center gap-2 ${activeTab === "attendance"
                                     ? "border-blue-600 text-blue-600 bg-blue-50/50"
-                                    : "border-transparent text-slate-600 hover:text-gray-700 hover:bg-gray-50"
+                                    : "border-transparent text-slate-700 hover:text-slate-900 hover:bg-slate-50"
                                     }`}
                             >
                                 <Clock className="w-4 h-4" />
@@ -363,7 +382,7 @@ export default function SearchPage() {
                                 onClick={() => setActiveTab("leave")}
                                 className={`flex-1 py-4 text-sm font-bold text-center border-b-2 transition-colors flex items-center justify-center gap-2 ${activeTab === "leave"
                                     ? "border-blue-600 text-blue-600 bg-blue-50/50"
-                                    : "border-transparent text-slate-600 hover:text-gray-700 hover:bg-gray-50"
+                                    : "border-transparent text-slate-700 hover:text-slate-900 hover:bg-slate-50"
                                     }`}
                             >
                                 <Briefcase className="w-4 h-4" />
@@ -373,7 +392,7 @@ export default function SearchPage() {
                                 onClick={() => setActiveTab("ot")}
                                 className={`flex-1 py-4 text-sm font-bold text-center border-b-2 transition-colors flex items-center justify-center gap-2 ${activeTab === "ot"
                                     ? "border-blue-600 text-blue-600 bg-blue-50/50"
-                                    : "border-transparent text-slate-600 hover:text-gray-700 hover:bg-gray-50"
+                                    : "border-transparent text-slate-700 hover:text-slate-900 hover:bg-slate-50"
                                     }`}
                             >
                                 <FileText className="w-4 h-4" />
@@ -383,7 +402,7 @@ export default function SearchPage() {
                                 onClick={() => setActiveTab("swap")}
                                 className={`flex-1 py-4 text-sm font-bold text-center border-b-2 transition-colors flex items-center justify-center gap-2 ${activeTab === "swap"
                                     ? "border-blue-600 text-blue-600 bg-blue-50/50"
-                                    : "border-transparent text-slate-600 hover:text-gray-700 hover:bg-gray-50"
+                                    : "border-transparent text-slate-700 hover:text-slate-900 hover:bg-slate-50"
                                     }`}
                             >
                                 <Briefcase className="w-4 h-4" />
@@ -393,7 +412,7 @@ export default function SearchPage() {
 
                         <div className="p-6 min-h-[400px]">
                             {loadingData ? (
-                                <div className="flex flex-col items-center justify-center h-64 text-slate-600">
+                                <div className="flex flex-col items-center justify-center h-64 text-slate-800">
                                     <div className="w-8 h-8 border-2 border-slate-300 border-t-blue-600 rounded-full animate-spin mb-4"></div>
                                     กำลังโหลดข้อมูล...
                                 </div>
@@ -499,7 +518,7 @@ export default function SearchPage() {
                                                             </div>
                                                             <div className="text-center">
                                                                 <div className="text-2xl font-bold text-slate-900">
-                                                                    {summary.absentDays} <span className="text-lg text-slate-500 font-normal">/ {summary.expectedWorkDays}</span>
+                                                                    {summary.absentDays} <span className="text-lg text-slate-600 font-normal">/ {summary.expectedWorkDays}</span>
                                                                 </div>
                                                                 <div className="text-xs text-slate-600">วันขาด (โดยประมาณ)</div>
                                                             </div>
@@ -673,13 +692,13 @@ export default function SearchPage() {
                                         <div className="space-y-4">
                                             <h3 className="font-semibold text-slate-900 mb-4">ประวัติการขอสลับวันหยุด</h3>
                                             {swapRequests.length === 0 ? (
-                                                <div className="text-center py-12 bg-gray-50 rounded-xl border border-dashed border-slate-300 text-slate-600">
+                                                <div className="text-center py-12 bg-gray-50 rounded-xl border border-dashed border-slate-300 text-slate-800">
                                                     ไม่มีประวัติการขอสลับวันหยุด
                                                 </div>
                                             ) : (
                                                 <div className="overflow-hidden rounded-xl border border-slate-300">
                                                     <table className="w-full text-sm text-left">
-                                                        <thead className="bg-gray-50 text-slate-600 font-medium border-b border-slate-300">
+                                                        <thead className="bg-gray-50 text-slate-800 font-medium border-b border-slate-300">
                                                             <tr>
                                                                 <th className="px-4 py-3">วันที่ยื่น</th>
                                                                 <th className="px-4 py-3">วันหยุดเดิม (มาทำ)</th>
@@ -691,7 +710,7 @@ export default function SearchPage() {
                                                         <tbody className="divide-y divide-gray-100 bg-white">
                                                             {swapRequests.map((req) => (
                                                                 <tr key={req.id} className="hover:bg-gray-50">
-                                                                    <td className="px-4 py-3 text-slate-600">
+                                                                    <td className="px-4 py-3 text-slate-800">
                                                                         {req.createdAt ? format(req.createdAt instanceof Date ? req.createdAt : (req.createdAt as any).toDate(), "d MMM yy HH:mm", { locale: th }) : "-"}
                                                                     </td>
                                                                     <td className="px-4 py-3 font-medium">
@@ -700,7 +719,7 @@ export default function SearchPage() {
                                                                     <td className="px-4 py-3 text-blue-600 font-medium">
                                                                         {format(req.holidayDate instanceof Date ? req.holidayDate : (req.holidayDate as any).toDate(), "d MMM yyyy", { locale: th })}
                                                                     </td>
-                                                                    <td className="px-4 py-3 text-gray-600 max-w-xs truncate" title={req.reason}>
+                                                                    <td className="px-4 py-3 text-gray-800 max-w-xs truncate" title={req.reason}>
                                                                         {req.reason}
                                                                     </td>
                                                                     <td className="px-4 py-3 text-right">

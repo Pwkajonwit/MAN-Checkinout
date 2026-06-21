@@ -4,13 +4,14 @@ import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { SwapTable } from "@/components/swap/SwapTable";
-import { swapService, type SwapRequest, employeeService, adminService } from "@/lib/firestore";
+import { swapService, type SwapRequest, employeeService, type Employee, adminService } from "@/lib/firestore";
 import { sendPushMessage } from "@/app/actions/line";
 import { auth } from "@/lib/firebase";
 import { CustomAlert } from "@/components/ui/custom-alert";
 
 export default function SwapPage() {
     const [requests, setRequests] = useState<SwapRequest[]>([]);
+    const [employees, setEmployees] = useState<Employee[]>([]);
     const [loading, setLoading] = useState(true);
     const [isSuperAdmin, setIsSuperAdmin] = useState(false);
     const [statusFilter, setStatusFilter] = useState<"all" | "รออนุมัติ" | "อนุมัติ" | "ไม่อนุมัติ">("all");
@@ -26,19 +27,23 @@ export default function SwapPage() {
         type: "info"
     });
 
-    const loadRequests = async () => {
+    const loadData = async () => {
         try {
-            const data = await swapService.getAll();
-            setRequests(data);
+            const [swapData, empData] = await Promise.all([
+                swapService.getAll(),
+                employeeService.getAll()
+            ]);
+            setRequests(swapData);
+            setEmployees(empData);
         } catch (error) {
-            console.error("Error loading swap requests:", error);
+            console.error("Error loading data:", error);
         } finally {
             setLoading(false);
         }
     };
 
     useEffect(() => {
-        loadRequests();
+        loadData();
 
         // Check if current user is super_admin
         const checkAdminRole = async () => {
@@ -56,7 +61,7 @@ export default function SwapPage() {
     const handleDeleteRequest = async (id: string) => {
         try {
             await swapService.delete(id);
-            loadRequests();
+            loadData();
             setAlertState({
                 isOpen: true,
                 title: "สำเร็จ",
@@ -198,7 +203,7 @@ export default function SwapPage() {
                 }
             }
 
-            loadRequests();
+            loadData();
             setAlertState({
                 isOpen: true,
                 title: "สำเร็จ",
@@ -266,6 +271,7 @@ export default function SwapPage() {
             ) : (
                 <SwapTable
                     requests={statusFilter === "all" ? requests : requests.filter(r => r.status === statusFilter)}
+                    employees={employees}
                     onStatusUpdate={handleStatusUpdate}
                     onDelete={handleDeleteRequest}
                     isSuperAdmin={isSuperAdmin}

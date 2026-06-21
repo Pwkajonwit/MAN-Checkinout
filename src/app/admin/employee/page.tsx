@@ -136,7 +136,7 @@ export default function EmployeePage() {
     };
 
     return (
-        <div className="flex-1 px-8 py-8 space-y-6">
+        <div className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                 <PageHeader
                     title="รายชื่อพนักงาน (Employees)"

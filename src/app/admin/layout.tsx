@@ -39,7 +39,7 @@ export default function AdminLayout({
                     </>
                 )}
                 <main className={isLoginPage ? "min-h-screen" : "md:pl-64 min-h-screen transition-all duration-300"}>
-                    <div className={isLoginPage ? "" : "p-4 md:p-8 max-w-7xl mx-auto"}>
+                    <div className={isLoginPage ? "" : "container mx-auto px-4 py-6 sm:px-6 lg:px-8"}>
                         {children}
                     </div>
                 </main>

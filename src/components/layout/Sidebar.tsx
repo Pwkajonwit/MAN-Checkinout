@@ -9,8 +9,8 @@ import {
     Users,
     FileText,
     Clock,
+    CalendarDays,
     BarChart2,
-    HelpCircle,
     LogOut,
     Settings,
     Calculator,
@@ -18,11 +18,13 @@ import {
     Timer,
     ArrowLeftRight,
     FileBarChart,
-    ClipboardList,
     ChevronDown,
+    ClipboardList,
     Database,
     UserCog,
-    FileCheck
+    FileCheck,
+    CircleDollarSign,
+    type LucideIcon
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { signOut } from "firebase/auth";
@@ -30,14 +32,14 @@ import { auth } from "@/lib/firebase";
 import { useAdmin } from "@/components/auth/AuthProvider";
 
 interface MenuItem {
-    icon: any;
+    icon: LucideIcon;
     label: string;
     href: string;
 }
 
 interface MenuGroup {
     title: string;
-    icon: any;
+    icon: LucideIcon;
     items: MenuItem[];
 }
 
@@ -70,12 +72,20 @@ const menuGroups: MenuGroup[] = [
         ]
     },
     {
+        title: "การเงิน",
+        icon: CircleDollarSign,
+        items: [
+            { icon: Calculator, label: "เงินเดือน", href: "/admin/payroll" },
+            { icon: CircleDollarSign, label: "ผ่อนสินค้า", href: "/admin/installments" },
+        ]
+    },
+    {
         title: "รายงาน",
         icon: BarChart2,
         items: [
             { icon: BarChart2, label: "ภาพรวม", href: "/admin/analytics" },
             { icon: FileBarChart, label: "รายงานละเอียด", href: "/admin/reports" },
-            { icon: Calculator, label: "เงินเดือน", href: "/admin/payroll" },
+            { icon: CalendarDays, label: "สรุปรายปี", href: "/admin/yearly-summary" },
         ]
     },
 ];
@@ -84,7 +94,7 @@ export function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () =>
     const pathname = usePathname();
     const router = useRouter();
     const { adminProfile } = useAdmin();
-    const [openGroups, setOpenGroups] = useState<string[]>(["ข้อมูล", "จัดการ", "คำขอ/อนุมัติ", "รายงาน"]);
+    const [openGroups, setOpenGroups] = useState<string[]>(["ข้อมูล"]);
 
     const handleLogout = async () => {
         try {
@@ -98,14 +108,12 @@ export function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () =>
     const toggleGroup = (title: string) => {
         setOpenGroups(prev =>
             prev.includes(title)
-                ? prev.filter(g => g !== title)
+                ? prev.filter(groupTitle => groupTitle !== title)
                 : [...prev, title]
         );
     };
 
-    const isGroupActive = (group: MenuGroup) => {
-        return group.items.some(item => pathname === item.href);
-    };
+    const isGroupActive = (group: MenuGroup) => group.items.some(item => pathname === item.href);
 
     return (
         <>
@@ -143,20 +151,45 @@ export function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () =>
                 </div>
 
                 {/* Menu Groups */}
-                <nav className="flex-1 px-4 py-6 overflow-y-auto custom-scrollbar space-y-6">
+                <nav className="flex-1 px-4 py-6 overflow-y-auto custom-scrollbar space-y-3">
                     {menuGroups.map((group) => {
-                        const isOpen = openGroups.includes(group.title);
+                        const groupOpen = openGroups.includes(group.title);
                         const groupActive = isGroupActive(group);
+                        const GroupIcon = group.icon;
 
                         return (
                             <div key={group.title}>
                                 {/* Group Header */}
-                                <div className="px-2 mb-2">
-                                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-                                        {group.title}
-                                    </h3>
-                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => toggleGroup(group.title)}
+                                    className={cn(
+                                        "mb-1 flex w-full items-center justify-between rounded-md px-2.5 py-2 text-sm font-semibold transition-colors",
+                                        groupActive
+                                            ? "bg-slate-800/80 text-white"
+                                            : "text-slate-400 hover:bg-slate-800/40 hover:text-slate-200"
+                                    )}
+                                    aria-expanded={groupOpen}
+                                >
+                                    <span className="flex min-w-0 items-center gap-2.5">
+                                        <span className={cn(
+                                            "flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors",
+                                            groupActive
+                                                ? "bg-emerald-500/15 text-emerald-300"
+                                                : "text-slate-500"
+                                        )}>
+                                            <GroupIcon className="h-4 w-4" />
+                                        </span>
+                                        <span className="truncate">{group.title}</span>
+                                    </span>
+                                    <ChevronDown className={cn(
+                                        "h-4 w-4 shrink-0 text-slate-400 transition-transform",
+                                        groupOpen ? "rotate-180" : "rotate-0",
+                                        groupActive && "text-white"
+                                    )} />
+                                </button>
 
+                                {groupOpen && (
                                 <div className="space-y-1">
                                     {group.items.map((item) => {
                                         const isActive = pathname === item.href;
@@ -179,13 +212,14 @@ export function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () =>
 
                                                 <item.icon className={cn(
                                                     "w-4 h-4 transition-transform group-hover:scale-110",
-                                                    isActive ? "text-white" : "text-slate-400 group-hover:text-slate-200"
+                                                    isActive ? "text-white" : "text-slate-500 group-hover:text-slate-300"
                                                 )} />
                                                 <span className="relative z-10">{item.label}</span>
                                             </Link>
                                         );
                                     })}
                                 </div>
+                                )}
                             </div>
                         );
                     })}
@@ -200,9 +234,6 @@ export function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () =>
                         <LogOut className="w-4 h-4 transition-colors group-hover:text-white" />
                         <span>ออกจากระบบ</span>
                     </button>
-                    <div className="mt-3 text-center">
-                        <p className="text-[10px] text-slate-500 font-mono">v.5.0.0 Business Edition</p>
-                    </div>
                 </div>
             </aside>
         </>

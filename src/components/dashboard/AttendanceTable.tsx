@@ -28,16 +28,16 @@ export function AttendanceTable({ attendances, onEdit, onDelete, isSuperAdmin = 
                 <div className="overflow-x-auto">
                     <table className="w-full">
                         <thead>
-                            <tr className="bg-gray-50/50 border-b border-gray-100 text-left">
-                                <th className="py-4 px-6 text-xs font-medium text-gray-400 uppercase tracking-wider">Name</th>
-                                <th className="py-4 px-6 text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
-                                <th className="py-4 px-6 text-xs font-medium text-gray-400 uppercase tracking-wider">วันที่</th>
-                                <th className="py-4 px-6 text-xs font-medium text-gray-400 uppercase tracking-wider">เข้า/ออกงาน</th>
-                                <th className="py-4 px-6 text-xs font-medium text-gray-400 uppercase tracking-wider">สถานที่</th>
-                                <th className="py-4 px-6 text-xs font-medium text-gray-400 uppercase tracking-wider">พิกัด</th>
-                                <th className="py-4 px-6 text-xs font-medium text-gray-400 uppercase tracking-wider">หมายเหตุ</th>
+                            <tr className="bg-slate-100 border-b border-slate-200 text-left">
+                                <th className="py-4 px-6 text-xs font-bold text-slate-700 uppercase tracking-wider">Name</th>
+                                <th className="py-4 px-6 text-xs font-bold text-slate-700 uppercase tracking-wider">Status</th>
+                                <th className="py-4 px-6 text-xs font-bold text-slate-700 uppercase tracking-wider">วันที่</th>
+                                <th className="py-4 px-6 text-xs font-bold text-slate-700 uppercase tracking-wider">เข้า/ออกงาน</th>
+                                <th className="py-4 px-6 text-xs font-bold text-slate-700 uppercase tracking-wider">สถานที่</th>
+                                <th className="py-4 px-6 text-xs font-bold text-slate-700 uppercase tracking-wider">พิกัด</th>
+                                <th className="py-4 px-6 text-xs font-bold text-slate-700 uppercase tracking-wider">หมายเหตุ</th>
                                 {isSuperAdmin && (
-                                    <th className="py-4 px-6 text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+                                    <th className="py-4 px-6 text-xs font-bold text-slate-700 uppercase tracking-wider">Actions</th>
                                 )}
                             </tr>
                         </thead>

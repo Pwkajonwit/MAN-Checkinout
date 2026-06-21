@@ -1,19 +1,19 @@
-import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { type SwapRequest } from "@/lib/firestore";
+import { type SwapRequest, type Employee } from "@/lib/firestore";
 import { Check, X, Edit2, Trash2, ArrowRight } from "lucide-react";
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
 
 interface SwapTableProps {
     requests: SwapRequest[];
+    employees?: Employee[];
     onStatusUpdate: (id: string, status: SwapRequest["status"]) => void;
     onEdit?: (request: SwapRequest) => void;
     onDelete?: (id: string) => void;
     isSuperAdmin?: boolean;
 }
 
-export function SwapTable({ requests, onStatusUpdate, onEdit, onDelete, isSuperAdmin = false }: SwapTableProps) {
+export function SwapTable({ requests, employees = [], onStatusUpdate, onEdit, onDelete, isSuperAdmin = false }: SwapTableProps) {
     const getStatusClass = (status: SwapRequest["status"]) => {
         switch (status) {
             case "รออนุมัติ":
@@ -38,7 +38,7 @@ export function SwapTable({ requests, onStatusUpdate, onEdit, onDelete, isSuperA
             <div className="hidden md:block overflow-x-auto">
                 <table className="w-full">
                     <thead>
-                        <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <tr className="bg-gray-100 border-b border-gray-200 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                             <th className="px-6 py-4">พนักงาน</th>
                             <th className="px-6 py-4">วันมาทำงาน</th>
                             <th className="px-6 py-4">วันหยุดแทน</th>
@@ -56,10 +56,36 @@ export function SwapTable({ requests, onStatusUpdate, onEdit, onDelete, isSuperA
                                 </td>
                             </tr>
                         ) : (
-                            requests.map((req) => (
+                            requests.map((req) => {
+                                const employee = employees.find(e => e.id === req.employeeId || e.employeeId === req.employeeId);
+                                return (
                                 <tr key={req.id} className="hover:bg-gray-50 transition-colors">
                                     <td className="px-6 py-4">
-                                        <span className="font-medium text-gray-900">{req.employeeName}</span>
+                                        <div className="flex items-center gap-3">
+                                            {employee?.avatar ? (
+                                                <div className="relative w-9 h-9 shrink-0">
+                                                    <img
+                                                        src={employee.avatar}
+                                                        alt={req.employeeName}
+                                                        className="w-full h-full rounded-full object-cover border border-gray-200"
+                                                        onError={(e) => {
+                                                            e.currentTarget.style.display = "none";
+                                                            if (e.currentTarget.nextElementSibling) {
+                                                                (e.currentTarget.nextElementSibling as HTMLElement).style.display = "flex";
+                                                            }
+                                                        }}
+                                                    />
+                                                    <div className="hidden w-full h-full rounded-full bg-gray-100 items-center justify-center text-gray-600 font-medium text-sm border border-gray-200">
+                                                        {req.employeeName.charAt(0)}
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="w-9 h-9 shrink-0 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 font-medium text-sm border border-gray-200">
+                                                    {req.employeeName.charAt(0)}
+                                                </div>
+                                            )}
+                                            <span className="font-medium text-gray-900">{req.employeeName}</span>
+                                        </div>
                                     </td>
                                     <td className="px-6 py-4">
                                         <span className="text-green-600 font-medium">
@@ -107,7 +133,7 @@ export function SwapTable({ requests, onStatusUpdate, onEdit, onDelete, isSuperA
                                                     </button>
                                                 </>
                                             )}
-                                            {isSuperAdmin && (
+                                            {isSuperAdmin && req.id && (
                                                 <>
                                                     {onEdit && (
                                                         <button
@@ -121,7 +147,7 @@ export function SwapTable({ requests, onStatusUpdate, onEdit, onDelete, isSuperA
                                                     {onDelete && (
                                                         <button
                                                             onClick={() => {
-                                                                if (confirm("ยืนยันการลบคำขอนี้?")) {
+                                                                if (confirm(`ยืนยันการลบคำขอสลับวันหยุดของ ${req.employeeName}?`)) {
                                                                     onDelete(req.id!);
                                                                 }
                                                             }}
@@ -136,7 +162,8 @@ export function SwapTable({ requests, onStatusUpdate, onEdit, onDelete, isSuperA
                                         </div>
                                     </td>
                                 </tr>
-                            ))
+                                );
+                            })
                         )}
                     </tbody>
                 </table>
@@ -149,17 +176,43 @@ export function SwapTable({ requests, onStatusUpdate, onEdit, onDelete, isSuperA
                         ไม่พบข้อมูลคำขอสลับวันหยุด
                     </div>
                 ) : (
-                    requests.map((req) => (
+                    requests.map((req) => {
+                        const employee = employees.find(e => e.id === req.employeeId || e.employeeId === req.employeeId);
+                        return (
                         <div key={req.id} className="p-4 space-y-3">
                             <div className="flex items-start justify-between">
-                                <div>
-                                    <span className="font-medium text-gray-900">{req.employeeName}</span>
-                                    <span className={cn(
-                                        "ml-2 px-2 py-0.5 rounded-full text-xs font-medium",
-                                        getStatusClass(req.status)
-                                    )}>
-                                        {req.status}
-                                    </span>
+                                <div className="flex items-center gap-3">
+                                    {employee?.avatar ? (
+                                        <div className="relative w-9 h-9 shrink-0">
+                                            <img
+                                                src={employee.avatar}
+                                                alt={req.employeeName}
+                                                className="w-full h-full rounded-full object-cover border border-gray-200"
+                                                onError={(e) => {
+                                                    e.currentTarget.style.display = "none";
+                                                    if (e.currentTarget.nextElementSibling) {
+                                                        (e.currentTarget.nextElementSibling as HTMLElement).style.display = "flex";
+                                                    }
+                                                }}
+                                            />
+                                            <div className="hidden w-full h-full rounded-full bg-gray-100 items-center justify-center text-gray-600 font-medium text-sm border border-gray-200">
+                                                {req.employeeName.charAt(0)}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="w-9 h-9 shrink-0 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 font-medium text-sm border border-gray-200">
+                                            {req.employeeName.charAt(0)}
+                                        </div>
+                                    )}
+                                    <div>
+                                        <span className="font-medium text-gray-900">{req.employeeName}</span>
+                                        <span className={cn(
+                                            "ml-2 px-2 py-0.5 rounded-full text-xs font-medium",
+                                            getStatusClass(req.status)
+                                        )}>
+                                            {req.status}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
 
@@ -206,7 +259,8 @@ export function SwapTable({ requests, onStatusUpdate, onEdit, onDelete, isSuperA
                                 </div>
                             )}
                         </div>
-                    ))
+                        );
+                    })
                 )}
             </div>
         </div>

@@ -7,7 +7,7 @@ import { OTTable } from "@/components/ot/OTTable";
 import { OTFormModal } from "@/components/ot/OTFormModal";
 import { Button } from "@/components/ui/button";
 import { Pencil, Plus } from "lucide-react";
-import { otService, type OTRequest, employeeService, adminService } from "@/lib/firestore";
+import { otService, type OTRequest, employeeService, type Employee, adminService } from "@/lib/firestore";
 import { sendPushMessage } from "@/app/actions/line";
 import { auth } from "@/lib/firebase";
 
@@ -15,23 +15,28 @@ export default function OTPage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedOT, setSelectedOT] = useState<OTRequest | null>(null);
     const [otRequests, setOTRequests] = useState<OTRequest[]>([]);
+    const [employees, setEmployees] = useState<Employee[]>([]);
     const [loading, setLoading] = useState(true);
     const [isSuperAdmin, setIsSuperAdmin] = useState(false);
     const [statusFilter, setStatusFilter] = useState<"all" | "รออนุมัติ" | "อนุมัติ" | "ไม่อนุมัติ">("all");
 
-    const loadOTRequests = async () => {
+    const loadData = async () => {
         try {
-            const data = await otService.getAll();
-            setOTRequests(data);
+            const [otData, empData] = await Promise.all([
+                otService.getAll(),
+                employeeService.getAll()
+            ]);
+            setOTRequests(otData);
+            setEmployees(empData);
         } catch (error) {
-            console.error("Error loading OT requests:", error);
+            console.error("Error loading data:", error);
         } finally {
             setLoading(false);
         }
     };
 
     useEffect(() => {
-        loadOTRequests();
+        loadData();
 
         // Check if current user is super_admin
         const checkAdminRole = async () => {
@@ -59,7 +64,7 @@ export default function OTPage() {
     const handleDeleteOT = async (id: string) => {
         try {
             await otService.delete(id);
-            loadOTRequests();
+            loadData();
         } catch (error) {
             console.error("Error deleting OT:", error);
             alert("เกิดข้อผิดพลาดในการลบคำขอ OT");
@@ -67,7 +72,7 @@ export default function OTPage() {
     };
 
     const handleSuccess = () => {
-        loadOTRequests();
+        loadData();
     };
 
     const handleStatusUpdate = async (id: string, status: OTRequest["status"]) => {
@@ -197,7 +202,7 @@ export default function OTPage() {
                 }
             }
 
-            loadOTRequests();
+            loadData();
         } catch (error) {
             console.error("Error updating status:", error);
             alert("เกิดข้อผิดพลาดในการอัพเดทสถานะ");
@@ -274,6 +279,7 @@ export default function OTPage() {
             ) : (
                 <OTTable
                     otRequests={statusFilter === "all" ? otRequests : otRequests.filter(ot => ot.status === statusFilter)}
+                    employees={employees}
                     onStatusUpdate={handleStatusUpdate}
                     onEdit={handleEditOT}
                     onDelete={handleDeleteOT}

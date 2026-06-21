@@ -76,11 +76,11 @@ export default function ShiftAssignmentPage() {
     ];
 
     if (!user) {
-        return <div className="p-8 text-center">กรุณาเข้าสู่ระบบ</div>;
+        return <div className="py-12 text-center">กรุณาเข้าสู่ระบบ</div>;
     }
 
     return (
-        <div className="flex-1 p-8">
+        <div className="space-y-6">
             <PageHeader
                 title="กำหนดกะพนักงาน"
                 subtitle="ลากวางพนักงานไปยังกะที่ต้องการ"

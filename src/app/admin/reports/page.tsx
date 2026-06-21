@@ -117,11 +117,11 @@ export default function ReportsPage() {
     };
 
     if (!user) {
-        return <div className="p-8 text-center text-gray-500">กรุณาเข้าสู่ระบบ</div>;
+        return <div className="py-12 text-center text-gray-500">กรุณาเข้าสู่ระบบ</div>;
     }
 
     return (
-        <div className="flex-1 px-8 py-8 space-y-6">
+        <div className="space-y-6">
             <PageHeader
                 title="รายงานและสถิติ (Reports)"
                 subtitle="สรุปข้อมูลการทำงานล่วงเวลา การมาสาย และการลาของพนักงาน"

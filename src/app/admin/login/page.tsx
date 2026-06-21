@@ -144,7 +144,7 @@ export default function AdminLoginPage() {
                                 Welcome Back!
                             </h1>
                             <p className="mt-1.5 text-xs text-zinc-500">
-                                Log in to start controlling everything modern with ease.
+                                Log in to start 
                             </p>
                         </div>
 
@@ -225,9 +225,6 @@ export default function AdminLoginPage() {
                                     />
                                     Remember Me
                                 </label>
-                                <button type="button" className="hover:text-zinc-950">
-                                    Forgot Password?
-                                </button>
                             </div>
 
                             <Button

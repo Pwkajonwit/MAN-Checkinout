@@ -216,11 +216,11 @@ export default function DailySummaryPage() {
     };
 
     if (!user) {
-        return <div className="p-8 text-center">กรุณาเข้าสู่ระบบ</div>;
+        return <div className="py-12 text-center">กรุณาเข้าสู่ระบบ</div>;
     }
 
     return (
-        <div className="flex-1 p-8">
+        <div className="space-y-6">
             <PageHeader
                 title="สรุปรายวัน"
                 subtitle="สรุปการลงเวลารายบุคคลในแต่ละวัน"
@@ -234,7 +234,7 @@ export default function DailySummaryPage() {
                         type="date"
                         value={selectedDate}
                         onChange={(e) => setSelectedDate(e.target.value)}
-                        className="px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="px-4 py-2 bg-white border border-gray-200 shadow-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                 </div>
 
@@ -245,7 +245,7 @@ export default function DailySummaryPage() {
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         placeholder="ค้นหาชื่อ หรือ แผนก..."
-                        className="px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
+                        className="px-4 py-2 bg-white border border-gray-200 shadow-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
                     />
                 </div>
 
@@ -254,7 +254,7 @@ export default function DailySummaryPage() {
                     <select
                         value={selectedEmployee}
                         onChange={(e) => setSelectedEmployee(e.target.value)}
-                        className="px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="px-4 py-2 bg-white border border-gray-200 shadow-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                         <option value="all">พนักงานทั้งหมด</option>
                         {employees.map(emp => (

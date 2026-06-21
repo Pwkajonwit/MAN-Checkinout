@@ -1,18 +1,19 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { type LeaveRequest } from "@/lib/firestore";
+import { type LeaveRequest, type Employee } from "@/lib/firestore";
 import { Check, X, Edit2, Trash2, Image as ImageIcon, X as CloseIcon } from "lucide-react";
 import { formatLeaveDateRange, formatLeaveDuration, formatLeaveDayHourUnits, getLeaveDayUnits } from "@/lib/leaveUtils";
 
 interface LeaveTableProps {
     leaves: LeaveRequest[];
+    employees?: Employee[];
     onStatusUpdate: (id: string, status: LeaveRequest["status"]) => void;
     onEdit?: (leave: LeaveRequest) => void;
     onDelete?: (id: string) => void;
     isSuperAdmin?: boolean;
 }
 
-export function LeaveTable({ leaves, onStatusUpdate, onEdit, onDelete, isSuperAdmin = false }: LeaveTableProps) {
+export function LeaveTable({ leaves, employees = [], onStatusUpdate, onEdit, onDelete, isSuperAdmin = false }: LeaveTableProps) {
     const [viewingImage, setViewingImage] = useState<string | null>(null);
 
     return (
@@ -21,15 +22,15 @@ export function LeaveTable({ leaves, onStatusUpdate, onEdit, onDelete, isSuperAd
                 <div className="overflow-x-auto">
                     <table className="w-full">
                         <thead>
-                            <tr className="bg-white border-b border-gray-100 text-left">
-                                <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider">พนักงาน</th>
-                                <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider">ประเภท</th>
-                                <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider">วันที่ลา</th>
-                                <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">ระยะเวลา</th>
-                                <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider">เหตุผล</th>
-                                <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">หลักฐาน</th>
-                                <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">สถานะ</th>
-                                <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">ดำเนินการ</th>
+                            <tr className="bg-gray-100 border-b border-gray-200 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                                <th className="py-4 px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider">พนักงาน</th>
+                                <th className="py-4 px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider">ประเภท</th>
+                                <th className="py-4 px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider">วันที่ลา</th>
+                                <th className="py-4 px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider text-center">ระยะเวลา</th>
+                                <th className="py-4 px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider">เหตุผล</th>
+                                <th className="py-4 px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider text-center">หลักฐาน</th>
+                                <th className="py-4 px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider text-center">สถานะ</th>
+                                <th className="py-4 px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider text-right">ดำเนินการ</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
@@ -40,16 +41,36 @@ export function LeaveTable({ leaves, onStatusUpdate, onEdit, onDelete, isSuperAd
                                     </td>
                                 </tr>
                             ) : (
-                                leaves.map((leave) => (
+                                leaves.map((leave) => {
+                                    const employee = employees.find(e => e.id === leave.employeeId || e.employeeId === leave.employeeId);
+                                    return (
                                     <tr key={leave.id} className="group hover:bg-gray-50/80 transition-all duration-200">
                                         <td className="py-4 px-6">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 font-medium text-sm border border-gray-200">
-                                                    {leave.employeeName.charAt(0)}
-                                                </div>
+                                                {employee?.avatar ? (
+                                                    <div className="relative w-9 h-9 shrink-0">
+                                                        <img
+                                                            src={employee.avatar}
+                                                            alt={leave.employeeName}
+                                                            className="w-full h-full rounded-full object-cover border border-gray-200"
+                                                            onError={(e) => {
+                                                                e.currentTarget.style.display = "none";
+                                                                if (e.currentTarget.nextElementSibling) {
+                                                                    (e.currentTarget.nextElementSibling as HTMLElement).style.display = "flex";
+                                                                }
+                                                            }}
+                                                        />
+                                                        <div className="hidden w-full h-full rounded-full bg-gray-100 items-center justify-center text-gray-600 font-medium text-sm border border-gray-200">
+                                                            {leave.employeeName.charAt(0)}
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="w-9 h-9 shrink-0 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 font-medium text-sm border border-gray-200">
+                                                        {leave.employeeName.charAt(0)}
+                                                    </div>
+                                                )}
                                                 <div>
                                                     <div className="text-sm font-medium text-gray-900">{leave.employeeName}</div>
-                                                    {/* Department not available in LeaveRequest */}
                                                 </div>
                                             </div>
                                         </td>
@@ -119,7 +140,6 @@ export function LeaveTable({ leaves, onStatusUpdate, onEdit, onDelete, isSuperAd
                                         </td>
                                         <td className="py-4 px-6 text-right">
                                             <div className="flex items-center justify-end gap-1">
-                                                {/* Approve/Reject buttons for pending requests */}
                                                 {leave.status === "รออนุมัติ" && leave.id && (
                                                     <>
                                                         <button
@@ -139,7 +159,6 @@ export function LeaveTable({ leaves, onStatusUpdate, onEdit, onDelete, isSuperAd
                                                     </>
                                                 )}
 
-                                                {/* Edit and Delete buttons for super_admin */}
                                                 {isSuperAdmin && leave.id && (
                                                     <>
                                                         {onEdit && (
@@ -169,14 +188,14 @@ export function LeaveTable({ leaves, onStatusUpdate, onEdit, onDelete, isSuperAd
                                             </div>
                                         </td>
                                     </tr>
-                                ))
+                                    );
+                                })
                             )}
                         </tbody>
                     </table>
                 </div>
             </div>
 
-            {/* Image Preview Modal */}
             {viewingImage && (
                 <div
                     className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"

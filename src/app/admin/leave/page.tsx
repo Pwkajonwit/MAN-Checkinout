@@ -7,7 +7,7 @@ import { LeaveTable } from "@/components/leave/LeaveTable";
 import { LeaveFormModal } from "@/components/leave/LeaveFormModal";
 import { Button } from "@/components/ui/button";
 import { Plus, Clock, CheckCircle, XCircle, FileText } from "lucide-react";
-import { leaveService, type LeaveRequest, employeeService, adminService } from "@/lib/firestore";
+import { leaveService, type LeaveRequest, employeeService, type Employee, adminService } from "@/lib/firestore";
 import { sendPushMessage } from "@/app/actions/line";
 import { auth } from "@/lib/firebase";
 import { CustomAlert } from "@/components/ui/custom-alert";
@@ -17,6 +17,7 @@ export default function LeavePage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedLeave, setSelectedLeave] = useState<LeaveRequest | null>(null);
     const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
+    const [employees, setEmployees] = useState<Employee[]>([]);
     const [loading, setLoading] = useState(true);
     const [isSuperAdmin, setIsSuperAdmin] = useState(false);
     const [statusFilter, setStatusFilter] = useState<"all" | "รออนุมัติ" | "อนุมัติ" | "ไม่อนุมัติ">("all");
@@ -32,19 +33,23 @@ export default function LeavePage() {
         type: "info"
     });
 
-    const loadLeaves = async () => {
+    const loadData = async () => {
         try {
-            const data = await leaveService.getAll();
-            setLeaves(data);
+            const [leaveData, empData] = await Promise.all([
+                leaveService.getAll(),
+                employeeService.getAll()
+            ]);
+            setLeaves(leaveData);
+            setEmployees(empData);
         } catch (error) {
-            console.error("Error loading leaves:", error);
+            console.error("Error loading data:", error);
         } finally {
             setLoading(false);
         }
     };
 
     useEffect(() => {
-        loadLeaves();
+        loadData();
 
         // Check if current user is super_admin
         const checkAdminRole = async () => {
@@ -72,7 +77,7 @@ export default function LeavePage() {
     const handleDeleteLeave = async (id: string) => {
         try {
             await leaveService.delete(id);
-            loadLeaves();
+            loadData();
         } catch (error) {
             console.error("Error deleting leave:", error);
             setAlertState({
@@ -85,7 +90,7 @@ export default function LeavePage() {
     };
 
     const handleSuccess = () => {
-        loadLeaves();
+        loadData();
     };
 
     const handleStatusUpdate = async (id: string, status: LeaveRequest["status"]) => {
@@ -209,7 +214,7 @@ export default function LeavePage() {
                 }
             }
 
-            loadLeaves();
+            loadData();
         } catch (error) {
             console.error("Error updating status:", error);
             setAlertState({
@@ -279,7 +284,7 @@ export default function LeavePage() {
                     value={stats.total}
                     icon={<FileText className="w-5 h-5 text-blue-600" />}
                     onClick={() => setStatusFilter("all")}
-                    isActive={statusFilter === "all"}
+                    isActive={statusFilter === "all"}
                     className="border-blue-100 bg-blue-50/50 hover:border-blue-200"
                 />
             </div>
@@ -292,6 +297,7 @@ export default function LeavePage() {
             ) : (
                 <LeaveTable
                     leaves={statusFilter === "all" ? leaves : leaves.filter(l => l.status === statusFilter)}
+                    employees={employees}
                     onStatusUpdate={handleStatusUpdate}
                     onEdit={handleEditLeave}
                     onDelete={handleDeleteLeave}

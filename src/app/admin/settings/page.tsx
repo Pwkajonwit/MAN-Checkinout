@@ -399,13 +399,13 @@ export default function SettingsPage() {
     }
 
     return (
-        <div className="bg-slate-50 min-h-screen pb-20">
+        <div className="pb-20">
             <PageHeader
                 title="ตั้งค่าระบบ"
                 subtitle="กำหนดนโยบายการเข้างาน การคำนวณเงินเดือน และการเชื่อมต่อ"
             />
 
-            <div className="max-w-5xl mx-auto px-6 -mt-6 relative z-10 space-y-6">
+            <div className="relative z-10 space-y-6">
 
                 {/* Success Notification */}
                 {saved && (
@@ -1154,7 +1154,7 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Save Button (Sticky Bottom) */}
-                <div className="sticky bottom-4 z-40 bg-white/90 backdrop-blur-md border border-slate-200 shadow-xl rounded-xl p-4 flex justify-between items-center max-w-5xl mx-auto">
+                <div className="sticky bottom-4 z-40 bg-white/90 backdrop-blur-md border border-slate-200 shadow-xl rounded-xl p-4 flex justify-between items-center">
                     <Button variant="ghost" className="text-slate-500 hover:text-slate-900" onClick={handleReset}>
                         <RefreshCw className="w-4 h-4 mr-2" />
                         คืนค่าเริ่มต้น
