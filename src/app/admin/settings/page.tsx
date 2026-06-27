@@ -1014,7 +1014,7 @@ export default function SettingsPage() {
                             {/* Payroll Rates */}
                             <div className="space-y-4">
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">OT Rate (Normal)</label>
+                                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">อัตรา OT (วันปกติ)</label>
                                     <div className="relative">
                                         <DollarSign className="absolute top-2.5 left-3 w-3.5 h-3.5 text-slate-400" />
                                         <input
@@ -1026,7 +1026,7 @@ export default function SettingsPage() {
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">OT Rate (Holiday)</label>
+                                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">อัตรา OT (วันหยุด)</label>
                                     <div className="relative">
                                         <DollarSign className="absolute top-2.5 left-3 w-3.5 h-3.5 text-slate-400" />
                                         <input
@@ -1040,9 +1040,9 @@ export default function SettingsPage() {
                             </div>
 
                             {/* Swap Policy */}
-                            <div className="md:col-span-2 space-y-4">
+                            <div className="space-y-4">
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Swap Request Advance Days</label>
+                                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">ขอสลับวันหยุดล่วงหน้า</label>
                                     <div className="flex items-center gap-3">
                                         <div className="relative flex-1">
                                             <ArrowLeftRight className="absolute top-2.5 left-3 w-3.5 h-3.5 text-slate-400" />
@@ -1053,10 +1053,45 @@ export default function SettingsPage() {
                                                 onChange={(e) => setSettings({ ...settings, swapAdvanceDays: parseInt(e.target.value) || 0 })}
                                             />
                                         </div>
-                                        <span className="text-sm text-slate-600">Days</span>
+                                        <span className="text-sm text-slate-600">วัน</span>
                                     </div>
-                                    <p className="text-[10px] text-slate-400 mt-1">จำนวนวันที่ต้องทำเรื่องขอสลับวันหยุดล่วงหน้า</p>
+                                    <p className="text-[10px] text-slate-400 mt-1">ขอสลับวันหยุดล่วงหน้า (วัน)</p>
                                 </div>
+                            </div>
+
+                            {/* Late Deduction Policy */}
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">นโยบายหักเงินค่ามาสาย</label>
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex-1">
+                                            <select
+                                                className="w-full rounded-md border-slate-300 shadow-sm focus:border-slate-500 focus:ring-slate-500 sm:text-sm h-9"
+                                                value={settings.lateDeductionType}
+                                                onChange={(e) => setSettings({ ...settings, lateDeductionType: e.target.value as any })}
+                                            >
+                                                <option value="none">ไม่หักเงิน (แค่บันทึก)</option>
+                                                <option value="pro-rated">หักตามจริง (รายชั่วโมง)</option>
+                                                <option value="fixed_per_minute">หักคงที่ต่อนาที</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 mt-1">นโยบายการหักเงินค่ามาสาย</p>
+                                </div>
+                                {settings.lateDeductionType === "fixed_per_minute" && (
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">อัตราหักเงิน (บาท/นาที)</label>
+                                        <div className="relative">
+                                            <DollarSign className="absolute top-2.5 left-3 w-3.5 h-3.5 text-slate-400" />
+                                            <input
+                                                type="number" step="1"
+                                                className="pl-9 w-full rounded-md border-slate-300 shadow-sm focus:border-slate-500 focus:ring-slate-500 sm:text-sm h-9 font-mono"
+                                                value={settings.lateDeductionRate}
+                                                onChange={(e) => setSettings({ ...settings, lateDeductionRate: parseFloat(e.target.value) || 0 })}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
 

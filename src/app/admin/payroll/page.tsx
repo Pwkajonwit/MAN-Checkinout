@@ -430,6 +430,31 @@ export default function PayrollPage() {
         }));
     };
 
+    const updateInstallmentDeduction = (
+        employeeId: string,
+        deductionId: string,
+        field: ManualDeductionField,
+        value: string
+    ) => {
+        setPayrollData(currentData => currentData.map(item => {
+            if (item.employeeId !== employeeId) return item;
+
+            const installmentDeductions = (item.installmentDeductions || []).map((deduction) => {
+                if (deduction.id !== deductionId) return deduction;
+
+                return {
+                    ...deduction,
+                    [field]: field === "amount" ? Math.max(0, Number(value) || 0) : value,
+                };
+            });
+
+            return normalizePayrollItem({
+                ...item,
+                installmentDeductions,
+            });
+        }));
+    };
+
     const removeManualDeduction = (employeeId: string, deductionId: string) => {
         setPayrollData(currentData => currentData.map(item => {
             if (item.employeeId !== employeeId) return item;
@@ -1390,7 +1415,7 @@ export default function PayrollPage() {
                                         <button
                                             key={type}
                                             onClick={() => setEmployeeType(type)}
-                                            className={`h-8 px-1.5 rounded-md text-[11px] font-medium transition-all text-center whitespace-nowrap ${employeeType === type
+                                            className={`h-8 px-1.5 rounded-md text-[13px] font-medium transition-all text-center whitespace-nowrap ${employeeType === type
                                                 ? "bg-white text-blue-700 shadow-sm ring-1 ring-black/5"
                                                 : "text-gray-700 hover:text-gray-700"
                                                 }`}
@@ -1655,19 +1680,19 @@ export default function PayrollPage() {
                                             </div>
                                             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:min-w-[680px]">
                                                 <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-                                                    <div className="text-[11px] font-medium text-slate-700">รายได้คำนวณ</div>
+                                                    <div className="text-[13px] font-medium text-slate-700">รายได้คำนวณ</div>
                                                     <div className="mt-1 text-sm font-bold text-slate-900">฿{totalBaseIncome.toLocaleString()}</div>
                                                 </div>
                                                 <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2">
-                                                    <div className="text-[11px] font-medium text-blue-600">เงินเพิ่ม</div>
+                                                    <div className="text-[13px] font-medium text-blue-600">เงินเพิ่ม</div>
                                                     <div className="mt-1 text-sm font-bold text-blue-700">฿{totalExtraIncome.toLocaleString()}</div>
                                                 </div>
                                                 <div className="rounded-lg border border-red-100 bg-red-50 px-3 py-2">
-                                                    <div className="text-[11px] font-medium text-red-600">รายการหัก</div>
+                                                    <div className="text-[13px] font-medium text-red-600">รายการหัก</div>
                                                     <div className="mt-1 text-sm font-bold text-red-700">฿{totalDeduction.toLocaleString()}</div>
                                                 </div>
                                                 <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2">
-                                                    <div className="text-[11px] font-medium text-emerald-600">รวมจ่ายสุทธิ</div>
+                                                    <div className="text-[13px] font-medium text-emerald-600">รวมจ่ายสุทธิ</div>
                                                     <div className="mt-1 text-lg font-bold text-emerald-700">฿{totalNet.toLocaleString()}</div>
                                                 </div>
                                             </div>
@@ -1678,7 +1703,7 @@ export default function PayrollPage() {
                                         <div className="flex flex-col gap-2 xl:flex-row xl:items-end xl:justify-between">
                                             <div>
                                                 <div className="text-xs font-semibold text-gray-900">เพิ่มรายการแบบกลุ่ม</div>
-                                                <div className="mt-0.5 text-[11px] text-gray-700">กรอกครั้งเดียวแล้วใช้กับทุกคน หรือเฉพาะพนักงานที่เลือก</div>
+                                                <div className="mt-0.5 text-[13px] text-gray-700">กรอกครั้งเดียวแล้วใช้กับทุกคน หรือเฉพาะพนักงานที่เลือก</div>
                                             </div>
                                             <div className="grid grid-cols-2 gap-2 sm:grid-cols-[120px_minmax(180px,1fr)_120px_130px_120px] xl:min-w-[760px]">
                                                 <select
@@ -1767,7 +1792,7 @@ export default function PayrollPage() {
                                                     <div className="min-w-0">
                                                         <div className="font-semibold text-gray-900">{item.name}</div>
                                                         <div className="text-xs text-gray-800 font-mono">{item.employeeId}</div>
-                                                        <span className={`mt-2 inline-flex text-[10px] px-2 py-0.5 rounded-full ${item.type === 'รายเดือน'
+                                                        <span className={`mt-2 inline-flex text-xs px-2 py-0.5 rounded-full ${item.type === 'รายเดือน'
                                                             ? 'bg-blue-50 text-blue-600 border border-blue-100'
                                                             : 'bg-orange-50 text-orange-600 border border-orange-100'
                                                             }`}>
@@ -1780,7 +1805,7 @@ export default function PayrollPage() {
                                                             <div className="text-slate-700">วันทำงาน</div>
                                                             <div className="mt-0.5 font-semibold text-slate-900">{item.workDays.toFixed(2).replace(/\.?0+$/, "")} วัน</div>
                                                             {item.leaveDays > 0 && (
-                                                                <div className="mt-0.5 text-[10px] font-medium text-blue-600">
+                                                                <div className="mt-0.5 text-xs font-medium text-blue-600">
                                                                     รวมลา {formatLeaveDayHourUnits(item.leaveDays)}
                                                                 </div>
                                                             )}
@@ -1803,11 +1828,11 @@ export default function PayrollPage() {
 
                                                     <div className="rounded-lg border border-blue-100 bg-blue-50/50 p-2">
                                                         <div className="mb-2 flex items-center justify-between gap-2">
-                                                            <span className="text-[11px] font-semibold text-blue-700">เงินเพิ่ม</span>
+                                                            <span className="text-[13px] font-semibold text-blue-700">เงินเพิ่ม</span>
                                                             <button
                                                                 type="button"
                                                                 onClick={() => addManualIncome(item.employeeId)}
-                                                                className="inline-flex h-7 items-center gap-1 rounded-md border border-blue-200 bg-white px-2 text-[11px] font-medium text-blue-700 hover:bg-blue-50"
+                                                                className="inline-flex h-7 items-center gap-1 rounded-md border border-blue-200 bg-white px-2 text-[13px] font-medium text-blue-700 hover:bg-blue-50"
                                                             >
                                                                 <Plus className="h-3 w-3" />
                                                                 เพิ่ม
@@ -1815,7 +1840,7 @@ export default function PayrollPage() {
                                                         </div>
 
                                                         {(item.manualIncomes || []).length === 0 ? (
-                                                            <div className="rounded-md border border-dashed border-blue-100 bg-white/60 px-2 py-2 text-center text-[11px] text-blue-400">
+                                                            <div className="rounded-md border border-dashed border-blue-100 bg-white/60 px-2 py-2 text-center text-[13px] text-blue-400">
                                                                 ยังไม่มีเงินเพิ่ม
                                                             </div>
                                                         ) : (
@@ -1857,11 +1882,11 @@ export default function PayrollPage() {
 
                                                     <div className="rounded-lg border border-red-100 bg-red-50/40 p-2">
                                                         <div className="mb-2 flex items-center justify-between gap-2">
-                                                            <span className="text-[11px] font-semibold text-red-700">รายการหักเพิ่มเติม</span>
+                                                            <span className="text-[13px] font-semibold text-red-700">รายการหักเพิ่มเติม</span>
                                                             <button
                                                                 type="button"
                                                                 onClick={() => addManualDeduction(item.employeeId)}
-                                                                className="inline-flex h-7 items-center gap-1 rounded-md border border-red-200 bg-white px-2 text-[11px] font-medium text-red-700 hover:bg-red-50"
+                                                                className="inline-flex h-7 items-center gap-1 rounded-md border border-red-200 bg-white px-2 text-[13px] font-medium text-red-700 hover:bg-red-50"
                                                             >
                                                                 <Plus className="h-3 w-3" />
                                                                 เพิ่ม
@@ -1870,18 +1895,25 @@ export default function PayrollPage() {
 
                                                         {(item.installmentDeductions || []).length > 0 && (
                                                             <div className="mb-2 space-y-1.5 rounded-md border border-amber-100 bg-amber-50 px-2 py-2">
-                                                                <div className="text-[11px] font-semibold text-amber-700">หักผ่อนสินค้าอัตโนมัติ</div>
+                                                                <div className="text-[13px] font-semibold text-amber-700">หักผ่อนสินค้าอัตโนมัติ</div>
                                                                 {(item.installmentDeductions || []).map((deduction) => (
-                                                                    <div key={deduction.id} className="flex items-center justify-between gap-2 text-[11px] text-amber-800">
-                                                                        <span className="truncate">{deduction.label}</span>
-                                                                        <span className="font-mono font-semibold">฿{toNumber(deduction.amount).toLocaleString()}</span>
+                                                                    <div key={deduction.id} className="grid grid-cols-[1fr_86px] gap-1.5 items-center">
+                                                                        <span className="truncate text-[13px] text-amber-800">{deduction.label}</span>
+                                                                        <input
+                                                                            type="number"
+                                                                            min="0"
+                                                                            value={toNumber(deduction.amount) || ""}
+                                                                            onChange={(e) => updateInstallmentDeduction(item.employeeId, deduction.id, "amount", e.target.value)}
+                                                                            className="h-8 min-w-0 rounded-md border border-amber-200 bg-white px-2 text-right text-xs font-mono focus:outline-none focus:ring-2 focus:ring-amber-300"
+                                                                            placeholder="0"
+                                                                        />
                                                                     </div>
                                                                 ))}
                                                             </div>
                                                         )}
 
                                                         {(item.manualDeductions || []).length === 0 ? (
-                                                            <div className="rounded-md border border-dashed border-red-100 bg-white/60 px-2 py-2 text-center text-[11px] text-red-400">
+                                                            <div className="rounded-md border border-dashed border-red-100 bg-white/60 px-2 py-2 text-center text-[13px] text-red-400">
                                                                 ยังไม่มีรายการหักเพิ่ม
                                                             </div>
                                                         ) : (
@@ -1925,10 +1957,10 @@ export default function PayrollPage() {
                                                         <div className="text-xs text-gray-700">รายรับ ฿{toNumber(item.totalIncome).toLocaleString()}</div>
                                                         <div className="text-xs text-red-600">หัก {toNumber(item.totalDeduction) > 0 ? `฿${toNumber(item.totalDeduction).toLocaleString()}` : "-"}</div>
                                                         {manualDeductionTotal > 0 && (
-                                                            <div className="text-[11px] text-red-400">รวมรายการหักเพิ่ม ฿{manualDeductionTotal.toLocaleString()}</div>
+                                                            <div className="text-[13px] text-red-400">รวมรายการหักเพิ่ม ฿{manualDeductionTotal.toLocaleString()}</div>
                                                         )}
                                                         {installmentDeductionTotal > 0 && (
-                                                            <div className="text-[11px] text-amber-600">ผ่อนสินค้า ฿{installmentDeductionTotal.toLocaleString()}</div>
+                                                            <div className="text-[13px] text-amber-600">ผ่อนสินค้า ฿{installmentDeductionTotal.toLocaleString()}</div>
                                                         )}
                                                         <div className="mt-2 inline-flex rounded-md border border-emerald-100 bg-emerald-50 px-3 py-1.5 font-mono text-base font-bold text-emerald-700">
                                                             ฿{toNumber(item.netTotal).toLocaleString()}
