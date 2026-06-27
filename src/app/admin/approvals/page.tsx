@@ -35,15 +35,14 @@ export default function ApprovalsPage() {
         setLoading(true);
         try {
             const [leaves, ots, swaps] = await Promise.all([
-                leaveService.getAll(),
-                otService.getAll(),
-                swapService.getAll()
+                leaveService.getPending(),
+                otService.getPending(),
+                swapService.getPending()
             ]);
 
-            // Filter only pending requests
-            setLeaveRequests(leaves.filter(r => r.status === "รออนุมัติ"));
-            setOtRequests(ots.filter(r => r.status === "รออนุมัติ"));
-            setSwapRequests(swaps.filter(r => r.status === "รออนุมัติ"));
+            setLeaveRequests(leaves);
+            setOtRequests(ots);
+            setSwapRequests(swaps);
         } catch (error) {
             console.error("Error fetching requests:", error);
         } finally {

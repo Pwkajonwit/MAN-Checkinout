@@ -62,6 +62,39 @@ const REQUIRED_QUERIES: {
             ]
         },
         {
+            name: "Pending Leave Requests",
+            collection: "leaveRequests",
+            buildQuery: () => query(
+                collection(db, "leaveRequests"),
+                where("status", "==", "รออนุมัติ"),
+                orderBy("createdAt", "desc"),
+                limit(1)
+            ),
+            fields: [
+                { fieldPath: "status", order: "ASCENDING" },
+                { fieldPath: "createdAt", order: "DESCENDING" }
+            ]
+        },
+        {
+            name: "Leave Requests by Employee and StartDate",
+            collection: "leaveRequests",
+            buildQuery: () => {
+                const now = new Date();
+                return query(
+                    collection(db, "leaveRequests"),
+                    where("employeeId", "==", "__test__"),
+                    where("startDate", ">=", Timestamp.fromDate(now)),
+                    where("startDate", "<=", Timestamp.fromDate(now)),
+                    orderBy("startDate", "desc"),
+                    limit(1)
+                );
+            },
+            fields: [
+                { fieldPath: "employeeId", order: "ASCENDING" },
+                { fieldPath: "startDate", order: "DESCENDING" }
+            ]
+        },
+        {
             name: "Leave Requests by Date Range",
             collection: "leaveRequests",
             buildQuery: () => {
@@ -86,6 +119,20 @@ const REQUIRED_QUERIES: {
             ),
             fields: [
                 { fieldPath: "employeeId", order: "ASCENDING" },
+                { fieldPath: "createdAt", order: "DESCENDING" }
+            ]
+        },
+        {
+            name: "Pending OT Requests",
+            collection: "otRequests",
+            buildQuery: () => query(
+                collection(db, "otRequests"),
+                where("status", "==", "รออนุมัติ"),
+                orderBy("createdAt", "desc"),
+                limit(1)
+            ),
+            fields: [
+                { fieldPath: "status", order: "ASCENDING" },
                 { fieldPath: "createdAt", order: "DESCENDING" }
             ]
         },
@@ -141,6 +188,20 @@ const REQUIRED_QUERIES: {
             ),
             fields: [
                 { fieldPath: "employeeId", order: "ASCENDING" },
+                { fieldPath: "createdAt", order: "DESCENDING" }
+            ]
+        },
+        {
+            name: "Pending Swap Requests",
+            collection: "swapRequests",
+            buildQuery: () => query(
+                collection(db, "swapRequests"),
+                where("status", "==", "รออนุมัติ"),
+                orderBy("createdAt", "desc"),
+                limit(1)
+            ),
+            fields: [
+                { fieldPath: "status", order: "ASCENDING" },
                 { fieldPath: "createdAt", order: "DESCENDING" }
             ]
         },

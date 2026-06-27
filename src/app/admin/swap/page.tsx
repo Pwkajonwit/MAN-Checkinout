@@ -1,6 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { startOfMonth, endOfMonth, format, subMonths, addMonths } from "date-fns";
+import { th } from "date-fns/locale";
+
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { SwapTable } from "@/components/swap/SwapTable";
@@ -14,6 +18,7 @@ export default function SwapPage() {
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [loading, setLoading] = useState(true);
     const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+    const [currentDate, setCurrentDate] = useState(new Date());
     const [statusFilter, setStatusFilter] = useState<"all" | "รออนุมัติ" | "อนุมัติ" | "ไม่อนุมัติ">("all");
     const [alertState, setAlertState] = useState<{
         isOpen: boolean;
@@ -30,8 +35,8 @@ export default function SwapPage() {
     const loadData = async () => {
         try {
             const [swapData, empData] = await Promise.all([
-                swapService.getAll(),
-                employeeService.getAll()
+                swapService.getByDateRange(startOfMonth(currentDate), endOfMonth(currentDate)),
+                employeeService.getActive()
             ]);
             setRequests(swapData);
             setEmployees(empData);
@@ -44,7 +49,9 @@ export default function SwapPage() {
 
     useEffect(() => {
         loadData();
+    }, [currentDate]);
 
+    useEffect(() => {
         // Check if current user is super_admin
         const checkAdminRole = async () => {
             const user = auth.currentUser;
@@ -234,6 +241,19 @@ export default function SwapPage() {
             <PageHeader
                 title="คำขอสลับวันหยุด"
                 subtitle={`${requests.length} รายการทั้งหมด`}
+                action={
+                    <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-gray-200 shadow-sm mr-2">
+                        <button onClick={() => setCurrentDate(subMonths(currentDate, 1))} className="p-1 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors">
+                            <ChevronLeft className="w-5 h-5" />
+                        </button>
+                        <span className="font-semibold text-gray-700 min-w-[120px] text-center">
+                            {format(currentDate, "MMMM yyyy", { locale: th })}
+                        </span>
+                        <button onClick={() => setCurrentDate(addMonths(currentDate, 1))} className="p-1 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors">
+                            <ChevronRight className="w-5 h-5" />
+                        </button>
+                    </div>
+                }
             />
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

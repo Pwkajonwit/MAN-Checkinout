@@ -24,8 +24,14 @@ export default function HistoryPage() {
 
     const [loading, setLoading] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
+
     const [currentDaysLoaded, setCurrentDaysLoaded] = useState(INITIAL_DAYS);
+    const [currentLeaveDaysLoaded, setCurrentLeaveDaysLoaded] = useState(INITIAL_DAYS);
+    const [currentOtDaysLoaded, setCurrentOtDaysLoaded] = useState(INITIAL_DAYS);
+    
     const [hasMoreAttendance, setHasMoreAttendance] = useState(true);
+    const [hasMoreLeaves, setHasMoreLeaves] = useState(true);
+    const [hasMoreOts, setHasMoreOts] = useState(true);
 
     const [loadedTabs, setLoadedTabs] = useState<{ attendance: boolean; leave: boolean; ot: boolean }>({
         attendance: false,
@@ -101,6 +107,54 @@ export default function HistoryPage() {
 
         fetchOT();
     }, [activeTab, employee]);
+
+    const loadMoreLeaves = async () => {
+        if (!employee?.id || loadingMore) return;
+
+        setLoadingMore(true);
+        try {
+            const newDays = currentLeaveDaysLoaded + LOAD_MORE_DAYS;
+            const endDate = new Date();
+            endDate.setHours(23, 59, 59, 999);
+            const startDate = subDays(endDate, newDays);
+            startDate.setHours(0, 0, 0, 0);
+
+            const leaveData = await leaveService.getHistory(employee.id, startDate, endDate);
+
+            setLeaves(leaveData);
+            setCurrentLeaveDaysLoaded(newDays);
+
+            setHasMoreLeaves(leaveData.length > leaves.length);
+        } catch (error) {
+            console.error("Error loading more leaves:", error);
+        } finally {
+            setLoadingMore(false);
+        }
+    };
+
+    const loadMoreOts = async () => {
+        if (!employee?.id || loadingMore) return;
+
+        setLoadingMore(true);
+        try {
+            const newDays = currentOtDaysLoaded + LOAD_MORE_DAYS;
+            const endDate = new Date();
+            endDate.setHours(23, 59, 59, 999);
+            const startDate = subDays(endDate, newDays);
+            startDate.setHours(0, 0, 0, 0);
+
+            const otData = await otService.getHistory(employee.id, startDate, endDate);
+
+            setOts(otData);
+            setCurrentOtDaysLoaded(newDays);
+
+            setHasMoreOts(otData.length > ots.length);
+        } catch (error) {
+            console.error("Error loading more OT:", error);
+        } finally {
+            setLoadingMore(false);
+        }
+    };
 
     const loadMoreAttendance = async () => {
         if (!employee?.id || loadingMore) return;

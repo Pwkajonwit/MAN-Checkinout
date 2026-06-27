@@ -1016,7 +1016,7 @@ export default function PayrollPage() {
             const [allAttendance, allOTRequests, allSwapRequests, allLeaveRequests, activeInstallments] = await Promise.all([
                 attendanceService.getByDateRange(startDate, endDate),
                 otService.getByDateRange(startDate, endDate),
-                swapService.getAll(), // Get all swap requests and filter later
+                swapService.getByDateRange(startDate, endDate), // Fetch only relevant swap requests
                 leaveService.getByDateRange(startDate, endDate),
                 installmentService.getActiveForPeriod(periodMonth),
             ]);

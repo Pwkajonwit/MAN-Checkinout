@@ -137,6 +137,20 @@ export const employeeService = {
         return docRef.id;
     },
 
+    async getActive() {
+        const q = query(collection(db, "employees"), where("status", "==", "ทำงาน"));
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                ...data,
+                registeredDate: data.registeredDate?.toDate(),
+                endDate: data.endDate?.toDate(),
+            };
+        }) as Employee[];
+    },
+
     async getAll() {
         const querySnapshot = await getDocs(collection(db, "employees"));
         return querySnapshot.docs.map(doc => {
@@ -394,6 +408,22 @@ export const leaveService = {
         })) as LeaveRequest[];
     },
 
+    async getPending() {
+        const q = query(
+            collection(db, "leaveRequests"),
+            where("status", "==", "รออนุมัติ"),
+            orderBy("createdAt", "desc")
+        );
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            startDate: doc.data().startDate?.toDate(),
+            endDate: doc.data().endDate?.toDate(),
+            createdAt: doc.data().createdAt?.toDate(),
+        })) as LeaveRequest[];
+    },
+
     async getByDateRange(startDate: Date, endDate: Date) {
         const start = new Date(startDate);
         start.setHours(0, 0, 0, 0);
@@ -467,6 +497,53 @@ export const leaveService = {
             createdAt: doc.data().createdAt?.toDate(),
         })) as LeaveRequest[];
     },
+
+    async getByEmployeeIdAndYear(employeeId: string, year: number) {
+        const startOfYear = new Date(year, 0, 1);
+        const endOfYear = new Date(year, 11, 31, 23, 59, 59, 999);
+        const q = query(
+            collection(db, "leaveRequests"),
+            where("employeeId", "==", employeeId),
+            where("startDate", ">=", Timestamp.fromDate(startOfYear)),
+            where("startDate", "<=", Timestamp.fromDate(endOfYear)),
+            orderBy("startDate", "desc")
+        );
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            startDate: doc.data().startDate?.toDate(),
+            endDate: doc.data().endDate?.toDate(),
+            createdAt: doc.data().createdAt?.toDate(),
+        })) as LeaveRequest[];
+    },
+
+    async getHistory(employeeId: string, startDate?: Date, endDate?: Date) {
+        let q = query(
+            collection(db, "leaveRequests"),
+            where("employeeId", "==", employeeId),
+            orderBy("createdAt", "desc")
+        );
+
+        if (startDate && endDate) {
+            q = query(
+                collection(db, "leaveRequests"),
+                where("employeeId", "==", employeeId),
+                where("createdAt", ">=", Timestamp.fromDate(startDate)),
+                where("createdAt", "<=", Timestamp.fromDate(endDate)),
+                orderBy("createdAt", "desc")
+            );
+        }
+
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            startDate: doc.data().startDate?.toDate(),
+            endDate: doc.data().endDate?.toDate(),
+            createdAt: doc.data().createdAt?.toDate(),
+        })) as LeaveRequest[];
+    },
 };
 
 // OT Request CRUD operations
@@ -484,6 +561,23 @@ export const otService = {
 
     async getAll() {
         const q = query(collection(db, "otRequests"), orderBy("createdAt", "desc"));
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            date: doc.data().date?.toDate(),
+            startTime: doc.data().startTime?.toDate(),
+            endTime: doc.data().endTime?.toDate(),
+            createdAt: doc.data().createdAt?.toDate(),
+        })) as OTRequest[];
+    },
+
+    async getPending() {
+        const q = query(
+            collection(db, "otRequests"),
+            where("status", "==", "รออนุมัติ"),
+            orderBy("createdAt", "desc")
+        );
         const querySnapshot = await getDocs(q);
         return querySnapshot.docs.map(doc => ({
             id: doc.id,
@@ -568,6 +662,34 @@ export const otService = {
             createdAt: doc.data().createdAt?.toDate(),
         })) as OTRequest[];
     },
+
+    async getHistory(employeeId: string, startDate?: Date, endDate?: Date) {
+        let q = query(
+            collection(db, "otRequests"),
+            where("employeeId", "==", employeeId),
+            orderBy("createdAt", "desc")
+        );
+
+        if (startDate && endDate) {
+            q = query(
+                collection(db, "otRequests"),
+                where("employeeId", "==", employeeId),
+                where("createdAt", ">=", Timestamp.fromDate(startDate)),
+                where("createdAt", "<=", Timestamp.fromDate(endDate)),
+                orderBy("createdAt", "desc")
+            );
+        }
+
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            date: doc.data().date?.toDate(),
+            startTime: doc.data().startTime?.toDate(),
+            endTime: doc.data().endTime?.toDate(),
+            createdAt: doc.data().createdAt?.toDate(),
+        })) as OTRequest[];
+    },
 };
 
 // Swap Holiday Request CRUD operations
@@ -592,6 +714,61 @@ export const swapService = {
             holidayDate: doc.data().holidayDate?.toDate(),
             createdAt: doc.data().createdAt?.toDate(),
         })) as SwapRequest[];
+    },
+
+    async getPending() {
+        const q = query(
+            collection(db, "swapRequests"),
+            where("status", "==", "รออนุมัติ"),
+            orderBy("createdAt", "desc")
+        );
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            workDate: doc.data().workDate?.toDate(),
+            holidayDate: doc.data().holidayDate?.toDate(),
+            createdAt: doc.data().createdAt?.toDate(),
+        })) as SwapRequest[];
+    },
+
+    async getByDateRange(startDate: Date, endDate: Date) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+
+        // Firebase doesn't support OR on different inequality fields, so we do two queries and merge
+        const qWork = query(
+            collection(db, "swapRequests"),
+            where("workDate", ">=", Timestamp.fromDate(start)),
+            where("workDate", "<=", Timestamp.fromDate(end))
+        );
+        const qHoliday = query(
+            collection(db, "swapRequests"),
+            where("holidayDate", ">=", Timestamp.fromDate(start)),
+            where("holidayDate", "<=", Timestamp.fromDate(end))
+        );
+
+        const [workSnap, holidaySnap] = await Promise.all([getDocs(qWork), getDocs(qHoliday)]);
+        const uniqueSwaps = new Map();
+
+        const processDoc = (doc: any) => {
+            if (!uniqueSwaps.has(doc.id)) {
+                uniqueSwaps.set(doc.id, {
+                    id: doc.id,
+                    ...doc.data(),
+                    workDate: doc.data().workDate?.toDate(),
+                    holidayDate: doc.data().holidayDate?.toDate(),
+                    createdAt: doc.data().createdAt?.toDate(),
+                });
+            }
+        };
+
+        workSnap.docs.forEach(processDoc);
+        holidaySnap.docs.forEach(processDoc);
+
+        return Array.from(uniqueSwaps.values()) as SwapRequest[];
     },
 
     async getByEmployeeId(employeeId: string) {

@@ -46,7 +46,8 @@ export default function LeaveRequestPage() {
         if (employee) {
             const fetchLeaveData = async () => {
                 try {
-                    const requests = await leaveService.getByEmployeeId(employee.id || "");
+                    const currentYear = new Date().getFullYear();
+                    const requests = await leaveService.getByEmployeeIdAndYear(employee.id || "", currentYear);
 
                     // Calculate used days
                     const used = {

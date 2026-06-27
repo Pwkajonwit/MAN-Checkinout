@@ -137,13 +137,11 @@ export async function GET(request: Request) {
             day: 'numeric'
         });
 
-        const [employees, attendances, allSwaps] = await Promise.all([
-            employeeService.getAll(),
+        const [activeEmployees, attendances, allSwaps] = await Promise.all([
+            employeeService.getActive(),
             attendanceService.getByDateRange(todayStart, todayEnd),
-            swapService.getAll(),
+            swapService.getByDateRange(todayStart, todayEnd),
         ]);
-
-        const activeEmployees = employees.filter(employee => employee.status === "ทำงาน");
         const approvedSwaps = allSwaps.filter(swap => swap.status === "อนุมัติ");
         const globalHolidays = config.weeklyHolidays || [0, 6];
         const useIndividualHolidays = config.useIndividualHolidays ?? false;

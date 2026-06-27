@@ -23,7 +23,7 @@ export default function ShiftAssignmentPage() {
     const loadData = async () => {
         try {
             const [empData, shiftData] = await Promise.all([
-                employeeService.getAll(),
+                employeeService.getActive(),
                 shiftService.getAll(),
             ]);
             setEmployees(empData.filter(e => e.status === "ทำงาน"));

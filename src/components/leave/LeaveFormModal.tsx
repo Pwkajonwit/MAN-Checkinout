@@ -34,11 +34,10 @@ export function LeaveFormModal({ isOpen, onClose, leave, onSuccess }: LeaveFormM
         attachment: null as string | null,
     });
 
-    // Load employees
     useEffect(() => {
         const loadEmployees = async () => {
             try {
-                const data = await employeeService.getAll();
+                const data = await employeeService.getActive();
                 setEmployees(data);
             } catch (error) {
                 console.error("Error loading employees:", error);

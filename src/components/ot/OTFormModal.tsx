@@ -30,7 +30,7 @@ export function OTFormModal({ isOpen, onClose, ot, onSuccess }: OTFormModalProps
     useEffect(() => {
         const loadEmployees = async () => {
             try {
-                const data = await employeeService.getAll();
+                const data = await employeeService.getActive();
                 setEmployees(data);
             } catch (error) {
                 console.error("Error loading employees:", error);

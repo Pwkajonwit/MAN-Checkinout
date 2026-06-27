@@ -6,7 +6,9 @@ import { StatsCard } from "@/components/dashboard/StatsCard";
 import { OTTable } from "@/components/ot/OTTable";
 import { OTFormModal } from "@/components/ot/OTFormModal";
 import { Button } from "@/components/ui/button";
-import { Pencil, Plus } from "lucide-react";
+import { Pencil, Plus, ChevronLeft, ChevronRight } from "lucide-react";
+import { startOfMonth, endOfMonth, format, subMonths, addMonths } from "date-fns";
+import { th } from "date-fns/locale";
 import { otService, type OTRequest, employeeService, type Employee, adminService } from "@/lib/firestore";
 import { sendPushMessage } from "@/app/actions/line";
 import { auth } from "@/lib/firebase";
@@ -18,12 +20,13 @@ export default function OTPage() {
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [loading, setLoading] = useState(true);
     const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+    const [currentDate, setCurrentDate] = useState(new Date());
     const [statusFilter, setStatusFilter] = useState<"all" | "รออนุมัติ" | "อนุมัติ" | "ไม่อนุมัติ">("all");
 
     const loadData = async () => {
         try {
             const [otData, empData] = await Promise.all([
-                otService.getAll(),
+                otService.getByDateRange(startOfMonth(currentDate), endOfMonth(currentDate)),
                 employeeService.getAll()
             ]);
             setOTRequests(otData);
@@ -37,7 +40,9 @@ export default function OTPage() {
 
     useEffect(() => {
         loadData();
+    }, [currentDate]);
 
+    useEffect(() => {
         // Check if current user is super_admin
         const checkAdminRole = async () => {
             const user = auth.currentUser;
@@ -231,7 +236,19 @@ export default function OTPage() {
                 subtitle={`${otRequests.length} results found`}
                 searchPlaceholder="Employee |"
                 action={
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-2 md:gap-4">
+                        <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-gray-200 shadow-sm mr-2">
+                            <button onClick={() => setCurrentDate(subMonths(currentDate, 1))} className="p-1 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors">
+                                <ChevronLeft className="w-5 h-5" />
+                            </button>
+                            <span className="font-semibold text-gray-700 min-w-[120px] text-center">
+                                {format(currentDate, "MMMM yyyy", { locale: th })}
+                            </span>
+                            <button onClick={() => setCurrentDate(addMonths(currentDate, 1))} className="p-1 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors">
+                                <ChevronRight className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className="flex gap-2">
                         <Button
                             onClick={handleAddOT}
                             className="bg-primary-dark hover:bg-primary-dark/90 text-white rounded-xl px-6 gap-2"
@@ -240,6 +257,7 @@ export default function OTPage() {
                             เพิ่มข้อมูลโอที
                         </Button>
 
+                    </div>
                     </div>
                 }
             />
