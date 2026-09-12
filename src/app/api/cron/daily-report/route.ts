@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { systemConfigService, employeeService, attendanceService, swapService } from "@/lib/firestore";
+import { getLateMinutes, WORK_TIME_CONFIG } from "@/lib/workTime";
 
 // Force dynamic to prevent caching
 export const dynamic = 'force-dynamic';
@@ -149,6 +150,7 @@ export async function GET(request: Request) {
         const absentNames: string[] = [];
         const swapHolidayNames: string[] = [];
         const systemHolidayNames: string[] = [];
+        const lateEmployees: { name: string; lateMinutes: number }[] = [];
         let normalCount = 0;
         let lateCount = 0;
 
@@ -179,9 +181,25 @@ export async function GET(request: Request) {
                 return;
             }
 
-            const actualLateMinutes = lateRecord?.lateMinutes || checkInRecord?.lateMinutes || 0;
+            let actualLateMinutes = lateRecord?.lateMinutes || checkInRecord?.lateMinutes || 0;
+            const rawCheckIn = lateRecord?.checkIn || checkInRecord?.checkIn;
+            if (actualLateMinutes === 0 && rawCheckIn && lateRecord) {
+                const checkInDate = rawCheckIn instanceof Date
+                    ? rawCheckIn
+                    : new Date(rawCheckIn);
+                actualLateMinutes = getLateMinutes(checkInDate, {
+                    hour: config.checkInHour ?? WORK_TIME_CONFIG.standardCheckIn.hour,
+                    minute: config.checkInMinute ?? WORK_TIME_CONFIG.standardCheckIn.minute,
+                    gracePeriod: config.lateGracePeriod ?? WORK_TIME_CONFIG.lateGracePeriod
+                });
+            }
+
             if (lateRecord || actualLateMinutes > 0) {
                 lateCount++;
+                lateEmployees.push({
+                    name: employee.name,
+                    lateMinutes: actualLateMinutes
+                });
                 return;
             }
 
@@ -193,7 +211,158 @@ export async function GET(request: Request) {
             absentNames.push(employee.name);
         });
 
-        // 4. Send Line Message
+        // Sort late employees by lateMinutes descending (most late first)
+        lateEmployees.sort((a, b) => b.lateMinutes - a.lateMinutes);
+
+        // 4. Send Line Message (Carousel with 2 Bubbles)
+        const summaryBubble = {
+            type: "bubble",
+            header: {
+                type: "box",
+                layout: "vertical",
+                contents: [
+                    {
+                        type: "text",
+                        text: "สรุปการลงเวลาประจำวัน",
+                        weight: "bold",
+                        color: "#1DB446",
+                        size: "sm"
+                    },
+                    {
+                        type: "text",
+                        text: reportDate,
+                        weight: "bold",
+                        size: "md",
+                        margin: "md",
+                        wrap: true
+                    }
+                ]
+            },
+            body: {
+                type: "box",
+                layout: "vertical",
+                contents: [
+                    createSummaryRow("พนักงานทั้งหมด", `${activeEmployees.length} คน`, "#111111", "md"),
+                    { type: "separator", margin: "md" },
+                    createSummaryRow("ปกติ", `${normalCount} คน`, "#22c55e", "md"),
+                    createSummaryRow("สาย", `${lateCount} คน`, "#f97316"),
+                    createSummaryRow("ไม่มา", `${absentNames.length} คน`, "#ef4444"),
+                    createSummaryRow("สลับหยุด", `${swapHolidayNames.length} คน`, "#8b5cf6"),
+                    createSummaryRow("หยุดตามระบบ", `${systemHolidayNames.length} คน`, "#64748b"),
+                    { type: "separator", margin: "md" },
+                    createNameSection("1. ไม่มา", absentNames, "#ef4444"),
+                    createNameSection("2. สลับหยุด", swapHolidayNames, "#8b5cf6"),
+                    createNameSection("3. หยุดตามระบบ", systemHolidayNames, "#64748b")
+                ]
+            }
+        };
+
+        const lateBubble = {
+            type: "bubble",
+            header: {
+                type: "box",
+                layout: "vertical",
+                contents: [
+                    {
+                        type: "text",
+                        text: "รายชื่อพนักงานมาสาย",
+                        weight: "bold",
+                        color: "#ea580c",
+                        size: "sm"
+                    },
+                    {
+                        type: "text",
+                        text: reportDate,
+                        weight: "bold",
+                        size: "md",
+                        margin: "md",
+                        wrap: true
+                    },
+                    {
+                        type: "text",
+                        text: `มาสายทั้งหมด ${lateCount} คน`,
+                        size: "xs",
+                        color: "#64748b",
+                        margin: "xs"
+                    }
+                ]
+            },
+            body: {
+                type: "box",
+                layout: "vertical",
+                contents: lateEmployees.length === 0
+                    ? [
+                        {
+                            type: "box",
+                            layout: "vertical",
+                            contents: [
+                                {
+                                    type: "text",
+                                    text: "ไม่มีพนักงานมาสาย 🎉",
+                                    size: "sm",
+                                    color: "#16a34a",
+                                    weight: "bold",
+                                    align: "center"
+                                },
+                                {
+                                    type: "text",
+                                    text: "ทุกคนเข้างานตรงเวลาในวันนี้",
+                                    size: "xs",
+                                    color: "#64748b",
+                                    align: "center",
+                                    margin: "xs"
+                                }
+                            ],
+                            margin: "xl"
+                        }
+                    ]
+                    : [
+                        {
+                            type: "box",
+                            layout: "horizontal",
+                            contents: [
+                                { type: "text", text: "พนักงาน", size: "xs", color: "#64748b", weight: "bold", flex: 4 },
+                                { type: "text", text: "สาย", size: "xs", color: "#64748b", weight: "bold", align: "end", flex: 2 }
+                            ],
+                            margin: "none"
+                        },
+                        { type: "separator", margin: "sm" },
+                        ...lateEmployees.slice(0, 30).map(emp => ({
+                            type: "box",
+                            layout: "horizontal",
+                            contents: [
+                                {
+                                    type: "text",
+                                    text: emp.name,
+                                    size: "sm",
+                                    color: "#333333",
+                                    flex: 4,
+                                    wrap: true
+                                },
+                                {
+                                    type: "text",
+                                    text: `${emp.lateMinutes > 0 ? emp.lateMinutes : 1} น`,
+                                    size: "sm",
+                                    color: "#ea580c",
+                                    weight: "bold",
+                                    align: "end",
+                                    flex: 2
+                                }
+                            ],
+                            margin: "md"
+                        })),
+                        ...(lateEmployees.length > 30 ? [{
+                            type: "text",
+                            text: `...และอีก ${lateEmployees.length - 30} คน`,
+                            size: "xs",
+                            color: "#64748b",
+                            margin: "md",
+                            align: "center"
+                        }] : [])
+                    ]
+            }
+        };
+
         const message = {
             to: config.adminLineGroupId,
             messages: [
@@ -201,45 +370,11 @@ export async function GET(request: Request) {
                     type: "flex",
                     altText: `สรุปการลงเวลาประจำวัน ${reportDate}`,
                     contents: {
-                        type: "bubble",
-                        header: {
-                            type: "box",
-                            layout: "vertical",
-                            contents: [
-                                {
-                                    type: "text",
-                                    text: "สรุปการลงเวลาประจำวัน",
-                                    weight: "bold",
-                                    color: "#1DB446",
-                                    size: "sm"
-                                },
-                                {
-                                    type: "text",
-                                    text: reportDate,
-                                    weight: "bold",
-                                    size: "md",
-                                    margin: "md",
-                                    wrap: true
-                                }
-                            ]
-                        },
-                        body: {
-                            type: "box",
-                            layout: "vertical",
-                            contents: [
-                                createSummaryRow("พนักงานทั้งหมด", `${activeEmployees.length} คน`, "#111111", "md"),
-                                { type: "separator", margin: "md" },
-                                createSummaryRow("ปกติ", `${normalCount} คน`, "#22c55e", "md"),
-                                createSummaryRow("สาย", `${lateCount} คน`, "#f97316"),
-                                createSummaryRow("ไม่มา", `${absentNames.length} คน`, "#ef4444"),
-                                createSummaryRow("สลับหยุด", `${swapHolidayNames.length} คน`, "#8b5cf6"),
-                                createSummaryRow("หยุดตามระบบ", `${systemHolidayNames.length} คน`, "#64748b"),
-                                { type: "separator", margin: "md" },
-                                createNameSection("1. ไม่มา", absentNames, "#ef4444"),
-                                createNameSection("2. สลับหยุด", swapHolidayNames, "#8b5cf6"),
-                                createNameSection("3. หยุดตามระบบ", systemHolidayNames, "#64748b")
-                            ]
-                        }
+                        type: "carousel",
+                        contents: [
+                            summaryBubble,
+                            lateBubble
+                        ]
                     }
                 }
             ]
@@ -271,12 +406,12 @@ export async function GET(request: Request) {
                 total: activeEmployees.length,
                 normal: normalCount,
                 late: lateCount,
+                lateEmployees,
                 absent: absentNames,
                 swapHoliday: swapHolidayNames,
                 systemHoliday: systemHolidayNames
             }
         });
-
     } catch (error) {
         console.error("Cron Job Error:", error);
         return NextResponse.json({ success: false, message: 'Internal Server Error', error: String(error) }, { status: 500 });

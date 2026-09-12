@@ -190,35 +190,43 @@ export function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () =>
                                 </button>
 
                                 {groupOpen && (
-                                <div className="space-y-1">
-                                    {group.items.map((item) => {
-                                        const isActive = pathname === item.href;
-                                        return (
-                                            <Link
-                                                key={item.href}
-                                                href={item.href}
-                                                onClick={onClose}
-                                                className={cn(
-                                                    "relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 group overflow-hidden",
-                                                    isActive
-                                                        ? "bg-[#009966] text-white shadow-md shadow-[#009966]/20 font-medium"
-                                                        : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-200"
-                                                )}
-                                            >
-                                                {/* Active Indicator Highlight */}
-                                                {isActive && (
-                                                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-white rounded-r-lg opacity-0" /> // Hidden for card style
-                                                )}
+                                    <div className="relative ml-[22px] pl-3.5 space-y-1 mt-1.5 mb-2.5">
+                                        {/* Vertical tree line from top to center of last item */}
+                                        <div className="absolute left-0 top-0 bottom-[17px] w-px bg-slate-700/70 pointer-events-none" />
 
-                                                <item.icon className={cn(
-                                                    "w-4 h-4 transition-transform group-hover:scale-110",
-                                                    isActive ? "text-white" : "text-slate-500 group-hover:text-slate-300"
-                                                )} />
-                                                <span className="relative z-10">{item.label}</span>
-                                            </Link>
-                                        );
-                                    })}
-                                </div>
+                                        {group.items.map((item) => {
+                                            const isActive = pathname === item.href;
+                                            return (
+                                                <Link
+                                                    key={item.href}
+                                                    href={item.href}
+                                                    onClick={onClose}
+                                                    className={cn(
+                                                        "relative flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] transition-all duration-150 group",
+                                                        isActive
+                                                            ? "bg-[#009966] text-white shadow-xs font-medium"
+                                                            : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200 font-normal"
+                                                    )}
+                                                >
+                                                    {/* Horizontal tree branch connector line */}
+                                                    <span
+                                                        className={cn(
+                                                            "absolute -left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-px transition-colors pointer-events-none",
+                                                            isActive
+                                                                ? "bg-emerald-400"
+                                                                : "bg-slate-700/70 group-hover:bg-slate-500"
+                                                        )}
+                                                    />
+
+                                                    <item.icon className={cn(
+                                                        "w-4 h-4 shrink-0 transition-transform group-hover:scale-105",
+                                                        isActive ? "text-white" : "text-slate-500 group-hover:text-slate-300"
+                                                    )} />
+                                                    <span className="relative z-10 truncate">{item.label}</span>
+                                                </Link>
+                                            );
+                                        })}
+                                    </div>
                                 )}
                             </div>
                         );

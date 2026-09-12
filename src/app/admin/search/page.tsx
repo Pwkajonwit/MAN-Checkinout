@@ -212,7 +212,21 @@ function SearchContent() {
 
     const summary = useMemo(() => {
         const { startDate, endDate, totalDays } = getDateRange();
-        const attendanceDays = attendances.filter(a => a.status === "เข้างาน" || a.status === "สาย" || a.status === "ออกงาน").length;
+        
+        // วันเข้างาน / วันมาทำงาน: นับเฉพาะการเข้างาน (ไม่นับออกงาน) โดยนับเป็นรายวันไม่ซ้ำ (Unique Dates)
+        const checkInDates = new Set<string>();
+        attendances.forEach(a => {
+            if (a.status === "เข้างาน" || a.status === "สาย") {
+                const d = a.checkIn || a.date;
+                if (d) {
+                    const dateStr = format(d instanceof Date ? d : (d as any).toDate(), "yyyy-MM-dd");
+                    checkInDates.add(dateStr);
+                } else if (a.id) {
+                    checkInDates.add(a.id);
+                }
+            }
+        });
+        const attendanceDays = checkInDates.size;
 
         let leaveDays = 0;
         leaves.forEach(l => {

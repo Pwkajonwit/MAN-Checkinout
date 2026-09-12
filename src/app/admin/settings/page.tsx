@@ -399,86 +399,86 @@ export default function SettingsPage() {
     }
 
     return (
-        <div className="pb-20">
+        <div className="space-y-4 pb-24">
             <PageHeader
                 title="ตั้งค่าระบบ"
                 subtitle="กำหนดนโยบายการเข้างาน การคำนวณเงินเดือน และการเชื่อมต่อ"
             />
 
-            <div className="relative z-10 space-y-6">
+            <div className="relative z-10 space-y-4">
 
                 {/* Success Notification */}
                 {saved && (
-                    <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 flex items-center gap-3 shadow-sm animate-fade-in">
-                        <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 px-4 flex items-center gap-3 shadow-xs animate-fade-in">
+                        <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
                         <div>
-                            <h4 className="text-emerald-800 font-semibold text-sm">บันทึกเรียบร้อย</h4>
-                            <p className="text-emerald-600 text-xs mt-0.5">การตั้งค่าระบบได้รับการอัปเดตแล้ว</p>
+                            <h4 className="text-emerald-900 font-semibold text-xs sm:text-sm">บันทึกเรียบร้อย</h4>
+                            <p className="text-emerald-700 text-xs font-normal mt-0.5">การตั้งค่าระบบได้รับการอัปเดตแล้ว</p>
                         </div>
                     </div>
                 )}
 
                 {/* 1. General Registration */}
-                <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
-                    <div className="px-6 py-4 border-b border-blue-100 bg-blue-50/50 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-blue-100 rounded-md">
-                                <UserPlus className="w-5 h-5 text-blue-700" />
+                <div className="bg-white rounded-xl shadow-xs border border-slate-200 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-slate-200 bg-slate-50/70 flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-lg bg-blue-100/80 text-blue-700 flex items-center justify-center shrink-0">
+                                <UserPlus className="w-4 h-4" />
                             </div>
                             <div>
-                                <h2 className="font-semibold text-slate-900">การลงทะเบียนพนักงาน</h2>
-                                <p className="text-xs text-slate-500">จัดการสิทธิ์การเข้าใช้งานระบบสำหรับพนักงานใหม่</p>
+                                <h2 className="text-xs sm:text-sm font-semibold text-slate-900 leading-tight">การลงทะเบียนพนักงาน</h2>
+                                <p className="text-[11px] text-slate-500 font-normal">จัดการสิทธิ์การเข้าใช้งานระบบสำหรับพนักงานใหม่</p>
                             </div>
                         </div>
                         <button
+                            type="button"
                             onClick={() => setSettings({ ...settings, allowNewRegistration: !settings.allowNewRegistration })}
-                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 ${settings.allowNewRegistration ? 'bg-slate-900' : 'bg-slate-200'}`}
+                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-hidden ${settings.allowNewRegistration ? 'bg-slate-900' : 'bg-slate-300'}`}
                         >
-                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.allowNewRegistration ? 'translate-x-6' : 'translate-x-1'}`} />
+                            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${settings.allowNewRegistration ? 'translate-x-4.5' : 'translate-x-1'}`} />
                         </button>
                     </div>
                     {settings.allowNewRegistration ? (
-                        <div className="px-6 py-3 bg-emerald-50/50 flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                            <span className="text-sm font-medium text-emerald-700">เปิดรับลงทะเบียน (Public)</span>
+                        <div className="px-4 py-2 bg-emerald-50/40 flex items-center gap-2 text-xs text-emerald-800 font-normal">
+                            <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></div>
+                            <span>เปิดรับลงทะเบียน (Public) — พนักงานใหม่สามารถลงทะเบียนผ่านระบบได้</span>
                         </div>
                     ) : (
-                        <div className="px-6 py-3 bg-slate-50 flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-slate-400"></div>
-                            <span className="text-sm font-medium text-slate-600">ปิดรับลงทะเบียน (จำกัดสิทธิ์)</span>
+                        <div className="px-4 py-2 bg-slate-50/60 flex items-center gap-2 text-xs text-slate-700 font-normal">
+                            <div className="w-2 h-2 rounded-full bg-slate-400 shrink-0"></div>
+                            <span>ปิดรับลงทะเบียน (จำกัดสิทธิ์) — ต้องได้รับอนุมัติจากผู้ดูแลระบบเท่านั้น</span>
                         </div>
                     )}
                 </div>
 
                 {/* 2. Photo & Storage Policy */}
-                <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
-                    <div className="px-6 py-4 border-b border-purple-100 bg-purple-50/50">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-purple-100 rounded-md">
-                                <ImageIcon className="w-5 h-5 text-purple-700" />
-                            </div>
-                            <div>
-                                <h2 className="font-semibold text-slate-900">รูปภาพและพื้นที่จัดเก็บ</h2>
-                                <p className="text-xs text-slate-500">จัดการนโยบายการยืนยันตัวตนด้วยรูปถ่าย</p>
-                            </div>
+                <div className="bg-white rounded-xl shadow-xs border border-slate-200 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-slate-200 bg-slate-50/70 flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-lg bg-purple-100/80 text-purple-700 flex items-center justify-center shrink-0">
+                            <ImageIcon className="w-4 h-4" />
+                        </div>
+                        <div>
+                            <h2 className="text-xs sm:text-sm font-semibold text-slate-900 leading-tight">รูปภาพและพื้นที่จัดเก็บ</h2>
+                            <p className="text-[11px] text-slate-500 font-normal">จัดการนโยบายการยืนยันตัวตนด้วยรูปถ่าย</p>
                         </div>
                     </div>
 
-                    <div className="p-6 space-y-6">
+                    <div className="p-4 sm:p-5 space-y-4">
                         {/* Require Photo Toggle */}
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-start gap-3">
-                                <Camera className="w-5 h-5 text-slate-400 mt-0.5" />
+                        <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-start gap-2.5">
+                                <Camera className="w-4 h-4 text-slate-500 mt-0.5 shrink-0" />
                                 <div>
-                                    <label className="text-sm font-medium text-slate-900 block">บังคับถ่ายรูปเมื่อลงเวลา</label>
-                                    <p className="text-xs text-slate-500 mt-1">พนักงานต้องถ่ายรูปยืนยันตัวตนทุกครั้งที่ Check-in / Check-out</p>
+                                    <label className="text-xs sm:text-sm font-medium text-slate-900 block">บังคับถ่ายรูปเมื่อลงเวลา</label>
+                                    <p className="text-[11px] text-slate-500 font-normal">พนักงานต้องถ่ายรูปยืนยันตัวตนทุกครั้งที่ Check-in / Check-out</p>
                                 </div>
                             </div>
                             <button
+                                type="button"
                                 onClick={() => setSettings({ ...settings, requirePhoto: !settings.requirePhoto })}
-                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 ${settings.requirePhoto ? 'bg-slate-900' : 'bg-slate-200'}`}
+                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-hidden ${settings.requirePhoto ? 'bg-slate-900' : 'bg-slate-300'}`}
                             >
-                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.requirePhoto ? 'translate-x-6' : 'translate-x-1'}`} />
+                                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${settings.requirePhoto ? 'translate-x-4.5' : 'translate-x-1'}`} />
                             </button>
                         </div>
 
@@ -486,88 +486,99 @@ export default function SettingsPage() {
 
                         {/* Storage Strategy */}
                         <div>
-                            <label className="text-sm font-medium text-slate-900 block mb-3">รูปแบบการจัดเก็บข้อมูล</label>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <label className="text-xs font-semibold text-slate-700 block mb-2">รูปแบบการจัดเก็บข้อมูล</label>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 <div
                                     onClick={() => setSettings({ ...settings, storageType: "base64" })}
-                                    className={`relative p-4 rounded-lg border-2 cursor-pointer transition-all ${(!settings.storageType || settings.storageType === "base64")
-                                        ? 'border-slate-900 bg-slate-50'
-                                        : 'border-slate-100 hover:border-slate-300'
+                                    className={`relative p-3.5 rounded-lg border cursor-pointer transition-all ${(!settings.storageType || settings.storageType === "base64")
+                                        ? 'border-slate-900 bg-slate-50/80 shadow-xs'
+                                        : 'border-slate-200 bg-white hover:border-slate-300'
                                         }`}
                                 >
-                                    <div className="flex justify-between items-start mb-2">
-                                        <Database className={`w-5 h-5 ${(!settings.storageType || settings.storageType === "base64") ? 'text-slate-900' : 'text-slate-400'}`} />
+                                    <div className="flex justify-between items-start mb-1.5">
+                                        <Database className={`w-4 h-4 ${(!settings.storageType || settings.storageType === "base64") ? 'text-slate-900' : 'text-slate-400'}`} />
                                         {(!settings.storageType || settings.storageType === "base64") && (
-                                            <span className="bg-slate-900 text-white text-[10px] uppercase font-bold px-2 py-0.5 rounded-full">Active</span>
+                                            <span className="bg-slate-900 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">Active</span>
                                         )}
                                     </div>
-                                    <h3 className="font-bold text-slate-900 text-sm">Base64 Encoding</h3>
-                                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                                    <h3 className="font-semibold text-slate-900 text-xs sm:text-sm">Base64 Encoding</h3>
+                                    <p className="text-xs text-slate-600 font-normal mt-1 leading-relaxed">
                                         เก็บไฟล์ภาพแปลงเป็น text ลงใน Database โดยตรง เหมาะสำหรับองค์กรขนาดเล็ก เน็ตช้า
                                     </p>
                                 </div>
 
                                 <div
                                     onClick={() => setSettings({ ...settings, storageType: "storage" })}
-                                    className={`relative p-4 rounded-lg border-2 cursor-pointer transition-all ${settings.storageType === "storage"
-                                        ? 'border-slate-900 bg-slate-50'
-                                        : 'border-slate-100 hover:border-slate-300'
+                                    className={`relative p-3.5 rounded-lg border cursor-pointer transition-all ${settings.storageType === "storage"
+                                        ? 'border-slate-900 bg-slate-50/80 shadow-xs'
+                                        : 'border-slate-200 bg-white hover:border-slate-300'
                                         }`}
                                 >
-                                    <div className="flex justify-between items-start mb-2">
-                                        <HardDrive className={`w-5 h-5 ${settings.storageType === "storage" ? 'text-slate-900' : 'text-slate-400'}`} />
+                                    <div className="flex justify-between items-start mb-1.5">
+                                        <HardDrive className={`w-4 h-4 ${settings.storageType === "storage" ? 'text-slate-900' : 'text-slate-400'}`} />
                                         {settings.storageType === "storage" && (
-                                            <span className="bg-slate-900 text-white text-[10px] uppercase font-bold px-2 py-0.5 rounded-full">Active</span>
+                                            <span className="bg-slate-900 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">Active</span>
                                         )}
                                     </div>
-                                    <h3 className="font-bold text-slate-900 text-sm">Firebase Cloud Storage</h3>
-                                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                                    <h3 className="font-semibold text-slate-900 text-xs sm:text-sm">Firebase Cloud Storage</h3>
+                                    <p className="text-xs text-slate-600 font-normal mt-1 leading-relaxed">
                                         เก็บลง Cloud Storage แยกต่างหาก รองรับไฟล์ใหญ่ ประหยัดพื้นที่ Database
                                     </p>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Storage Usage (Clean) */}
-                        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
-                            <div className="flex items-center justify-between mb-3">
-                                <span className="text-xs font-semibold text-slate-700 uppercase tracking-wider flex items-center gap-2">
-                                    <HardDrive className="w-3 h-3" /> Database Usage
+                        {/* Storage Usage */}
+                        <div className="bg-slate-50 rounded-lg p-3.5 border border-slate-200">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
+                                    <HardDrive className="w-3.5 h-3.5 text-slate-600" /> พื้นที่จัดเก็บ Database (Usage)
                                 </span>
                                 {storageUsage === null ? (
                                     <button
+                                        type="button"
                                         onClick={loadStorageUsage}
                                         disabled={loadingStorage}
-                                        className="text-xs text-slate-600 hover:text-slate-900 font-medium underline decoration-slate-300 hover:decoration-slate-900 decoration-2 underline-offset-2"
+                                        className="text-xs text-slate-700 hover:text-slate-900 font-medium underline underline-offset-2"
                                     >
-                                        {loadingStorage ? "Calculating..." : "Check Usage"}
+                                        {loadingStorage ? "กำลังคำนวณ..." : "ตรวจสอบพื้นที่ (Check Usage)"}
                                     </button>
                                 ) : (
-                                    <span className="text-xs font-mono text-slate-600">
+                                    <span className="text-xs font-mono text-slate-700 font-medium">
                                         {(storageUsage.totalBytes / (1024 * 1024)).toFixed(2)} MB / {(storageUsage.limitBytes / (1024 * 1024)).toFixed(0)} MB
                                     </span>
                                 )}
                             </div>
 
                             {storageUsage && (
-                                <div className="space-y-2">
-                                    <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                                <div className="space-y-2 mt-2">
+                                    <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
                                         <div
                                             className={`h-full transition-all duration-500 ${storageUsage.usagePercent > 80 ? 'bg-red-500' : 'bg-slate-800'}`}
                                             style={{ width: `${Math.min(storageUsage.usagePercent, 100)}%` }}
                                         />
                                     </div>
-                                    <div className="flex justify-between text-[10px] text-slate-500">
-                                        <span>{storageUsage.fileCount.toLocaleString()} items</span>
-                                        <span>{storageUsage.usagePercent.toFixed(1)}% Used</span>
+                                    <div className="flex justify-between text-[11px] text-slate-600 font-normal">
+                                        <span>{storageUsage.fileCount.toLocaleString()} รายการ</span>
+                                        <span className="font-semibold text-slate-800">{storageUsage.usagePercent.toFixed(1)}% ใช้ไป</span>
                                     </div>
 
-                                    <div className="pt-3 border-t border-slate-200 mt-3 flex gap-2">
-                                        <button onClick={() => handleCleanup(6)} className="text-[10px] px-2 py-1 bg-white border border-slate-300 rounded hover:bg-slate-50 text-slate-700 transition-colors">
-                                            Clean &gt; 6 Months
+                                    <div className="pt-2.5 border-t border-slate-200 mt-2.5 flex gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleCleanup(6)}
+                                            disabled={cleanupLoading}
+                                            className="h-7 text-xs px-2.5 bg-white border border-slate-300 rounded hover:bg-slate-100 text-slate-700 font-normal transition-colors"
+                                        >
+                                            ลบรูป &gt; 6 เดือน
                                         </button>
-                                        <button onClick={() => handleCleanup(12)} className="text-[10px] px-2 py-1 bg-white border border-slate-300 rounded hover:bg-slate-50 text-slate-700 transition-colors">
-                                            Clean &gt; 1 Year
+                                        <button
+                                            type="button"
+                                            onClick={() => handleCleanup(12)}
+                                            disabled={cleanupLoading}
+                                            className="h-7 text-xs px-2.5 bg-white border border-slate-300 rounded hover:bg-slate-100 text-slate-700 font-normal transition-colors"
+                                        >
+                                            ลบรูป &gt; 1 ปี
                                         </button>
                                     </div>
                                 </div>
@@ -577,45 +588,46 @@ export default function SettingsPage() {
                 </div>
 
                 {/* 3. Work Time Policy */}
-                <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
-                    <div className="px-6 py-4 border-b border-emerald-100 bg-emerald-50/50 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-emerald-100 rounded-md">
-                                <Clock className="w-5 h-5 text-emerald-700" />
+                <div className="bg-white rounded-xl shadow-xs border border-slate-200 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-slate-200 bg-slate-50/70 flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-lg bg-emerald-100/80 text-emerald-700 flex items-center justify-center shrink-0">
+                                <Clock className="w-4 h-4" />
                             </div>
                             <div>
-                                <h2 className="font-semibold text-slate-900">เวลาทำงาน & นโยบาย</h2>
-                                <p className="text-xs text-slate-500">ตั้งค่าเวลาเข้า-ออกงาน และกฎการมาสาย</p>
+                                <h2 className="text-xs sm:text-sm font-semibold text-slate-900 leading-tight">เวลาทำงาน & นโยบาย</h2>
+                                <p className="text-[11px] text-slate-500 font-normal">ตั้งค่าเวลาเข้า-ออกงาน และกฎการมาสาย</p>
                             </div>
                         </div>
                         <button
+                            type="button"
                             onClick={() => setSettings({ ...settings, workTimeEnabled: !settings.workTimeEnabled })}
-                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 ${settings.workTimeEnabled ? 'bg-slate-900' : 'bg-slate-200'}`}
+                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-hidden ${settings.workTimeEnabled ? 'bg-slate-900' : 'bg-slate-300'}`}
                         >
-                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.workTimeEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${settings.workTimeEnabled ? 'translate-x-4.5' : 'translate-x-1'}`} />
                         </button>
                     </div>
 
-                    <div className={`p-6 transition-opacity ${settings.workTimeEnabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+                    <div className={`p-4 sm:p-5 space-y-4 transition-opacity ${settings.workTimeEnabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
                         {/* Time Slots */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-                            <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                                <label className="text-xs font-bold text-slate-500 uppercase mb-3 block">เวลาเข้างาน (Check In)</label>
-                                <div className="flex gap-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200">
+                                <label className="text-xs font-semibold text-slate-800 uppercase tracking-wider mb-2 block">เวลาเข้างาน (Check In)</label>
+                                <div className="flex items-center gap-2">
                                     <select
                                         value={settings.checkInHour}
                                         onChange={(e) => setSettings({ ...settings, checkInHour: parseInt(e.target.value) })}
-                                        className="flex-1 bg-white border border-slate-300 text-slate-900 text-sm rounded-md focus:ring-slate-500 focus:border-slate-500 block p-2.5"
+                                        className="h-9 flex-1 bg-white border border-slate-300 text-slate-800 text-xs sm:text-sm font-normal rounded-md focus:ring-1 focus:ring-slate-400 focus:border-slate-400 block px-2.5"
                                     >
                                         {Array.from({ length: 24 }, (_, i) => (
                                             <option key={i} value={i}>{i.toString().padStart(2, '0')}</option>
                                         ))}
                                     </select>
-                                    <span className="flex items-center font-bold text-slate-400">:</span>
+                                    <span className="font-bold text-slate-400">:</span>
                                     <select
                                         value={settings.checkInMinute}
                                         onChange={(e) => setSettings({ ...settings, checkInMinute: parseInt(e.target.value) })}
-                                        className="flex-1 bg-white border border-slate-300 text-slate-900 text-sm rounded-md focus:ring-slate-500 focus:border-slate-500 block p-2.5"
+                                        className="h-9 flex-1 bg-white border border-slate-300 text-slate-800 text-xs sm:text-sm font-normal rounded-md focus:ring-1 focus:ring-slate-400 focus:border-slate-400 block px-2.5"
                                     >
                                         {[0, 15, 30, 45].map((m) => (
                                             <option key={m} value={m}>{m.toString().padStart(2, '0')}</option>
@@ -624,23 +636,23 @@ export default function SettingsPage() {
                                 </div>
                             </div>
 
-                            <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                                <label className="text-xs font-bold text-slate-500 uppercase mb-3 block">เวลาออกงาน (Check Out)</label>
-                                <div className="flex gap-2">
+                            <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200">
+                                <label className="text-xs font-semibold text-slate-800 uppercase tracking-wider mb-2 block">เวลาออกงาน (Check Out)</label>
+                                <div className="flex items-center gap-2">
                                     <select
                                         value={settings.checkOutHour}
                                         onChange={(e) => setSettings({ ...settings, checkOutHour: parseInt(e.target.value) })}
-                                        className="flex-1 bg-white border border-slate-300 text-slate-900 text-sm rounded-md focus:ring-slate-500 focus:border-slate-500 block p-2.5"
+                                        className="h-9 flex-1 bg-white border border-slate-300 text-slate-800 text-xs sm:text-sm font-normal rounded-md focus:ring-1 focus:ring-slate-400 focus:border-slate-400 block px-2.5"
                                     >
                                         {Array.from({ length: 24 }, (_, i) => (
                                             <option key={i} value={i}>{i.toString().padStart(2, '0')}</option>
                                         ))}
                                     </select>
-                                    <span className="flex items-center font-bold text-slate-400">:</span>
+                                    <span className="font-bold text-slate-400">:</span>
                                     <select
                                         value={settings.checkOutMinute}
                                         onChange={(e) => setSettings({ ...settings, checkOutMinute: parseInt(e.target.value) })}
-                                        className="flex-1 bg-white border border-slate-300 text-slate-900 text-sm rounded-md focus:ring-slate-500 focus:border-slate-500 block p-2.5"
+                                        className="h-9 flex-1 bg-white border border-slate-300 text-slate-800 text-xs sm:text-sm font-normal rounded-md focus:ring-1 focus:ring-slate-400 focus:border-slate-400 block px-2.5"
                                     >
                                         {[0, 15, 30, 45].map((m) => (
                                             <option key={m} value={m}>{m.toString().padStart(2, '0')}</option>
@@ -651,63 +663,65 @@ export default function SettingsPage() {
                         </div>
 
                         {/* Grace Period & OT */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">Late Grace Period (นาที)</label>
+                                <label className="block text-xs font-medium text-slate-800 mb-1.5">อนุโลมสายได้ (Late Grace Period - นาที)</label>
                                 <div className="relative">
                                     <Shield className="absolute top-2.5 left-3 w-4 h-4 text-slate-400" />
                                     <input
                                         type="number"
-                                        className="pl-9 w-full rounded-md border-slate-300 shadow-sm focus:border-slate-500 focus:ring-slate-500 sm:text-sm h-10"
+                                        className="pl-9 w-full rounded-md border-slate-300 text-slate-800 focus:border-slate-400 focus:ring-1 focus:ring-slate-400 text-xs sm:text-sm font-normal h-9"
                                         value={settings.lateGracePeriod}
                                         onChange={(e) => setSettings({ ...settings, lateGracePeriod: parseInt(e.target.value) || 0 })}
                                         placeholder="0"
                                     />
                                 </div>
-                                <p className="text-[10px] text-slate-500 mt-1">เวลาที่อนุโลมให้สายได้โดยไม่นับว่าสาย</p>
+                                <p className="text-[11px] text-slate-500 font-normal mt-1">เวลาที่อนุโลมให้สายได้โดยไม่นับว่าสาย</p>
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">Minimum OT (นาที)</label>
+                                <label className="block text-xs font-medium text-slate-800 mb-1.5">OT ขั้นต่ำ (Minimum OT - นาที)</label>
                                 <div className="relative">
                                     <Clock className="absolute top-2.5 left-3 w-4 h-4 text-slate-400" />
                                     <input
                                         type="number"
-                                        className="pl-9 w-full rounded-md border-slate-300 shadow-sm focus:border-slate-500 focus:ring-slate-500 sm:text-sm h-10"
+                                        className="pl-9 w-full rounded-md border-slate-300 text-slate-800 focus:border-slate-400 focus:ring-1 focus:ring-slate-400 text-xs sm:text-sm font-normal h-9"
                                         value={settings.minOTMinutes}
                                         onChange={(e) => setSettings({ ...settings, minOTMinutes: parseInt(e.target.value) || 0 })}
                                         placeholder="30"
                                     />
                                 </div>
-                                <p className="text-[10px] text-slate-500 mt-1">เวลาทำงานล่วงเวลาขั้นต่ำที่จะนับเป็น OT</p>
+                                <p className="text-[11px] text-slate-500 font-normal mt-1">เวลาทำงานล่วงเวลาขั้นต่ำที่จะนับเป็น OT</p>
                             </div>
                         </div>
 
                         {/* Extra Features Toggles */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-slate-100 pt-6">
-                            <div className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:border-slate-300 transition-colors">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 border-t border-slate-100 pt-3">
+                            <div className="flex items-center justify-between p-3 border border-slate-200 rounded-lg bg-slate-50/50 hover:border-slate-300 transition-colors">
                                 <div>
-                                    <span className="text-sm font-medium text-slate-900 block">Break Time Tracking</span>
-                                    <span className="text-xs text-slate-500">อนุญาตให้ลงเวลาพักเบรค</span>
+                                    <span className="text-xs sm:text-sm font-medium text-slate-900 block">Break Time Tracking</span>
+                                    <span className="text-[11px] text-slate-500 font-normal">อนุญาตให้ลงเวลาพักเบรค</span>
                                 </div>
                                 <button
+                                    type="button"
                                     onClick={() => setSettings({ ...settings, enableBreak: !settings.enableBreak })}
-                                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${settings.enableBreak ? 'bg-emerald-600' : 'bg-slate-300'}`}
+                                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-hidden ${settings.enableBreak ? 'bg-emerald-600' : 'bg-slate-300'}`}
                                 >
-                                    <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${settings.enableBreak ? 'translate-x-5' : 'translate-x-1'}`} />
+                                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${settings.enableBreak ? 'translate-x-4.5' : 'translate-x-1'}`} />
                                 </button>
                             </div>
 
-                            <div className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:border-slate-300 transition-colors">
+                            <div className="flex items-center justify-between p-3 border border-slate-200 rounded-lg bg-slate-50/50 hover:border-slate-300 transition-colors">
                                 <div>
-                                    <span className="text-sm font-medium text-slate-900 block">Offsite Tracking</span>
-                                    <span className="text-xs text-slate-500">อนุญาตให้ลงเวลานอกสถานที่</span>
+                                    <span className="text-xs sm:text-sm font-medium text-slate-900 block">Offsite Tracking</span>
+                                    <span className="text-[11px] text-slate-500 font-normal">อนุญาตให้ลงเวลานอกสถานที่</span>
                                 </div>
                                 <button
+                                    type="button"
                                     onClick={() => setSettings({ ...settings, enableOffsite: !settings.enableOffsite })}
-                                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${settings.enableOffsite ? 'bg-emerald-600' : 'bg-slate-300'}`}
+                                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-hidden ${settings.enableOffsite ? 'bg-emerald-600' : 'bg-slate-300'}`}
                                 >
-                                    <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${settings.enableOffsite ? 'translate-x-5' : 'translate-x-1'}`} />
+                                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${settings.enableOffsite ? 'translate-x-4.5' : 'translate-x-1'}`} />
                                 </button>
                             </div>
                         </div>
@@ -715,111 +729,113 @@ export default function SettingsPage() {
                 </div>
 
                 {/* 4. Location Verification */}
-                <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
-                    <div className="px-6 py-4 border-b border-rose-100 bg-rose-50/50 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-rose-100 rounded-md">
-                                <MapPin className="w-5 h-5 text-rose-700" />
+                <div className="bg-white rounded-xl shadow-xs border border-slate-200 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-slate-200 bg-slate-50/70 flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-lg bg-rose-100/80 text-rose-700 flex items-center justify-center shrink-0">
+                                <MapPin className="w-4 h-4" />
                             </div>
                             <div>
-                                <h2 className="font-semibold text-slate-900">การยืนยันพิกัด (GPS)</h2>
-                                <p className="text-xs text-slate-500">กำหนดพื้นที่อนุญาตให้ลงเวลา (Geofencing)</p>
+                                <h2 className="text-xs sm:text-sm font-semibold text-slate-900 leading-tight">การยืนยันพิกัด (GPS)</h2>
+                                <p className="text-[11px] text-slate-500 font-normal">กำหนดพื้นที่อนุญาตให้ลงเวลา (Geofencing)</p>
                             </div>
                         </div>
                         <button
+                            type="button"
                             onClick={() => setSettings(prev => ({ ...prev, locationEnabled: !prev.locationEnabled }))}
-                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 ${settings.locationEnabled ? 'bg-slate-900' : 'bg-slate-200'}`}
+                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-hidden ${settings.locationEnabled ? 'bg-slate-900' : 'bg-slate-300'}`}
                         >
-                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.locationEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${settings.locationEnabled ? 'translate-x-4.5' : 'translate-x-1'}`} />
                         </button>
                     </div>
 
-                    <div className={`p-6 transition-opacity ${settings.locationEnabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
-                        <div className="flex items-start justify-between gap-4 mb-4">
+                    <div className={`p-4 sm:p-5 space-y-3.5 transition-opacity ${settings.locationEnabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+                        <div className="flex items-center justify-between gap-3">
                             <div>
-                                <p className="text-sm font-medium text-slate-900">รายการจุดเช็กอิน</p>
-                                <p className="text-xs text-slate-500 mt-1">เพิ่มได้หลายจุด และนำไปกำหนดให้พนักงานแต่ละคนได้</p>
+                                <p className="text-xs sm:text-sm font-medium text-slate-900">รายการจุดเช็กอิน</p>
+                                <p className="text-[11px] text-slate-500 font-normal">เพิ่มได้หลายจุด และนำไปกำหนดให้พนักงานแต่ละคนได้</p>
                             </div>
-                            <Button type="button" variant="outline" size="sm" onClick={handleAddWorkLocation} className="gap-2">
+                            <Button type="button" variant="outline" size="sm" onClick={handleAddWorkLocation} className="h-8 text-xs font-medium gap-1.5 border-slate-300 text-slate-700 hover:bg-slate-100">
                                 <Plus className="w-3.5 h-3.5" />
                                 เพิ่มจุดเช็กอิน
                             </Button>
                         </div>
 
-                        <div className="space-y-4">
+                        <div className="space-y-3">
                             {(settings.workLocations || []).map((location, index) => (
-                                <div key={location.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                                    <div className="flex items-center justify-between gap-3 mb-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center text-sm font-bold">
+                                <div key={location.id} className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 space-y-3">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="w-7 h-7 rounded-md bg-rose-100 text-rose-700 flex items-center justify-center text-xs font-bold shrink-0">
                                                 {index + 1}
                                             </div>
                                             <div>
-                                                <p className="text-sm font-semibold text-slate-900">{location.name || `จุดเช็กอิน ${index + 1}`}</p>
-                                                <p className="text-xs text-slate-500">ID: {location.id}</p>
+                                                <p className="text-xs sm:text-sm font-semibold text-slate-900 leading-tight">{location.name || `จุดเช็กอิน ${index + 1}`}</p>
+                                                <p className="text-[10px] font-mono text-slate-500">ID: {location.id}</p>
                                             </div>
                                         </div>
                                         <button
                                             type="button"
                                             onClick={() => handleRemoveWorkLocation(location.id)}
-                                            className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                                            className="p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
                                             disabled={(settings.workLocations || []).length === 1}
+                                            title="ลบจุดเช็กอิน"
                                         >
                                             <Trash2 className="w-4 h-4" />
                                         </button>
                                     </div>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                        <div className="md:col-span-2">
-                                            <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">ชื่อจุดเช็กอิน</label>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                                        <div className="sm:col-span-2">
+                                            <label className="block text-[11px] font-semibold text-slate-700 uppercase mb-1">ชื่อจุดเช็กอิน</label>
                                             <input
                                                 type="text"
-                                                className="w-full rounded-md border-slate-300 shadow-sm focus:border-slate-500 focus:ring-slate-500 sm:text-sm h-10"
+                                                className="w-full rounded-md border-slate-300 text-slate-800 text-xs sm:text-sm font-normal focus:border-slate-400 focus:ring-1 focus:ring-slate-400 h-9 px-3 bg-white"
                                                 value={location.name}
                                                 onChange={(e) => handleLocationFieldChange(location.id, "name", e.target.value)}
                                                 placeholder={`จุดเช็กอิน ${index + 1}`}
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Latitude</label>
+                                            <label className="block text-[11px] font-semibold text-slate-700 uppercase mb-1">Latitude</label>
                                             <input
                                                 type="number"
                                                 step="any"
-                                                className="w-full rounded-md border-slate-300 shadow-sm focus:border-slate-500 focus:ring-slate-500 sm:text-sm h-10 font-mono"
+                                                className="w-full rounded-md border-slate-300 text-slate-800 text-xs sm:text-sm font-mono font-normal focus:border-slate-400 focus:ring-1 focus:ring-slate-400 h-9 px-3 bg-white"
                                                 value={location.latitude}
                                                 onChange={(e) => handleLocationFieldChange(location.id, "latitude", parseFloat(e.target.value) || 0)}
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Longitude</label>
+                                            <label className="block text-[11px] font-semibold text-slate-700 uppercase mb-1">Longitude</label>
                                             <input
                                                 type="number"
                                                 step="any"
-                                                className="w-full rounded-md border-slate-300 shadow-sm focus:border-slate-500 focus:ring-slate-500 sm:text-sm h-10 font-mono"
+                                                className="w-full rounded-md border-slate-300 text-slate-800 text-xs sm:text-sm font-mono font-normal focus:border-slate-400 focus:ring-1 focus:ring-slate-400 h-9 px-3 bg-white"
                                                 value={location.longitude}
                                                 onChange={(e) => handleLocationFieldChange(location.id, "longitude", parseFloat(e.target.value) || 0)}
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Radius (Meters)</label>
+                                            <label className="block text-[11px] font-semibold text-slate-700 uppercase mb-1">รัศมี (เมตร)</label>
                                             <input
                                                 type="number"
-                                                className="w-full rounded-md border-slate-300 shadow-sm focus:border-slate-500 focus:ring-slate-500 sm:text-sm h-10"
+                                                className="w-full rounded-md border-slate-300 text-slate-800 text-xs sm:text-sm font-normal focus:border-slate-400 focus:ring-1 focus:ring-slate-400 h-9 px-3 bg-white"
                                                 value={location.radius}
                                                 onChange={(e) => handleLocationFieldChange(location.id, "radius", parseInt(e.target.value) || 100)}
                                             />
                                         </div>
-                                        <div className="md:col-span-3 flex items-end">
+                                        <div className="sm:col-span-2 md:col-span-3 flex items-end">
                                             <Button
                                                 type="button"
                                                 variant="outline"
                                                 size="sm"
                                                 onClick={() => handleGetCurrentLocation(location.id)}
                                                 disabled={gettingLocationId === location.id}
-                                                className="gap-2"
+                                                className="h-9 px-3 text-xs font-medium gap-1.5 border-slate-300 text-slate-700 hover:bg-white"
                                             >
                                                 <Crosshair className={`w-3.5 h-3.5 ${gettingLocationId === location.id ? 'animate-spin' : ''}`} />
-                                                {gettingLocationId === location.id ? 'กำลังระบุตำแหน่ง...' : 'ใช้ตำแหน่งปัจจุบัน'}
+                                                {gettingLocationId === location.id ? 'กำลังระบุตำแหน่ง...' : 'ใช้ตำแหน่งปัจจุบันของฉัน'}
                                             </Button>
                                         </div>
                                     </div>
@@ -830,93 +846,96 @@ export default function SettingsPage() {
                 </div>
 
                 {/* 5. Notifications */}
-                <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
-                    <div className="px-6 py-4 border-b border-amber-100 bg-amber-50/50 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-amber-100 rounded-md">
-                                <Bell className="w-5 h-5 text-amber-700" />
-                            </div>
-                            <div>
-                                <h2 className="font-semibold text-slate-900">การแจ้งเตือน (Notifications)</h2>
-                                <p className="text-xs text-slate-500">จัดการการแจ้งเตือนผ่าน LINK Notify หรือ Flex Message</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="p-6 space-y-6">
-                        <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 flex items-center justify-between mb-4">
-                            <div>
-                                <span className="text-sm font-medium text-slate-900 block">รายงานสรุปประจำวัน</span>
-                                <span className="text-xs text-slate-500">ส่งรายงานสรุปการเข้างานอัตโนมัติทุกวัน</span>
-                            </div>
-                            <button
-                                onClick={() => setSettings({ ...settings, enableDailyReport: !settings.enableDailyReport })}
-                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${settings.enableDailyReport ? 'bg-indigo-600' : 'bg-slate-300'}`}
-                            >
-                                <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${settings.enableDailyReport ? 'translate-x-5' : 'translate-x-1'}`} />
-                            </button>
+                <div className="bg-white rounded-xl shadow-xs border border-slate-200 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-slate-200 bg-slate-50/70 flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-lg bg-amber-100/80 text-amber-700 flex items-center justify-center shrink-0">
+                            <Bell className="w-4 h-4" />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">Admin Line Group ID</label>
+                            <h2 className="text-xs sm:text-sm font-semibold text-slate-900 leading-tight">การแจ้งเตือน (Notifications)</h2>
+                            <p className="text-[11px] text-slate-500 font-normal">จัดการการแจ้งเตือนผ่าน LINE Notify, LINE OA หรือ Telegram</p>
+                        </div>
+                    </div>
+
+                    <div className="p-4 sm:p-5 space-y-4">
+                        <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200 flex items-center justify-between">
+                            <div>
+                                <span className="text-xs sm:text-sm font-medium text-slate-900 block">รายงานสรุปประจำวัน</span>
+                                <span className="text-[11px] text-slate-500 font-normal">ส่งรายงานสรุปการเข้างานอัตโนมัติทุกวัน</span>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setSettings({ ...settings, enableDailyReport: !settings.enableDailyReport })}
+                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-hidden ${settings.enableDailyReport ? 'bg-indigo-600' : 'bg-slate-300'}`}
+                            >
+                                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${settings.enableDailyReport ? 'translate-x-4.5' : 'translate-x-1'}`} />
+                            </button>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-semibold text-slate-700 mb-1.5">Admin Line Group ID</label>
                             <input
                                 type="text"
-                                className="w-full rounded-md border-slate-300 shadow-sm focus:border-slate-500 focus:ring-slate-500 sm:text-sm h-10 font-mono"
+                                className="w-full rounded-md border-slate-300 text-slate-800 text-xs sm:text-sm font-mono font-normal focus:border-slate-400 focus:ring-1 focus:ring-slate-400 h-9 px-3 bg-white"
                                 value={settings.adminLineGroupId}
                                 onChange={(e) => setSettings({ ...settings, adminLineGroupId: e.target.value })}
                                 placeholder="Cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
                             />
-                            <p className="text-[10px] text-slate-400 mt-1">ID ของกลุ่ม LINE ที่ต้องการให้ส่งแจ้งเตือนและรายงาน</p>
+                            <p className="text-[11px] text-slate-500 font-normal mt-1">ID ของกลุ่ม LINE ที่ต้องการให้ส่งแจ้งเตือนและรายงาน</p>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 space-y-4">
-                                <div className="flex items-center justify-between gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200 space-y-3">
+                                <div className="flex items-center justify-between gap-3">
                                     <div>
-                                        <span className="text-sm font-medium text-slate-900 block">แจ้งเตือนเช็กอินไปยัง LINE OA</span>
-                                        <span className="text-xs text-slate-500">ส่งชื่อพนักงาน เวลา และที่อยู่ไปยังกลุ่ม LINE OA</span>
+                                        <span className="text-xs sm:text-sm font-medium text-slate-900 block">แจ้งเตือนเช็กอินไปยัง LINE OA</span>
+                                        <span className="text-[11px] text-slate-500 font-normal">ส่งชื่อพนักงาน เวลา และที่อยู่ไปยังกลุ่ม LINE OA</span>
                                     </div>
                                     <button
+                                        type="button"
                                         onClick={() => setSettings({ ...settings, enableLineCheckInNotification: !settings.enableLineCheckInNotification })}
-                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${settings.enableLineCheckInNotification ? 'bg-emerald-600' : 'bg-slate-300'}`}
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-hidden ${settings.enableLineCheckInNotification ? 'bg-emerald-600' : 'bg-slate-300'}`}
                                     >
-                                        <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${settings.enableLineCheckInNotification ? 'translate-x-5' : 'translate-x-1'}`} />
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${settings.enableLineCheckInNotification ? 'translate-x-4.5' : 'translate-x-1'}`} />
                                     </button>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-2">LINE OA Group ID</label>
+                                    <label className="block text-xs font-medium text-slate-700 mb-1">LINE OA Group ID</label>
                                     <input
                                         type="text"
-                                        className="w-full rounded-md border-slate-300 shadow-sm focus:border-slate-500 focus:ring-slate-500 sm:text-sm h-10 font-mono"
+                                        className="w-full rounded-md border-slate-300 text-slate-800 text-xs sm:text-sm font-mono font-normal focus:border-slate-400 focus:ring-1 focus:ring-slate-400 h-9 px-3 bg-white"
                                         value={settings.lineCheckInGroupId ?? ""}
                                         onChange={(e) => setSettings({ ...settings, lineCheckInGroupId: e.target.value })}
                                         placeholder="Cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
                                     />
-                                    <p className="text-[10px] text-slate-400 mt-1">ใช้สำหรับแจ้งเตือนเมื่อพนักงานเช็กอินสำเร็จ</p>
+                                    <p className="text-[10px] text-slate-500 font-normal mt-1">ใช้สำหรับแจ้งเตือนเมื่อพนักงานเช็กอินสำเร็จ</p>
                                 </div>
                             </div>
 
-                            <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 space-y-4">
-                                <div className="flex items-center justify-between gap-4">
+                            <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200 space-y-3">
+                                <div className="flex items-center justify-between gap-3">
                                     <div>
-                                        <span className="text-sm font-medium text-slate-900 block">แจ้งเตือนเช็กอินไปยัง Telegram</span>
-                                        <span className="text-xs text-slate-500">ส่งข้อมูลเช็กอินไปยัง Telegram group หรือ chat ที่กำหนด</span>
+                                        <span className="text-xs sm:text-sm font-medium text-slate-900 block">แจ้งเตือนเช็กอินไปยัง Telegram</span>
+                                        <span className="text-[11px] text-slate-500 font-normal">ส่งข้อมูลเช็กอินไปยัง Telegram group หรือ chat ที่กำหนด</span>
                                     </div>
                                     <button
+                                        type="button"
                                         onClick={() => setSettings({ ...settings, enableTelegramCheckInNotification: !settings.enableTelegramCheckInNotification })}
-                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${settings.enableTelegramCheckInNotification ? 'bg-sky-600' : 'bg-slate-300'}`}
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-hidden ${settings.enableTelegramCheckInNotification ? 'bg-sky-600' : 'bg-slate-300'}`}
                                     >
-                                        <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${settings.enableTelegramCheckInNotification ? 'translate-x-5' : 'translate-x-1'}`} />
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${settings.enableTelegramCheckInNotification ? 'translate-x-4.5' : 'translate-x-1'}`} />
                                     </button>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-2">Telegram Chat ID</label>
+                                    <label className="block text-xs font-medium text-slate-700 mb-1">Telegram Chat ID</label>
                                     <input
                                         type="text"
-                                        className="w-full rounded-md border-slate-300 shadow-sm focus:border-slate-500 focus:ring-slate-500 sm:text-sm h-10 font-mono"
+                                        className="w-full rounded-md border-slate-300 text-slate-800 text-xs sm:text-sm font-mono font-normal focus:border-slate-400 focus:ring-1 focus:ring-slate-400 h-9 px-3 bg-white"
                                         value={settings.telegramChatId ?? ""}
                                         onChange={(e) => setSettings({ ...settings, telegramChatId: e.target.value })}
                                         placeholder="-1001234567890"
                                     />
-                                    <p className="text-[10px] text-slate-400 mt-1">ใส่ Chat ID หรือ Group ID ของ Telegram ที่ต้องการรับแจ้งเตือน</p>
+                                    <p className="text-[10px] text-slate-500 font-normal mt-1">ใส่ Chat ID หรือ Group ID ของ Telegram ที่ต้องการรับแจ้งเตือน</p>
                                 </div>
                             </div>
                         </div>
@@ -924,30 +943,29 @@ export default function SettingsPage() {
                 </div>
 
                 {/* 6. Payroll & Holidays */}
-                <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
-                    <div className="px-6 py-4 border-b border-indigo-100 bg-indigo-50/50 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-indigo-100 rounded-md">
-                                <Calendar className="w-5 h-5 text-indigo-700" />
-                            </div>
-                            <div>
-                                <h2 className="font-semibold text-slate-900">วันหยุด & การจ่ายเงิน (Payroll)</h2>
-                                <p className="text-xs text-slate-500">กำหนดวันหยุดประจำสัปดาห์ และอัตราการจ่าย OT</p>
-                            </div>
+                <div className="bg-white rounded-xl shadow-xs border border-slate-200 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-slate-200 bg-slate-50/70 flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-lg bg-indigo-100/80 text-indigo-700 flex items-center justify-center shrink-0">
+                            <Calendar className="w-4 h-4" />
+                        </div>
+                        <div>
+                            <h2 className="text-xs sm:text-sm font-semibold text-slate-900 leading-tight">วันหยุด & การจ่ายเงิน (Payroll)</h2>
+                            <p className="text-[11px] text-slate-500 font-normal">กำหนดวันหยุดประจำสัปดาห์ และอัตราการจ่าย OT</p>
                         </div>
                     </div>
 
-                    <div className="p-6 space-y-8">
+                    <div className="p-4 sm:p-5 space-y-5">
                         {/* Weekly Holidays */}
                         <div>
-                            <label className="text-sm font-medium text-slate-900 block mb-3">วันหยุดประจำสัปดาห์ (Weekly Holidays)</label>
-                            <div className="flex flex-wrap gap-2">
+                            <label className="text-xs sm:text-sm font-medium text-slate-900 block mb-2">วันหยุดประจำสัปดาห์ (Weekly Holidays)</label>
+                            <div className="flex flex-wrap gap-1.5">
                                 {["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"].map((day, index) => {
                                     const isSelected = settings.weeklyHolidays?.includes(index);
                                     const isDisabled = settings.useIndividualHolidays;
                                     return (
                                         <button
                                             key={index}
+                                            type="button"
                                             onClick={() => {
                                                 if (isDisabled) return;
                                                 const current = settings.weeklyHolidays || [];
@@ -958,9 +976,9 @@ export default function SettingsPage() {
                                                 }
                                             }}
                                             disabled={isDisabled}
-                                            className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 border ${isSelected
-                                                ? 'bg-slate-800 text-white border-slate-800 shadow-sm'
-                                                : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                                            className={`h-9 px-3.5 rounded-lg text-xs sm:text-sm font-medium transition-colors border ${isSelected
+                                                ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                                                : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
                                                 } ${isDisabled ? 'opacity-40 cursor-not-allowed' : ''}`}
                                         >
                                             {day}
@@ -968,70 +986,71 @@ export default function SettingsPage() {
                                     );
                                 })}
                             </div>
-                            <p className="text-[10px] text-slate-400 mt-2">
+                            <p className="text-[11px] text-slate-500 font-normal mt-1.5">
                                 * เลือกวันที่เป็นวันหยุดประจำสัปดาห์ของบริษัท
                             </p>
                         </div>
 
                         {/* Holiday Mode Toggle */}
-                        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
-                            <div className="flex justify-between items-center mb-4">
+                        <div className="bg-slate-50 rounded-lg p-3.5 border border-slate-200">
+                            <div className="flex justify-between items-center mb-3">
                                 <div>
-                                    <h4 className="text-sm font-bold text-slate-800">โหมดวันหยุดพนักงาน</h4>
-                                    <p className="text-xs text-slate-500">เลือกวิธีการคำนวณวันหยุดสำหรับพนักงานในองค์กร</p>
+                                    <h4 className="text-xs sm:text-sm font-semibold text-slate-900">โหมดวันหยุดพนักงาน</h4>
+                                    <p className="text-[11px] text-slate-500 font-normal">เลือกวิธีการคำนวณวันหยุดสำหรับพนักงานในองค์กร</p>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <span className={`text-xs font-medium ${!settings.useIndividualHolidays ? 'text-slate-900' : 'text-slate-400'}`}>Global</span>
                                     <button
+                                        type="button"
                                         onClick={() => setSettings({ ...settings, useIndividualHolidays: !settings.useIndividualHolidays })}
-                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${settings.useIndividualHolidays ? 'bg-indigo-600' : 'bg-slate-300'}`}
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-hidden ${settings.useIndividualHolidays ? 'bg-indigo-600' : 'bg-slate-300'}`}
                                     >
-                                        <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${settings.useIndividualHolidays ? 'translate-x-5' : 'translate-x-1'}`} />
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${settings.useIndividualHolidays ? 'translate-x-4.5' : 'translate-x-1'}`} />
                                     </button>
                                     <span className={`text-xs font-medium ${settings.useIndividualHolidays ? 'text-indigo-600' : 'text-slate-400'}`}>Individual</span>
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className={`p-3 rounded border transition-all ${!settings.useIndividualHolidays ? 'bg-white border-slate-300 shadow-sm' : 'bg-transparent border-transparent opacity-50'}`}>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div className={`p-3 rounded-lg border transition-all ${!settings.useIndividualHolidays ? 'bg-white border-slate-300 shadow-xs' : 'bg-transparent border-transparent opacity-50'}`}>
                                     <div className="flex items-center gap-2 mb-1">
-                                        <div className="w-2 h-2 rounded-full bg-slate-400"></div>
-                                        <span className="text-xs font-bold text-slate-700">ใช้วันหยุดส่วนกลาง (Global)</span>
+                                        <div className="w-2 h-2 rounded-full bg-slate-500"></div>
+                                        <span className="text-xs font-semibold text-slate-800">ใช้วันหยุดส่วนกลาง (Global)</span>
                                     </div>
-                                    <p className="text-[10px] text-slate-500 pl-4">พนักงานทุกคนใช้วันหยุดชุดเดียวกันตามที่กำหนดข้างต้น</p>
+                                    <p className="text-[11px] text-slate-600 font-normal pl-4">พนักงานทุกคนใช้วันหยุดชุดเดียวกันตามที่กำหนดข้างต้น</p>
                                 </div>
-                                <div className={`p-3 rounded border transition-all ${settings.useIndividualHolidays ? 'bg-white border-indigo-300 shadow-sm' : 'bg-transparent border-transparent opacity-50'}`}>
+                                <div className={`p-3 rounded-lg border transition-all ${settings.useIndividualHolidays ? 'bg-white border-indigo-300 shadow-xs' : 'bg-transparent border-transparent opacity-50'}`}>
                                     <div className="flex items-center gap-2 mb-1">
                                         <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
-                                        <span className="text-xs font-bold text-indigo-700">ใช้วันหยุดรายบุคคล (Individual)</span>
+                                        <span className="text-xs font-semibold text-indigo-800">ใช้วันหยุดรายบุคคล (Individual)</span>
                                     </div>
-                                    <p className="text-[10px] text-slate-500 pl-4">ระบบจะยึดตามวันหยุดที่ระบุในโปรไฟล์ของพนักงานแต่ละคน</p>
+                                    <p className="text-[11px] text-slate-600 font-normal pl-4">ระบบจะยึดตามวันหยุดที่ระบุในโปรไฟล์ของพนักงานแต่ละคน</p>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                             {/* Payroll Rates */}
-                            <div className="space-y-4">
+                            <div className="space-y-3">
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">อัตรา OT (วันปกติ)</label>
+                                    <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">อัตรา OT (วันปกติ)</label>
                                     <div className="relative">
                                         <DollarSign className="absolute top-2.5 left-3 w-3.5 h-3.5 text-slate-400" />
                                         <input
                                             type="number" step="0.1"
-                                            className="pl-9 w-full rounded-md border-slate-300 shadow-sm focus:border-slate-500 focus:ring-slate-500 sm:text-sm h-9 font-mono"
+                                            className="pl-8.5 w-full rounded-md border-slate-300 text-slate-800 focus:border-slate-400 focus:ring-1 focus:ring-slate-400 text-xs sm:text-sm font-mono font-normal h-9 bg-white"
                                             value={settings.otMultiplier}
                                             onChange={(e) => setSettings({ ...settings, otMultiplier: parseFloat(e.target.value) || 1.5 })}
                                         />
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">อัตรา OT (วันหยุด)</label>
+                                    <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">อัตรา OT (วันหยุด)</label>
                                     <div className="relative">
                                         <DollarSign className="absolute top-2.5 left-3 w-3.5 h-3.5 text-slate-400" />
                                         <input
                                             type="number" step="0.1"
-                                            className="pl-9 w-full rounded-md border-slate-300 shadow-sm focus:border-slate-500 focus:ring-slate-500 sm:text-sm h-9 font-mono"
+                                            className="pl-8.5 w-full rounded-md border-slate-300 text-slate-800 focus:border-slate-400 focus:ring-1 focus:ring-slate-400 text-xs sm:text-sm font-mono font-normal h-9 bg-white"
                                             value={settings.otMultiplierHoliday}
                                             onChange={(e) => setSettings({ ...settings, otMultiplierHoliday: parseFloat(e.target.value) || 3.0 })}
                                         />
@@ -1040,52 +1059,50 @@ export default function SettingsPage() {
                             </div>
 
                             {/* Swap Policy */}
-                            <div className="space-y-4">
+                            <div className="space-y-3">
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">ขอสลับวันหยุดล่วงหน้า</label>
-                                    <div className="flex items-center gap-3">
+                                    <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">ขอสลับวันหยุดล่วงหน้า</label>
+                                    <div className="flex items-center gap-2">
                                         <div className="relative flex-1">
                                             <ArrowLeftRight className="absolute top-2.5 left-3 w-3.5 h-3.5 text-slate-400" />
                                             <input
                                                 type="number"
-                                                className="pl-9 w-full rounded-md border-slate-300 shadow-sm focus:border-slate-500 focus:ring-slate-500 sm:text-sm h-9"
+                                                className="pl-8.5 w-full rounded-md border-slate-300 text-slate-800 focus:border-slate-400 focus:ring-1 focus:ring-slate-400 text-xs sm:text-sm font-normal h-9 bg-white"
                                                 value={settings.swapAdvanceDays ?? 3}
                                                 onChange={(e) => setSettings({ ...settings, swapAdvanceDays: parseInt(e.target.value) || 0 })}
                                             />
                                         </div>
-                                        <span className="text-sm text-slate-600">วัน</span>
+                                        <span className="text-xs sm:text-sm text-slate-700 font-normal">วัน</span>
                                     </div>
-                                    <p className="text-[10px] text-slate-400 mt-1">ขอสลับวันหยุดล่วงหน้า (วัน)</p>
+                                    <p className="text-[11px] text-slate-500 font-normal mt-1">ต้องส่งคำขอล่วงหน้าก่อนกี่วัน</p>
                                 </div>
                             </div>
 
                             {/* Late Deduction Policy */}
-                            <div className="space-y-4">
+                            <div className="space-y-3">
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">นโยบายหักเงินค่ามาสาย</label>
-                                    <div className="flex items-center gap-3">
-                                        <div className="flex-1">
-                                            <select
-                                                className="w-full rounded-md border-slate-300 shadow-sm focus:border-slate-500 focus:ring-slate-500 sm:text-sm h-9"
-                                                value={settings.lateDeductionType}
-                                                onChange={(e) => setSettings({ ...settings, lateDeductionType: e.target.value as any })}
-                                            >
-                                                <option value="none">ไม่หักเงิน (แค่บันทึก)</option>
-                                                <option value="pro-rated">หักตามจริง (รายชั่วโมง)</option>
-                                                <option value="fixed_per_minute">หักคงที่ต่อนาที</option>
-                                            </select>
-                                        </div>
+                                    <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">นโยบายหักเงินค่ามาสาย</label>
+                                    <div>
+                                        <select
+                                            className="w-full rounded-md border-slate-300 text-slate-800 focus:border-slate-400 focus:ring-1 focus:ring-slate-400 text-xs sm:text-sm font-normal h-9 px-2.5 bg-white"
+                                            value={settings.lateDeductionType}
+                                            onChange={(e) => setSettings({ ...settings, lateDeductionType: e.target.value as any })}
+                                        >
+                                            <option value="none">ไม่หักเงิน (แค่บันทึก)</option>
+                                            <option value="pro-rated">หักตามจริง (รายชั่วโมง)</option>
+                                            <option value="fixed_per_minute">หักคงที่ต่อนาที</option>
+                                        </select>
                                     </div>
-                                    <p className="text-[10px] text-slate-400 mt-1">นโยบายการหักเงินค่ามาสาย</p>
+                                    <p className="text-[11px] text-slate-500 font-normal mt-1">กฎการหักเงินกรณีเข้างานสาย</p>
                                 </div>
                                 {settings.lateDeductionType === "fixed_per_minute" && (
                                     <div>
-                                        <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">อัตราหักเงิน (บาท/นาที)</label>
+                                        <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">อัตราหักเงิน (บาท/นาที)</label>
                                         <div className="relative">
                                             <DollarSign className="absolute top-2.5 left-3 w-3.5 h-3.5 text-slate-400" />
                                             <input
                                                 type="number" step="1"
-                                                className="pl-9 w-full rounded-md border-slate-300 shadow-sm focus:border-slate-500 focus:ring-slate-500 sm:text-sm h-9 font-mono"
+                                                className="pl-8.5 w-full rounded-md border-slate-300 text-slate-800 focus:border-slate-400 focus:ring-1 focus:ring-slate-400 text-xs sm:text-sm font-mono font-normal h-9 bg-white"
                                                 value={settings.lateDeductionRate}
                                                 onChange={(e) => setSettings({ ...settings, lateDeductionRate: parseFloat(e.target.value) || 0 })}
                                             />
@@ -1096,55 +1113,60 @@ export default function SettingsPage() {
                         </div>
 
                         {/* Custom Holidays Manager */}
-                        <div className="pt-6 border-t border-slate-100">
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-sm font-bold text-slate-900">วันหยุดนักขัตฤกษ์ / พิเศษ (Custom Holidays)</h3>
+                        <div className="pt-4 border-t border-slate-200">
+                            <div className="flex items-center justify-between mb-3">
+                                <div>
+                                    <h3 className="text-xs sm:text-sm font-semibold text-slate-900">วันหยุดนักขัตฤกษ์ / พิเศษ (Custom Holidays)</h3>
+                                    <p className="text-[11px] text-slate-500 font-normal">กำหนดวันหยุดเพิ่มเติม พร้อมตัวคูณอัตราค่าจ้างและ OT</p>
+                                </div>
                             </div>
 
-                            <div className="bg-slate-50 rounded-lg p-4 border border-slate-200 mb-4">
-                                <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-                                    <div className="md:col-span-3">
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase">Date</label>
+                            <div className="bg-slate-50 rounded-lg p-3 border border-slate-200 mb-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end">
+                                    <div className="sm:col-span-3">
+                                        <label className="text-[11px] font-semibold text-slate-700 block mb-1">วันที่ (Date)</label>
                                         <input
                                             type="date"
-                                            className="w-full rounded border-slate-300 text-sm h-9 px-2"
+                                            className="w-full rounded-md border-slate-300 text-slate-800 text-xs sm:text-sm font-normal h-9 px-2 bg-white focus:border-slate-400 focus:ring-1 focus:ring-slate-400"
                                             value={newHoliday.date}
                                             onChange={(e) => setNewHoliday({ ...newHoliday, date: e.target.value })}
                                         />
                                     </div>
-                                    <div className="md:col-span-4">
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase">Holiday Name</label>
+                                    <div className="sm:col-span-4">
+                                        <label className="text-[11px] font-semibold text-slate-700 block mb-1">ชื่อวันหยุด (Holiday Name)</label>
                                         <input
                                             type="text"
-                                            placeholder="Ex. วันปีใหม่"
-                                            className="w-full rounded border-slate-300 text-sm h-9 px-2"
+                                            placeholder="เช่น วันขึ้นปีใหม่"
+                                            className="w-full rounded-md border-slate-300 text-slate-800 text-xs sm:text-sm font-normal h-9 px-2.5 bg-white focus:border-slate-400 focus:ring-1 focus:ring-slate-400"
                                             value={newHoliday.name}
                                             onChange={(e) => setNewHoliday({ ...newHoliday, name: e.target.value })}
                                         />
                                     </div>
-                                    <div className="md:col-span-2">
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase">Work x</label>
+                                    <div className="sm:col-span-2">
+                                        <label className="text-[11px] font-semibold text-slate-700 block mb-1">ค่าแรง x (Work)</label>
                                         <input
                                             type="number" step="0.1"
-                                            className="w-full rounded border-slate-300 text-sm h-9 px-2 text-center"
+                                            className="w-full rounded-md border-slate-300 text-slate-800 text-xs sm:text-sm font-normal h-9 px-2 text-center bg-white focus:border-slate-400 focus:ring-1 focus:ring-slate-400"
                                             value={newHoliday.workdayMultiplier}
                                             onChange={(e) => setNewHoliday({ ...newHoliday, workdayMultiplier: parseFloat(e.target.value) || 2.0 })}
                                         />
                                     </div>
-                                    <div className="md:col-span-2">
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase">OT x</label>
+                                    <div className="sm:col-span-2">
+                                        <label className="text-[11px] font-semibold text-slate-700 block mb-1">OT x</label>
                                         <input
                                             type="number" step="0.1"
-                                            className="w-full rounded border-slate-300 text-sm h-9 px-2 text-center"
+                                            className="w-full rounded-md border-slate-300 text-slate-800 text-xs sm:text-sm font-normal h-9 px-2 text-center bg-white focus:border-slate-400 focus:ring-1 focus:ring-slate-400"
                                             value={newHoliday.otMultiplier}
                                             onChange={(e) => setNewHoliday({ ...newHoliday, otMultiplier: parseFloat(e.target.value) || 1.5 })}
                                         />
                                     </div>
-                                    <div className="md:col-span-1">
+                                    <div className="sm:col-span-1">
                                         <button
+                                            type="button"
                                             onClick={handleAddHoliday}
                                             disabled={!newHoliday.name}
-                                            className="w-full h-9 bg-slate-900 text-white rounded hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                                            className="w-full h-9 bg-slate-900 text-white rounded-md hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center transition-colors shadow-xs"
+                                            title="เพิ่มวันหยุด"
                                         >
                                             <Plus className="w-4 h-4" />
                                         </button>
@@ -1152,35 +1174,37 @@ export default function SettingsPage() {
                                 </div>
                             </div>
 
-                            <div className="space-y-2 max-h-60 overflow-y-auto pr-1 custom-scrollbar">
+                            <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1 custom-scrollbar">
                                 {settings.customHolidays && settings.customHolidays.length > 0 ? (
                                     settings.customHolidays.map((holiday, index) => (
-                                        <div key={index} className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded hover:border-indigo-300 transition-colors group">
+                                        <div key={index} className="flex items-center justify-between p-2 px-3 bg-white border border-slate-200 rounded-lg hover:border-slate-300 transition-colors group">
                                             <div className="flex items-center gap-3">
-                                                <div className="text-center min-w-[50px]">
-                                                    <div className="text-[10px] text-slate-400 font-bold uppercase">{format(new Date(holiday.date), "MMM", { locale: th })}</div>
-                                                    <div className="text-lg font-bold text-slate-800 leading-none">{format(new Date(holiday.date), "d")}</div>
+                                                <div className="text-center min-w-[46px]">
+                                                    <div className="text-[10px] text-slate-500 font-semibold uppercase">{format(new Date(holiday.date), "MMM", { locale: th })}</div>
+                                                    <div className="text-base font-bold text-slate-900 leading-none">{format(new Date(holiday.date), "d")}</div>
                                                 </div>
-                                                <div className="w-px h-8 bg-slate-100"></div>
+                                                <div className="w-px h-7 bg-slate-200"></div>
                                                 <div>
-                                                    <div className="font-medium text-slate-900 text-sm">{holiday.name}</div>
-                                                    <div className="flex gap-2 text-[10px] mt-0.5">
-                                                        <span className="bg-emerald-50 text-emerald-700 px-1.5 rounded">Work x{holiday.workdayMultiplier}</span>
-                                                        <span className="bg-amber-50 text-amber-700 px-1.5 rounded">OT x{holiday.otMultiplier}</span>
+                                                    <div className="font-medium text-slate-900 text-xs sm:text-sm">{holiday.name}</div>
+                                                    <div className="flex gap-1.5 text-[11px] mt-0.5">
+                                                        <span className="bg-emerald-50 text-emerald-800 border border-emerald-200/80 px-1.5 py-0.5 rounded font-normal">Work x{holiday.workdayMultiplier}</span>
+                                                        <span className="bg-amber-50 text-amber-800 border border-amber-200/80 px-1.5 py-0.5 rounded font-normal">OT x{holiday.otMultiplier}</span>
                                                     </div>
                                                 </div>
                                             </div>
                                             <button
+                                                type="button"
                                                 onClick={() => handleRemoveHoliday(index)}
-                                                className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition-all"
+                                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-all"
+                                                title="ลบวันหยุด"
                                             >
-                                                <Trash2 className="w-4 h-4" />
+                                                <Trash2 className="w-3.5 h-3.5" />
                                             </button>
                                         </div>
                                     ))
                                 ) : (
-                                    <div className="text-center py-6 text-slate-400 bg-slate-50/50 rounded border border-dashed border-slate-200 text-sm">
-                                        No custom holidays defined.
+                                    <div className="text-center py-5 text-slate-500 bg-slate-50/50 rounded-lg border border-dashed border-slate-200 text-xs font-normal">
+                                        ยังไม่มีวันหยุดพิเศษที่กำหนด
                                     </div>
                                 )}
                             </div>
@@ -1189,13 +1213,13 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Save Button (Sticky Bottom) */}
-                <div className="sticky bottom-4 z-40 bg-white/90 backdrop-blur-md border border-slate-200 shadow-xl rounded-xl p-4 flex justify-between items-center">
-                    <Button variant="ghost" className="text-slate-500 hover:text-slate-900" onClick={handleReset}>
-                        <RefreshCw className="w-4 h-4 mr-2" />
+                <div className="sticky bottom-3 z-40 bg-white/95 backdrop-blur-md border border-slate-200 shadow-md rounded-xl p-2.5 px-4 flex justify-between items-center">
+                    <Button variant="ghost" size="sm" className="h-9 text-xs sm:text-sm font-normal text-slate-600 hover:text-slate-900 hover:bg-slate-100" onClick={handleReset}>
+                        <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
                         คืนค่าเริ่มต้น
                     </Button>
-                    <div className="flex gap-3">
-                        {/* Index Checker Button (Compact) */}
+                    <div className="flex gap-2">
+                        {/* Index Checker Button */}
                         <Button
                             variant="outline"
                             size="sm"
@@ -1211,18 +1235,18 @@ export default function SettingsPage() {
                                     setCheckingIndexes(false);
                                 }
                             }}
-                            className="bg-white"
+                            className="h-9 text-xs sm:text-sm font-normal bg-white border-slate-300 text-slate-700 hover:bg-slate-50"
                         >
-                            <Database className="w-4 h-4 mr-2 text-indigo-600" />
-                            {checkingIndexes ? "Checking..." : "Check Firestore Indexes"}
+                            <Database className="w-3.5 h-3.5 mr-1.5 text-indigo-600" />
+                            {checkingIndexes ? "กำลังตรวจ..." : "ตรวจ Firestore Indexes"}
                         </Button>
 
                         <Button
                             onClick={handleSave}
                             disabled={loading}
-                            className="bg-slate-900 hover:bg-slate-800 text-white min-w-[140px]"
+                            className="h-9 px-4 text-xs sm:text-sm font-semibold bg-slate-900 hover:bg-slate-800 text-white min-w-[130px] shadow-xs"
                         >
-                            {loading ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                            {loading ? <RefreshCw className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <Save className="w-3.5 h-3.5 mr-1.5" />}
                             บันทึกการตั้งค่า
                         </Button>
                     </div>
@@ -1232,41 +1256,41 @@ export default function SettingsPage() {
 
             {/* Index Modal */}
             {showIndexModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[85vh] flex flex-col overflow-hidden">
-                        <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                            <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
-                                <Database className="w-5 h-5 text-indigo-600" /> Firestore Indexes
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[85vh] flex flex-col overflow-hidden border border-slate-200">
+                        <div className="px-4 py-3 border-b border-slate-200 flex justify-between items-center bg-slate-50/70">
+                            <h3 className="font-semibold text-slate-900 text-sm sm:text-base flex items-center gap-2">
+                                <Database className="w-4 h-4 text-indigo-600" /> Firestore Indexes
                             </h3>
-                            <button onClick={() => setShowIndexModal(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+                            <button onClick={() => setShowIndexModal(false)} className="text-slate-400 hover:text-slate-700 text-sm p-1">✕</button>
                         </div>
-                        <div className="p-6 overflow-y-auto flex-1">
+                        <div className="p-4 sm:p-5 overflow-y-auto flex-1 space-y-4">
                             {indexResults.filter(r => r.status === "missing").length === 0 ? (
-                                <div className="text-center py-10">
-                                    <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                        <CheckCircle2 className="w-8 h-8 text-emerald-600" />
+                                <div className="text-center py-8">
+                                    <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                        <CheckCircle2 className="w-6 h-6 text-emerald-600" />
                                     </div>
-                                    <h4 className="text-lg font-bold text-slate-800">All Indexes Healthy</h4>
-                                    <p className="text-slate-500 text-sm mt-1">ระบบฐานข้อมูลพร้อมใช้งานสมบูรณ์</p>
+                                    <h4 className="text-sm sm:text-base font-semibold text-slate-900">All Indexes Healthy</h4>
+                                    <p className="text-slate-600 text-xs font-normal mt-1">ระบบฐานข้อมูลพร้อมใช้งานสมบูรณ์</p>
                                 </div>
                             ) : (
-                                <div className="space-y-4">
-                                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3">
-                                        <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5" />
+                                <div className="space-y-3">
+                                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2.5">
+                                        <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
                                         <div>
-                                            <h4 className="text-amber-800 font-bold text-sm">Missing Indexes Found</h4>
-                                            <p className="text-amber-700 text-xs mt-0.5">จำเป็นต้องสร้าง Index เพื่อให้การค้นหาข้อมูลทำงานได้ถูกต้อง คลิกที่ปุ่มด้านล่างเพื่อสร้าง</p>
+                                            <h4 className="text-amber-900 font-semibold text-xs sm:text-sm">Missing Indexes Found</h4>
+                                            <p className="text-amber-800 text-xs font-normal mt-0.5">จำเป็นต้องสร้าง Index เพื่อให้การค้นหาข้อมูลทำงานได้ถูกต้อง คลิกที่ปุ่มด้านล่างเพื่อสร้าง</p>
                                         </div>
                                     </div>
                                     {indexResults.filter(r => r.status === "missing").map((result, idx) => (
-                                        <div key={idx} className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm hover:border-indigo-200 transition-all">
-                                            <div className="flex justify-between items-start">
+                                        <div key={idx} className="bg-white border border-slate-200 rounded-lg p-3 shadow-xs hover:border-indigo-200 transition-all">
+                                            <div className="flex justify-between items-start gap-2">
                                                 <div>
-                                                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{result.collection}</span>
-                                                    <h4 className="font-medium text-slate-800 mt-1">{result.queryName}</h4>
+                                                    <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">{result.collection}</span>
+                                                    <h4 className="font-medium text-slate-900 text-xs sm:text-sm mt-0.5">{result.queryName}</h4>
                                                 </div>
                                                 {result.indexUrl && (
-                                                    <a href={result.indexUrl} target="_blank" rel="noopener noreferrer" className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-1.5 rounded-md flex items-center gap-1.5 font-medium transition-colors">
+                                                    <a href={result.indexUrl} target="_blank" rel="noopener noreferrer" className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-2.5 py-1.5 rounded-md flex items-center gap-1.5 font-medium transition-colors">
                                                         Create <ExternalLink className="w-3 h-3" />
                                                     </a>
                                                 )}
@@ -1277,11 +1301,11 @@ export default function SettingsPage() {
                             )}
 
                             {/* Dev Tools */}
-                            <div className="mt-8 pt-6 border-t border-slate-100">
+                            <div className="pt-4 border-t border-slate-200">
                                 <div className="flex items-center justify-between mb-2">
-                                    <span className="text-xs font-semibold text-slate-400 uppercase">JSON Definition</span>
+                                    <span className="text-xs font-semibold text-slate-600 uppercase">JSON Definition</span>
                                     <button
-                                        className="text-[10px] text-slate-500 hover:text-indigo-600 flex items-center gap-1"
+                                        className="text-xs text-slate-600 hover:text-indigo-600 flex items-center gap-1 font-normal"
                                         onClick={() => {
                                             const json = JSON.stringify({
                                                 indexes: indexResults.filter(r => r.fields).map(r => ({
@@ -1297,8 +1321,8 @@ export default function SettingsPage() {
                                         <Copy className="w-3 h-3" /> Copy JSON
                                     </button>
                                 </div>
-                                <div className="bg-slate-900 rounded-lg p-3 overflow-hidden">
-                                    <pre className="text-[10px] text-slate-300 font-mono overflow-auto max-h-32 custom-scrollbar">
+                                <div className="bg-slate-900 rounded-lg p-2.5 overflow-hidden">
+                                    <pre className="text-[10px] text-slate-300 font-mono overflow-auto max-h-28 custom-scrollbar">
                                         {JSON.stringify({
                                             indexes: indexResults.filter(r => r.fields).map(r => ({
                                                 collectionGroup: r.collection,
@@ -1317,28 +1341,28 @@ export default function SettingsPage() {
 
             {/* Reset Confirmation Modal */}
             {showResetConfirm && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
-                        <div className="p-6 flex flex-col items-center text-center">
-                            <div className="mb-4 p-3 rounded-full bg-orange-50">
-                                <AlertCircle className="w-12 h-12 text-orange-500" />
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-200">
+                        <div className="p-5 flex flex-col items-center text-center">
+                            <div className="mb-3 p-2.5 rounded-full bg-orange-50">
+                                <AlertCircle className="w-8 h-8 text-orange-500" />
                             </div>
-                            <h3 className="text-xl font-bold text-gray-900 mb-2">
+                            <h3 className="text-base font-semibold text-slate-900 mb-1.5">
                                 ยืนยันคืนค่าเริ่มต้น?
                             </h3>
-                            <p className="text-gray-500 mb-6 leading-relaxed">
+                            <p className="text-xs text-slate-600 mb-5 leading-relaxed font-normal">
                                 การตั้งค่าทั้งหมดจะถูกรีเซ็ตกลับไปเป็นค่าเริ่มต้นของระบบ คุณแน่ใจหรือไม่?
                             </p>
-                            <div className="flex gap-3 w-full">
+                            <div className="flex gap-2.5 w-full">
                                 <button
                                     onClick={() => setShowResetConfirm(false)}
-                                    className="flex-1 py-3 rounded-xl font-semibold border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors active:scale-95"
+                                    className="flex-1 h-9 rounded-lg font-normal text-xs sm:text-sm border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors"
                                 >
                                     ยกเลิก
                                 </button>
                                 <button
                                     onClick={confirmReset}
-                                    className="flex-1 py-3 rounded-xl text-white font-semibold shadow-lg bg-orange-500 hover:bg-orange-600 transition-transform active:scale-95"
+                                    className="flex-1 h-9 rounded-lg text-white font-medium text-xs sm:text-sm bg-orange-500 hover:bg-orange-600 transition-colors shadow-xs"
                                 >
                                     ยืนยัน
                                 </button>
