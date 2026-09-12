@@ -1,12 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { StatsCard } from "@/components/dashboard/StatsCard";
 import { AttendanceTable } from "@/components/dashboard/AttendanceTable";
 import { AttendanceFormModal } from "@/components/dashboard/AttendanceFormModal";
-import { Button } from "@/components/ui/button";
-import { Plus, Calendar as CalendarIcon } from "lucide-react";
+import { Plus, Calendar as CalendarIcon, ChevronLeft, ChevronRight, Search, Users, CheckCircle2, Clock, Coffee, MapPin } from "lucide-react";
 import { attendanceService, type Attendance, adminService, systemConfigService } from "@/lib/firestore";
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
@@ -25,6 +22,7 @@ export default function DashboardPage() {
     const [enableBreak, setEnableBreak] = useState(true);
     const [enableOffsite, setEnableOffsite] = useState(true);
     const [statusFilter, setStatusFilter] = useState<string | null>(null);
+    const [searchQuery, setSearchQuery] = useState("");
     const [alertState, setAlertState] = useState<{
         isOpen: boolean;
         title: string;
@@ -82,6 +80,21 @@ export default function DashboardPage() {
         };
         loadConfig();
     }, []);
+
+    const changeDate = (days: number) => {
+        const d = new Date(selectedDate);
+        d.setDate(d.getDate() + days);
+        setSelectedDate(d);
+    };
+
+    const formatThaiDate = (date: Date) => {
+        try {
+            const thaiYear = date.getFullYear() + 543;
+            return `${format(date, "EEEEที่ d MMMM", { locale: th })} ${thaiYear}`;
+        } catch {
+            return format(date, "d MMM yyyy");
+        }
+    };
 
     const handleAddAttendance = () => {
         setSelectedAttendance(null);
@@ -147,106 +160,249 @@ export default function DashboardPage() {
         total: attendances.length,
     };
 
-    // Filter attendances
-    const filteredAttendances = statusFilter
-        ? attendances.filter(a => {
-            if (statusFilter === "เข้างาน") return a.status === "เข้างาน" || a.status === "สาย";
-            if (statusFilter === "ออกงาน") return a.status === "ออกงาน";
-            if (statusFilter === "สาย") return a.status === "สาย";
-            if (statusFilter === "พัก") return a.status === "ก่อนพัก" || a.status === "หลังพัก";
-            if (statusFilter === "นอกพื้นที่") return a.status === "ออกนอกพื้นที่ขาไป" || a.status === "ออกนอกพื้นที่ขากลับ";
-            return true;
-        })
-        : attendances;
+    // Filter attendances by status and search query
+    const filteredAttendances = attendances.filter(a => {
+        if (statusFilter === "เข้างาน" && !(a.status === "เข้างาน" || a.status === "สาย")) return false;
+        if (statusFilter === "ออกงาน" && a.status !== "ออกงาน") return false;
+        if (statusFilter === "สาย" && a.status !== "สาย") return false;
+        if (statusFilter === "พัก" && !(a.status === "ก่อนพัก" || a.status === "หลังพัก")) return false;
+        if (statusFilter === "นอกพื้นที่" && !(a.status === "ออกนอกพื้นที่ขาไป" || a.status === "ออกนอกพื้นที่ขากลับ")) return false;
+
+        if (searchQuery.trim()) {
+            const query = searchQuery.toLowerCase();
+            const matchName = a.employeeName?.toLowerCase().includes(query);
+            const matchLocation = a.location?.toLowerCase().includes(query);
+            const matchNote = a.locationNote?.toLowerCase().includes(query);
+            if (!matchName && !matchLocation && !matchNote) return false;
+        }
+
+        return true;
+    });
+
+    const isToday = format(selectedDate, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
 
     return (
-        <div>
-            <PageHeader
-                title="บันทึก"
-                subtitle={`${attendances.length} results found`}
-                searchPlaceholder="Employee |"
-                action={
-                    <div className="grid grid-cols-2 gap-3 w-full">
-                        {/* Date Picker */}
-                        <input
-                            type="date"
-                            value={selectedDate instanceof Date && !isNaN(selectedDate.getTime()) ? format(selectedDate, "yyyy-MM-dd") : ""}
-                            onChange={(e) => {
-                                if (e.target.value) {
-                                    const date = new Date(e.target.value);
-                                    if (!isNaN(date.getTime())) {
-                                        setSelectedDate(date);
-                                    }
-                                }
-                            }}
-                            className="w-full h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 cursor-pointer shadow-sm hover:shadow-md transition-all duration-200"
-                        />
-
-                        {/* Add Button */}
-                        <Button
-                            onClick={handleAddAttendance}
-                            className="w-full h-11 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl px-3 gap-1.5 shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/30 transition-all duration-200 font-medium text-sm"
-                        >
-                            <Plus className="w-4 h-4 flex-shrink-0" />
-                            <span className="truncate">บันทึกลงเวลา</span>
-                        </Button>
+        <div className="space-y-4">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200/80">
+                <div>
+                    <div className="flex items-center gap-2.5">
+                        <h1 className="text-xl sm:text-2xl font-semibold text-slate-800 tracking-tight">
+                            บันทึกการลงเวลา
+                        </h1>
+                        <span className="text-[11px] font-normal px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                            Attendance Log
+                        </span>
+                        {isToday && (
+                            <span className="text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                วันนี้
+                            </span>
+                        )}
                     </div>
-                }
-            />
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-                <div
-                    onClick={() => setStatusFilter(statusFilter === "เข้างาน" ? null : "เข้างาน")}
-                    className={`bg-white p-4 rounded-xl border cursor-pointer transition-all ${statusFilter === "เข้างาน" ? "border-green-500 ring-2 ring-green-200" : "border-gray-100 hover:border-gray-300"}`}
-                >
-                    <div className="text-xs text-gray-500">เข้างาน</div>
-                    <div className={`text-2xl font-bold ${statusFilter === "เข้างาน" ? "text-green-600" : "text-gray-800"}`}>{stats.checkedIn}</div>
-                </div>
-                <div
-                    onClick={() => setStatusFilter(statusFilter === "ออกงาน" ? null : "ออกงาน")}
-                    className={`bg-white p-4 rounded-xl border cursor-pointer transition-all ${statusFilter === "ออกงาน" ? "border-blue-500 ring-2 ring-blue-200" : "border-gray-100 hover:border-gray-300"}`}
-                >
-                    <div className="text-xs text-gray-500">ออกงาน</div>
-                    <div className={`text-2xl font-bold ${statusFilter === "ออกงาน" ? "text-blue-600" : "text-gray-800"}`}>{stats.checkedOut}</div>
-                </div>
-                <div
-                    onClick={() => setStatusFilter(statusFilter === "สาย" ? null : "สาย")}
-                    className={`bg-white p-4 rounded-xl border cursor-pointer transition-all ${statusFilter === "สาย" ? "border-red-500 ring-2 ring-red-200" : "border-gray-100 hover:border-gray-300"}`}
-                >
-                    <div className="text-xs text-gray-500">สาย</div>
-                    <div className={`text-2xl font-bold ${statusFilter === "สาย" ? "text-red-600" : "text-gray-800"}`}>{stats.late}</div>
-                </div>
-                {enableBreak && (
-                    <div
-                        onClick={() => setStatusFilter(statusFilter === "พัก" ? null : "พัก")}
-                        className={`bg-white p-4 rounded-xl border cursor-pointer transition-all ${statusFilter === "พัก" ? "border-orange-500 ring-2 ring-orange-200" : "border-gray-100 hover:border-gray-300"}`}
-                    >
-                        <div className="text-xs text-gray-500">พัก</div>
-                        <div className={`text-2xl font-bold ${statusFilter === "พัก" ? "text-orange-600" : "text-gray-800"}`}>{stats.break}</div>
-                    </div>
-                )}
-                {enableOffsite && (
-                    <div
-                        onClick={() => setStatusFilter(statusFilter === "นอกพื้นที่" ? null : "นอกพื้นที่")}
-                        className={`bg-white p-4 rounded-xl border cursor-pointer transition-all ${statusFilter === "นอกพื้นที่" ? "border-purple-500 ring-2 ring-purple-200" : "border-gray-100 hover:border-gray-300"}`}
-                    >
-                        <div className="text-xs text-gray-500">นอกพื้นที่</div>
-                        <div className={`text-2xl font-bold ${statusFilter === "นอกพื้นที่" ? "text-purple-600" : "text-gray-800"}`}>{stats.offsite}</div>
-                    </div>
-                )}
-                <div
-                    onClick={() => setStatusFilter(null)}
-                    className={`bg-white p-4 rounded-xl border cursor-pointer transition-all ${statusFilter === null ? "border-gray-500 ring-2 ring-gray-200" : "border-gray-100 hover:border-gray-300"}`}
-                >
-                    <div className="text-xs text-gray-500">ทั้งหมด</div>
-                    <div className={`text-2xl font-bold ${statusFilter === null ? "text-gray-600" : "text-gray-800"}`}>{stats.total}</div>
+                    <p className="text-xs sm:text-sm font-normal text-slate-500 mt-1">
+                        ประวัติการลงเวลารายวัน • {formatThaiDate(selectedDate)}
+                    </p>
                 </div>
             </div>
 
+            {/* Compact Filters & Controls Bar */}
+            <div className="bg-white rounded-xl border border-slate-200/90 p-2.5 sm:p-3 shadow-xs flex flex-wrap items-center justify-between gap-2.5">
+                <div className="flex flex-wrap items-center gap-2">
+                    {/* Date Selector with prev/next buttons */}
+                    <div className="inline-flex items-center bg-slate-50 rounded-lg border border-slate-200 p-0.5">
+                        <button
+                            type="button"
+                            onClick={() => changeDate(-1)}
+                            title="วันก่อนหน้า"
+                            className="p-1.5 hover:bg-white hover:shadow-2xs text-slate-600 hover:text-slate-900 rounded-md transition-all"
+                        >
+                            <ChevronLeft className="w-4 h-4" />
+                        </button>
+                        <div className="flex items-center gap-1.5 px-2">
+                            <CalendarIcon className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                            <input
+                                type="date"
+                                value={selectedDate instanceof Date && !isNaN(selectedDate.getTime()) ? format(selectedDate, "yyyy-MM-dd") : ""}
+                                onChange={(e) => {
+                                    if (e.target.value) {
+                                        const date = new Date(e.target.value);
+                                        if (!isNaN(date.getTime())) {
+                                            setSelectedDate(date);
+                                        }
+                                    }
+                                }}
+                                className="bg-transparent text-xs sm:text-sm font-normal text-slate-800 focus:outline-none cursor-pointer"
+                            />
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => changeDate(1)}
+                            title="วันถัดไป"
+                            className="p-1.5 hover:bg-white hover:shadow-2xs text-slate-600 hover:text-slate-900 rounded-md transition-all"
+                        >
+                            <ChevronRight className="w-4 h-4" />
+                        </button>
+                    </div>
+
+                    {/* Today Button */}
+                    {!isToday && (
+                        <button
+                            type="button"
+                            onClick={() => setSelectedDate(new Date())}
+                            className="h-9 px-2.5 text-xs font-medium text-blue-700 bg-blue-50/70 hover:bg-blue-100/70 border border-blue-200 rounded-lg transition-colors"
+                        >
+                            กลับไปวันนี้
+                        </button>
+                    )}
+
+                    {/* Search Input */}
+                    <div className="relative">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="ค้นหาชื่อ, สถานที่, หรือหมายเหตุ..."
+                            className="h-9 pl-8 pr-7 py-1 bg-white border border-slate-200 rounded-lg text-xs sm:text-sm font-normal text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400 focus:border-slate-400 w-48 sm:w-64 transition-all"
+                        />
+                        {searchQuery && (
+                            <button
+                                type="button"
+                                onClick={() => setSearchQuery("")}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs p-0.5"
+                            >
+                                ✕
+                            </button>
+                        )}
+                    </div>
+                </div>
+
+                {/* Add Attendance Button */}
+                <div className="flex items-center gap-2 ml-auto">
+                    <button
+                        onClick={handleAddAttendance}
+                        className="h-9 inline-flex items-center gap-1.5 px-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs sm:text-sm font-medium shadow-xs transition-all"
+                    >
+                        <Plus className="w-3.5 h-3.5 shrink-0" />
+                        <span>บันทึกลงเวลา</span>
+                    </button>
+                </div>
+            </div>
+
+            {/* Compact & Clean Stat Cards (Clickable status filters) */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-2.5">
+                {/* เข้างาน */}
+                <div
+                    onClick={() => setStatusFilter(statusFilter === "เข้างาน" ? null : "เข้างาน")}
+                    className={`bg-white rounded-xl p-3 border transition-all cursor-pointer shadow-xs ${
+                        statusFilter === "เข้างาน"
+                            ? "border-emerald-500 ring-2 ring-emerald-100 bg-emerald-50/20"
+                            : "border-slate-200/90 hover:border-slate-300"
+                    }`}
+                >
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-700">เข้างาน</span>
+                        <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    </div>
+                    <div className="text-xl sm:text-2xl font-bold text-slate-800 mt-1 tabular-nums">{stats.checkedIn}</div>
+                    <div className="text-[11px] font-normal text-slate-400 mt-0.5">คน</div>
+                </div>
+
+                {/* ออกงาน */}
+                <div
+                    onClick={() => setStatusFilter(statusFilter === "ออกงาน" ? null : "ออกงาน")}
+                    className={`bg-white rounded-xl p-3 border transition-all cursor-pointer shadow-xs ${
+                        statusFilter === "ออกงาน"
+                            ? "border-blue-500 ring-2 ring-blue-100 bg-blue-50/20"
+                            : "border-slate-200/90 hover:border-slate-300"
+                    }`}
+                >
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-700">ออกงาน</span>
+                        <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                    </div>
+                    <div className="text-xl sm:text-2xl font-bold text-slate-800 mt-1 tabular-nums">{stats.checkedOut}</div>
+                    <div className="text-[11px] font-normal text-slate-400 mt-0.5">คน</div>
+                </div>
+
+                {/* สาย */}
+                <div
+                    onClick={() => setStatusFilter(statusFilter === "สาย" ? null : "สาย")}
+                    className={`bg-white rounded-xl p-3 border transition-all cursor-pointer shadow-xs ${
+                        statusFilter === "สาย"
+                            ? "border-rose-500 ring-2 ring-rose-100 bg-rose-50/20"
+                            : "border-slate-200/90 hover:border-slate-300"
+                    }`}
+                >
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-700">สาย</span>
+                        <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                    </div>
+                    <div className="text-xl sm:text-2xl font-bold text-slate-800 mt-1 tabular-nums">{stats.late}</div>
+                    <div className="text-[11px] font-normal text-slate-400 mt-0.5">คน</div>
+                </div>
+
+                {/* พัก */}
+                {enableBreak && (
+                    <div
+                        onClick={() => setStatusFilter(statusFilter === "พัก" ? null : "พัก")}
+                        className={`bg-white rounded-xl p-3 border transition-all cursor-pointer shadow-xs ${
+                            statusFilter === "พัก"
+                                ? "border-amber-500 ring-2 ring-amber-100 bg-amber-50/20"
+                                : "border-slate-200/90 hover:border-slate-300"
+                        }`}
+                    >
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-slate-700">พัก</span>
+                            <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                        </div>
+                        <div className="text-xl sm:text-2xl font-bold text-slate-800 mt-1 tabular-nums">{stats.break}</div>
+                        <div className="text-[11px] font-normal text-slate-400 mt-0.5">คน</div>
+                    </div>
+                )}
+
+                {/* นอกพื้นที่ */}
+                {enableOffsite && (
+                    <div
+                        onClick={() => setStatusFilter(statusFilter === "นอกพื้นที่" ? null : "นอกพื้นที่")}
+                        className={`bg-white rounded-xl p-3 border transition-all cursor-pointer shadow-xs ${
+                            statusFilter === "นอกพื้นที่"
+                                ? "border-purple-500 ring-2 ring-purple-100 bg-purple-50/20"
+                            : "border-slate-200/90 hover:border-slate-300"
+                        }`}
+                    >
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-slate-700">นอกพื้นที่</span>
+                            <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+                        </div>
+                        <div className="text-xl sm:text-2xl font-bold text-slate-800 mt-1 tabular-nums">{stats.offsite}</div>
+                        <div className="text-[11px] font-normal text-slate-400 mt-0.5">คน</div>
+                    </div>
+                )}
+
+                {/* ทั้งหมด */}
+                <div
+                    onClick={() => setStatusFilter(null)}
+                    className={`bg-white rounded-xl p-3 border transition-all cursor-pointer shadow-xs ${
+                        statusFilter === null
+                            ? "border-slate-700 ring-2 ring-slate-100 bg-slate-50/50"
+                            : "border-slate-200/90 hover:border-slate-300"
+                    }`}
+                >
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-700">ทั้งหมด</span>
+                        <span className="w-2 h-2 rounded-full bg-slate-400"></span>
+                    </div>
+                    <div className="text-xl sm:text-2xl font-bold text-slate-800 mt-1 tabular-nums">{stats.total}</div>
+                    <div className="text-[11px] font-normal text-slate-400 mt-0.5">รายการ</div>
+                </div>
+            </div>
+
+            {/* Table */}
             {loading ? (
-                <div className="text-center py-12">
-                    <div className="w-12 h-12 border-4 border-gray-100 border-t-primary rounded-full animate-spin mx-auto"></div>
-                    <p className="text-gray-600 mt-4">กำลังโหลดข้อมูล...</p>
+                <div className="bg-white rounded-xl border border-slate-200/90 shadow-xs p-10 text-center text-slate-500 font-normal">
+                    <div className="animate-spin w-5 h-5 border-2 border-slate-600 border-t-transparent rounded-full mx-auto mb-2"></div>
+                    กำลังโหลดข้อมูลการลงเวลา...
                 </div>
             ) : (
                 <AttendanceTable

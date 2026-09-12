@@ -1,12 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PageHeader } from "@/components/layout/PageHeader";
-
 import { EmployeeTable } from "@/components/employee/EmployeeTable";
 import { EmployeeFormModal } from "@/components/employee/EmployeeFormModal";
-import { Button } from "@/components/ui/button";
-import { Pencil, Plus, Search, Filter, Users } from "lucide-react";
+import { Plus, Search, Filter, Users } from "lucide-react";
 import { employeeService, type Employee } from "@/lib/firestore";
 import { useAdmin } from "@/components/auth/AuthProvider";
 import { CustomAlert } from "@/components/ui/custom-alert";
@@ -58,7 +55,8 @@ export default function EmployeePage() {
             result = result.filter(e =>
                 e.name.toLowerCase().includes(query) ||
                 e.employeeId?.toLowerCase().includes(query) ||
-                e.position.toLowerCase().includes(query)
+                e.position?.toLowerCase().includes(query) ||
+                e.department?.toLowerCase().includes(query)
             );
         }
 
@@ -67,7 +65,6 @@ export default function EmployeePage() {
             if (filterType === "ชั่วคราว") {
                 result = result.filter(e => e.employmentType === "ชั่วคราว" || e.type === "ชั่วคราว");
             } else {
-                // For "รายเดือน" and "รายวัน", exclude "ชั่วคราว" unless specifically requested
                 result = result.filter(e =>
                     e.type === filterType &&
                     e.employmentType !== "ชั่วคราว"
@@ -136,138 +133,170 @@ export default function EmployeePage() {
     };
 
     return (
-        <div className="space-y-6">
-            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                <PageHeader
-                    title="รายชื่อพนักงาน (Employees)"
-                    subtitle={`จัดการข้อมูลพนักงานทั้งหมด ${stats.total} คน`}
-                />
+        <div className="space-y-4">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200/80">
+                <div>
+                    <div className="flex items-center gap-2.5">
+                        <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                            รายชื่อพนักงาน
+                        </h1>
+                        <span className="text-[11px] font-normal px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                            Employees
+                        </span>
+                        <span className="text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                            ทั้งหมด {stats.total} คน
+                        </span>
+                    </div>
+                    <p className="text-xs sm:text-sm font-normal text-slate-500 mt-1">
+                        จัดการข้อมูลพนักงาน ฝ่าย แผนก และสิทธิ์การใช้งานระบบ
+                    </p>
+                </div>
+            </div>
 
+            {/* Compact & Clean KPI / Stats Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-2.5">
+                {/* ประจำ - รายเดือน */}
+                <div
+                    onClick={() => { setFilterType("รายเดือน"); setStatusFilter("active"); }}
+                    className={`bg-white rounded-xl p-3 border transition-all cursor-pointer shadow-xs ${
+                        filterType === "รายเดือน" && statusFilter === "active"
+                            ? "border-blue-500 ring-2 ring-blue-100 bg-blue-50/20"
+                            : "border-slate-200/90 hover:border-slate-300"
+                    }`}
+                >
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-700">ประจำ - รายเดือน</span>
+                        <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                    </div>
+                    <div className="text-xl sm:text-2xl font-bold text-slate-800 mt-1 tabular-nums">{stats.monthly}</div>
+                    <div className="text-[11px] font-normal text-slate-400 mt-0.5">คน</div>
+                </div>
+
+                {/* ประจำ - รายวัน */}
+                <div
+                    onClick={() => { setFilterType("รายวัน"); setStatusFilter("active"); }}
+                    className={`bg-white rounded-xl p-3 border transition-all cursor-pointer shadow-xs ${
+                        filterType === "รายวัน" && statusFilter === "active"
+                            ? "border-amber-500 ring-2 ring-amber-100 bg-amber-50/20"
+                            : "border-slate-200/90 hover:border-slate-300"
+                    }`}
+                >
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-700">ประจำ - รายวัน</span>
+                        <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                    </div>
+                    <div className="text-xl sm:text-2xl font-bold text-slate-800 mt-1 tabular-nums">{stats.daily}</div>
+                    <div className="text-[11px] font-normal text-slate-400 mt-0.5">คน</div>
+                </div>
+
+                {/* พนักงานชั่วคราว */}
+                <div
+                    onClick={() => { setFilterType("ชั่วคราว"); setStatusFilter("active"); }}
+                    className={`bg-white rounded-xl p-3 border transition-all cursor-pointer shadow-xs ${
+                        filterType === "ชั่วคราว" && statusFilter === "active"
+                            ? "border-purple-500 ring-2 ring-purple-100 bg-purple-50/20"
+                            : "border-slate-200/90 hover:border-slate-300"
+                    }`}
+                >
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-700">พนักงานชั่วคราว</span>
+                        <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+                    </div>
+                    <div className="text-xl sm:text-2xl font-bold text-slate-800 mt-1 tabular-nums">{stats.temporary}</div>
+                    <div className="text-[11px] font-normal text-slate-400 mt-0.5">คน</div>
+                </div>
+
+                {/* ทั้งหมด (Active) */}
+                <div
+                    onClick={() => { setFilterType("all"); setStatusFilter("active"); }}
+                    className={`bg-white rounded-xl p-3 border transition-all cursor-pointer shadow-xs ${
+                        filterType === "all" && statusFilter === "active"
+                            ? "border-emerald-500 ring-2 ring-emerald-100 bg-emerald-50/20"
+                            : "border-slate-200/90 hover:border-slate-300"
+                    }`}
+                >
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-700">พนักงานปัจจุบัน</span>
+                        <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    </div>
+                    <div className="text-xl sm:text-2xl font-bold text-slate-800 mt-1 tabular-nums">{stats.total}</div>
+                    <div className="text-[11px] font-normal text-slate-400 mt-0.5">คน</div>
+                </div>
+
+                {/* ลาออก / พ้นสภาพ */}
+                <div
+                    onClick={() => { setFilterType("all"); setStatusFilter("inactive"); }}
+                    className={`bg-white rounded-xl p-3 border transition-all cursor-pointer shadow-xs col-span-2 sm:col-span-1 lg:col-span-1 ${
+                        statusFilter === "inactive"
+                            ? "border-rose-500 ring-2 ring-rose-100 bg-rose-50/20"
+                            : "border-slate-200/90 hover:border-slate-300"
+                    }`}
+                >
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-700">ลาออก / พ้นสภาพ</span>
+                        <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                    </div>
+                    <div className="text-xl sm:text-2xl font-bold text-slate-800 mt-1 tabular-nums">{stats.inactive}</div>
+                    <div className="text-[11px] font-normal text-slate-400 mt-0.5">คน</div>
+                </div>
+            </div>
+
+            {/* Compact Toolbar (Search, Filter Indicator, & Add Button) */}
+            <div className="bg-white rounded-xl border border-slate-200/90 p-2.5 sm:p-3 shadow-xs flex flex-wrap items-center justify-between gap-2.5">
+                <div className="flex flex-wrap items-center gap-2">
+                    {/* Search Input */}
+                    <div className="relative">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                        <input
+                            type="text"
+                            placeholder="ค้นหาชื่อ, รหัส, แผนก, หรือตำแหน่ง..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="h-9 pl-8 pr-7 py-1 bg-white border border-slate-200 rounded-lg text-xs sm:text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400 focus:border-slate-400 w-52 sm:w-72 transition-all"
+                        />
+                        {searchQuery && (
+                            <button
+                                type="button"
+                                onClick={() => setSearchQuery("")}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs p-0.5"
+                            >
+                                ✕
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Filter Status Pill */}
+                    <div className="h-9 px-3 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-600 inline-flex items-center gap-1.5">
+                        <Filter className="w-3.5 h-3.5 text-slate-400" />
+                        <span>สถานะ: <span className="font-medium text-slate-800">
+                            {statusFilter === "active" ? (filterType === "all" ? "ปัจจุบันทั้งหมด" : filterType) : "พ้นสภาพ"}
+                        </span></span>
+                    </div>
+                </div>
+
+                {/* Add Employee Button (if super admin) */}
                 {isSuperAdmin && (
-                    <button
-                        onClick={handleAddEmployee}
-                        className="inline-flex items-center justify-center px-6 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-700 transition-all shadow-sm shadow-blue-200 gap-2 min-w-[160px]"
-                    >
-                        <Plus className="w-4 h-4" />
-                        เพิ่มพนักงานใหม่
-                    </button>
+                    <div className="flex items-center gap-2 ml-auto">
+                        <button
+                            onClick={handleAddEmployee}
+                            className="h-9 inline-flex items-center gap-1.5 px-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs sm:text-sm font-medium shadow-xs transition-all"
+                        >
+                            <Plus className="w-3.5 h-3.5 shrink-0" />
+                            <span>เพิ่มพนักงานใหม่</span>
+                        </button>
+                    </div>
                 )}
             </div>
 
-            {/* KPI / Stats Grid */}
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-                <div onClick={() => { setFilterType("รายเดือน"); setStatusFilter("active"); }} className="cursor-pointer group">
-                    <div className={`h-full p-4 rounded-xl border transition-all duration-200 ${filterType === "รายเดือน" && statusFilter === "active"
-                        ? "bg-blue-50 border-blue-200 shadow-sm"
-                        : "bg-white border-gray-200 hover:border-blue-300 hover:shadow-md"
-                        }`}>
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">ประจำ - รายเดือน</span>
-                            <div className={`w-2 h-2 rounded-full ${filterType === "รายเดือน" && statusFilter === "active" ? "bg-blue-500" : "bg-gray-300"}`} />
-                        </div>
-                        <div className="flex items-baseline gap-1">
-                            <span className="text-2xl font-bold text-gray-900">{stats.monthly}</span>
-                            <span className="text-xs text-gray-500">คน</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div onClick={() => { setFilterType("รายวัน"); setStatusFilter("active"); }} className="cursor-pointer group">
-                    <div className={`h-full p-4 rounded-xl border transition-all duration-200 ${filterType === "รายวัน" && statusFilter === "active"
-                        ? "bg-orange-50 border-orange-200 shadow-sm"
-                        : "bg-white border-gray-200 hover:border-orange-300 hover:shadow-md"
-                        }`}>
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">ประจำ - รายวัน</span>
-                            <div className={`w-2 h-2 rounded-full ${filterType === "รายวัน" && statusFilter === "active" ? "bg-orange-500" : "bg-gray-300"}`} />
-                        </div>
-                        <div className="flex items-baseline gap-1">
-                            <span className="text-2xl font-bold text-gray-900">{stats.daily}</span>
-                            <span className="text-xs text-gray-500">คน</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div onClick={() => { setFilterType("ชั่วคราว"); setStatusFilter("active"); }} className="cursor-pointer group">
-                    <div className={`h-full p-4 rounded-xl border transition-all duration-200 ${filterType === "ชั่วคราว" && statusFilter === "active"
-                        ? "bg-purple-50 border-purple-200 shadow-sm"
-                        : "bg-white border-gray-200 hover:border-purple-300 hover:shadow-md"
-                        }`}>
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">พนักงานชั่วคราว</span>
-                            <div className={`w-2 h-2 rounded-full ${filterType === "ชั่วคราว" && statusFilter === "active" ? "bg-purple-500" : "bg-gray-300"}`} />
-                        </div>
-                        <div className="flex items-baseline gap-1">
-                            <span className="text-2xl font-bold text-gray-900">{stats.temporary}</span>
-                            <span className="text-xs text-gray-500">คน</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div onClick={() => { setFilterType("all"); setStatusFilter("active"); }} className="cursor-pointer group">
-                    <div className={`h-full p-4 rounded-xl border transition-all duration-200 ${filterType === "all" && statusFilter === "active"
-                        ? "bg-gray-50 border-gray-300 shadow-sm"
-                        : "bg-white border-gray-200 hover:border-gray-300 hover:shadow-md"
-                        }`}>
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">ทั้งหมด (Active)</span>
-                            <div className={`w-2 h-2 rounded-full ${filterType === "all" && statusFilter === "active" ? "bg-gray-900" : "bg-gray-300"}`} />
-                        </div>
-                        <div className="flex items-baseline gap-1">
-                            <span className="text-2xl font-bold text-gray-900">{stats.total}</span>
-                            <span className="text-xs text-gray-500">คน</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div onClick={() => { setFilterType("all"); setStatusFilter("inactive"); }} className="cursor-pointer group">
-                    <div className={`h-full p-4 rounded-xl border transition-all duration-200 ${statusFilter === "inactive"
-                        ? "bg-red-50 border-red-200 shadow-sm"
-                        : "bg-white border-gray-200 hover:border-red-300 hover:shadow-md"
-                        }`}>
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">ลาออก/พ้นสภาพ</span>
-                            <div className={`w-2 h-2 rounded-full ${statusFilter === "inactive" ? "bg-red-500" : "bg-gray-300"}`} />
-                        </div>
-                        <div className="flex items-baseline gap-1">
-                            <span className="text-2xl font-bold text-gray-900">{stats.inactive}</span>
-                            <span className="text-xs text-gray-500">คน</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Controls & Search */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex flex-col md:flex-row gap-4 justify-between items-center">
-                <div className="relative w-full md:w-96">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Search className="h-4 w-4 text-gray-400" />
-                    </div>
-                    <input
-                        type="text"
-                        placeholder="ค้นหาชื่อ, รหัส, หรือตำแหน่งงาน..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="block w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all hover:bg-gray-50 focus:bg-white"
-                    />
-                </div>
-
-                <div className="flex items-center gap-2 text-sm text-gray-500 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100">
-                    <Filter className="w-3.5 h-3.5" />
-                    <span>สถานะ: <span className="font-medium text-gray-700">
-                        {statusFilter === "active" ? (filterType === "all" ? "พนักงานปัจจุบันทั้งหมด" : filterType) : "พ้นสภาพ"}
-                    </span></span>
-                </div>
-            </div>
-
-            {/* Loading / Data Table */}
+            {/* Table Container */}
             {loading ? (
-                <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-12 flex flex-col items-center justify-center text-gray-500">
-                    <div className="w-10 h-10 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin mb-4"></div>
-                    <p className="font-medium">กำลังโหลดข้อมูลพนักงาน...</p>
+                <div className="bg-white rounded-xl border border-slate-200/90 shadow-xs p-10 text-center text-slate-500 font-normal">
+                    <div className="animate-spin w-5 h-5 border-2 border-slate-600 border-t-transparent rounded-full mx-auto mb-2"></div>
+                    กำลังโหลดข้อมูลพนักงาน...
                 </div>
             ) : (
-                <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden min-h-[400px]">
+                <div className="bg-white rounded-xl shadow-xs border border-slate-200/90 overflow-hidden">
                     <EmployeeTable
                         employees={filteredEmployees}
                         onEdit={handleEditEmployee}
@@ -275,14 +304,22 @@ export default function EmployeePage() {
                         onView={handleViewEmployee}
                         canManage={isSuperAdmin}
                     />
-                    {filteredEmployees.length === 0 && (
-                        <div className="px-6 py-16 text-center text-gray-500">
-                            <div className="mx-auto flex items-center justify-center w-12 h-12 rounded-full bg-gray-100 mb-3">
-                                <Users className="w-6 h-6 text-gray-400" />
-                            </div>
-                            <p>ไม่พบข้อมูลพนักงานตามเงื่อนไขที่ระบุ</p>
+
+                    {/* Table Footer Summary */}
+                    <div className="px-3.5 py-2.5 bg-slate-50/80 border-t border-slate-200 text-xs font-normal text-slate-500 flex flex-wrap items-center justify-between gap-2">
+                        <span>
+                            แสดงผล <span className="font-semibold text-slate-800">{filteredEmployees.length}</span> จากทั้งหมด <span className="font-semibold text-slate-800">{employees.length}</span> คน
+                        </span>
+                        <div className="flex items-center gap-3 text-[11px] text-slate-500">
+                            <span>รายเดือน: {stats.monthly}</span>
+                            <span>•</span>
+                            <span>รายวัน: {stats.daily}</span>
+                            <span>•</span>
+                            <span>ชั่วคราว: {stats.temporary}</span>
+                            <span>•</span>
+                            <span>พ้นสภาพ: {stats.inactive}</span>
                         </div>
-                    )}
+                    </div>
                 </div>
             )}
 

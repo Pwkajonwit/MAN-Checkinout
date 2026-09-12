@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { employeeService, attendanceService, leaveService, otService, swapService, systemConfigService, type Employee, type Attendance, type LeaveRequest, type OTRequest, type SwapRequest } from "@/lib/firestore";
 import { AttendanceTable } from "@/components/dashboard/AttendanceTable";
 import { LeaveTable } from "@/components/leave/LeaveTable";
 import { OTTable } from "@/components/ot/OTTable";
-import { Search, User, Download, Clock, Briefcase, FileText, ChevronRight, Phone, Mail, Calendar, MapPin, ArrowLeft } from "lucide-react";
-import { format } from "date-fns";
+import { Search, User, Download, Clock, Briefcase, FileText, ChevronRight, ChevronLeft, Phone, Mail, Calendar, MapPin, ArrowLeft } from "lucide-react";
+import { format, startOfWeek, endOfWeek, addWeeks, subWeeks } from "date-fns";
 import { th } from "date-fns/locale";
 import { sendPushMessage } from "@/app/actions/line";
 import { generateAttendancePDF } from "@/lib/pdfGenerator";
@@ -16,8 +17,13 @@ import { getLateMinutes, isLate, formatMinutesToHours } from "@/lib/workTime";
 import { Button } from "@/components/ui/button";
 import { formatLeaveDayHourUnits, getLeaveDayUnits } from "@/lib/leaveUtils";
 
-export default function SearchPage() {
-    const [searchQuery, setSearchQuery] = useState("");
+function SearchContent() {
+    const searchParams = useSearchParams();
+    const queryEmployeeId = searchParams.get("employeeId") || searchParams.get("id");
+    const queryMonth = searchParams.get("month");
+    const querySearch = searchParams.get("q") || searchParams.get("search");
+
+    const [searchQuery, setSearchQuery] = useState(querySearch || "");
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
     const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
@@ -31,7 +37,82 @@ export default function SearchPage() {
     const [locationEnabled, setLocationEnabled] = useState(false);
     const [workTimeEnabled, setWorkTimeEnabled] = useState(true);
 
-    const [selectedMonth, setSelectedMonth] = useState(format(new Date(), "yyyy-MM"));
+    const [filterType, setFilterType] = useState<"month" | "week" | "custom">("month");
+    const [selectedMonth, setSelectedMonth] = useState(() => {
+        if (queryMonth && /^\d{4}-\d{2}$/.test(queryMonth)) {
+            return queryMonth;
+        }
+        return format(new Date(), "yyyy-MM");
+    });
+    const [selectedWeekDate, setSelectedWeekDate] = useState(() => new Date());
+    const [customRange, setCustomRange] = useState(() => {
+        const today = new Date();
+        const start = new Date(today);
+        start.setDate(today.getDate() - 7);
+        return { start, end: today };
+    });
+
+    const getDateRange = useCallback(() => {
+        if (filterType === "month") {
+            const [year, month] = selectedMonth.split('-').map(Number);
+            const startDate = new Date(year, month - 1, 1, 0, 0, 0, 0);
+            const endDate = new Date(year, month, 0, 23, 59, 59, 999);
+            const totalDays = new Date(year, month, 0).getDate();
+            return {
+                startDate,
+                endDate,
+                label: format(startDate, "MMMM yyyy", { locale: th }),
+                totalDays,
+            };
+        } else if (filterType === "week") {
+            const startDate = startOfWeek(selectedWeekDate, { weekStartsOn: 1 });
+            startDate.setHours(0, 0, 0, 0);
+            const endDate = endOfWeek(selectedWeekDate, { weekStartsOn: 1 });
+            endDate.setHours(23, 59, 59, 999);
+            return {
+                startDate,
+                endDate,
+                label: `สัปดาห์ ${format(startDate, "d MMM", { locale: th })} - ${format(endDate, "d MMM yyyy", { locale: th })}`,
+                totalDays: 7,
+            };
+        } else {
+            const startDate = new Date(customRange.start);
+            startDate.setHours(0, 0, 0, 0);
+            const endDate = new Date(customRange.end);
+            endDate.setHours(23, 59, 59, 999);
+            const diffMs = endDate.getTime() - startDate.getTime();
+            const totalDays = Math.max(1, Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1);
+            return {
+                startDate,
+                endDate,
+                label: `ช่วงวันที่ ${format(startDate, "d MMM", { locale: th })} - ${format(endDate, "d MMM yyyy", { locale: th })}`,
+                totalDays,
+            };
+        }
+    }, [filterType, selectedMonth, selectedWeekDate, customRange]);
+
+    const loadEmployeeData = useCallback(async (employeeId: string, customDates?: { startDate: Date; endDate: Date }) => {
+        setLoadingData(true);
+        try {
+            const { startDate, endDate } = customDates || getDateRange();
+
+            const [attendanceData, leaveData, otData, swapData] = await Promise.all([
+                attendanceService.getHistory(employeeId, startDate, endDate),
+                leaveService.getByEmployeeId(employeeId),
+                otService.getByEmployeeId(employeeId),
+                swapService.getByEmployeeId(employeeId)
+            ]);
+
+            setAttendances(attendanceData);
+            setLeaves(leaveData);
+            setOTRequests(otData);
+            setSwapRequests(swapData);
+        } catch (error) {
+            console.error("Error loading employee data:", error);
+        } finally {
+            setLoadingData(false);
+        }
+    }, [getDateRange]);
 
     useEffect(() => {
         loadEmployees();
@@ -53,7 +134,30 @@ export default function SearchPage() {
         if (selectedEmployee?.id) {
             loadEmployeeData(selectedEmployee.id);
         }
-    }, [selectedMonth]);
+    }, [selectedEmployee?.id, getDateRange, loadEmployeeData]);
+
+    useEffect(() => {
+        if (queryMonth && /^\d{4}-\d{2}$/.test(queryMonth) && queryMonth !== selectedMonth) {
+            setSelectedMonth(queryMonth);
+            setFilterType("month");
+        }
+    }, [queryMonth]);
+
+    useEffect(() => {
+        if (employees.length > 0 && queryEmployeeId) {
+            const target = employees.find(
+                emp => emp.id === queryEmployeeId || emp.employeeId === queryEmployeeId
+            );
+            if (target && target.id !== selectedEmployee?.id) {
+                setSelectedEmployee(target);
+                if (target.id) {
+                    loadEmployeeData(target.id);
+                }
+            }
+        } else if (employees.length > 0 && querySearch && !selectedEmployee) {
+            setSearchQuery(querySearch);
+        }
+    }, [employees, queryEmployeeId, querySearch]);
 
     useEffect(() => {
         if (searchQuery.trim() === "") {
@@ -80,32 +184,6 @@ export default function SearchPage() {
         }
     };
 
-    const loadEmployeeData = async (employeeId: string) => {
-        setLoadingData(true);
-        try {
-            const [year, month] = selectedMonth.split('-').map(Number);
-            const startDate = new Date(year, month - 1, 1);
-            const endDate = new Date(year, month, 0); // Last day of month
-            endDate.setHours(23, 59, 59, 999);
-
-            const [attendanceData, leaveData, otData, swapData] = await Promise.all([
-                attendanceService.getHistory(employeeId, startDate, endDate),
-                leaveService.getByEmployeeId(employeeId),
-                otService.getByEmployeeId(employeeId),
-                swapService.getByEmployeeId(employeeId)
-            ]);
-
-            setAttendances(attendanceData);
-            setLeaves(leaveData);
-            setOTRequests(otData);
-            setSwapRequests(swapData);
-        } catch (error) {
-            console.error("Error loading employee data:", error);
-        } finally {
-            setLoadingData(false);
-        }
-    };
-
     const handleSelectEmployee = (employee: Employee) => {
         setSelectedEmployee(employee);
         setSearchQuery(""); // Clear search to focus on detail
@@ -113,12 +191,108 @@ export default function SearchPage() {
         if (employee.id) {
             loadEmployeeData(employee.id);
         }
+        if (typeof window !== "undefined") {
+            const newUrl = new URL(window.location.href);
+            newUrl.searchParams.set("employeeId", employee.id || employee.employeeId || "");
+            window.history.replaceState(null, "", newUrl.toString());
+        }
     };
 
     const handleBackToSearch = () => {
         setSelectedEmployee(null);
         setSearchQuery("");
         setFilteredEmployees([]);
+        if (typeof window !== "undefined") {
+            const newUrl = new URL(window.location.href);
+            newUrl.searchParams.delete("employeeId");
+            newUrl.searchParams.delete("id");
+            window.history.replaceState(null, "", newUrl.pathname);
+        }
+    };
+
+    const summary = useMemo(() => {
+        const { startDate, endDate, totalDays } = getDateRange();
+        const attendanceDays = attendances.filter(a => a.status === "เข้างาน" || a.status === "สาย" || a.status === "ออกงาน").length;
+
+        let leaveDays = 0;
+        leaves.forEach(l => {
+            if (l.status === "อนุมัติ") {
+                const lStart = l.startDate instanceof Date ? l.startDate : new Date(l.startDate);
+                const lEnd = l.endDate instanceof Date ? l.endDate : new Date(l.endDate);
+                if (lStart <= endDate && lEnd >= startDate) {
+                    leaveDays += getLeaveDayUnits(l);
+                }
+            }
+        });
+
+        const weeklyHolidays = selectedEmployee?.weeklyHolidays || [0, 6];
+        let expectedWorkDays = 0;
+        let elapsedWorkDays = 0;
+        const now = new Date();
+        now.setHours(23, 59, 59, 999);
+
+        const cur = new Date(startDate);
+        while (cur <= endDate) {
+            if (!weeklyHolidays.includes(cur.getDay())) {
+                expectedWorkDays++;
+                if (cur <= now) {
+                    elapsedWorkDays++;
+                }
+            }
+            cur.setDate(cur.getDate() + 1);
+        }
+
+        const absentDays = Math.max(0, elapsedWorkDays - attendanceDays - leaveDays);
+
+        const lateCount = attendances.filter(a => {
+            if (a.status === "สาย") return true;
+            if (a.status === "เข้างาน" && a.checkIn && isLate(new Date(a.checkIn))) return true;
+            return false;
+        }).length;
+
+        const lateMinutes = attendances.reduce((sum, a) => {
+            if (a.status === "สาย") return sum + (a.lateMinutes || 0);
+            if (a.status === "เข้างาน" && a.checkIn && isLate(new Date(a.checkIn))) {
+                return sum + getLateMinutes(new Date(a.checkIn));
+            }
+            return sum + (a.lateMinutes || 0);
+        }, 0);
+
+        const totalOTHours = otRequests
+            .filter(ot => {
+                const otDate = ot.date instanceof Date ? ot.date : new Date(ot.date);
+                return ot.status === "อนุมัติ" && otDate >= startDate && otDate <= endDate;
+            })
+            .reduce((sum, ot) => {
+                if (ot.startTime && ot.endTime) {
+                    const start = ot.startTime instanceof Date ? ot.startTime : new Date(ot.startTime);
+                    const end = ot.endTime instanceof Date ? ot.endTime : new Date(ot.endTime);
+                    const minutes = (end.getTime() - start.getTime()) / (1000 * 60);
+                    return sum + minutes;
+                }
+                return sum;
+            }, 0);
+
+        return {
+            totalDays,
+            attendanceDays,
+            leaveDays,
+            absentDays,
+            expectedWorkDays,
+            lateCount,
+            lateMinutes,
+            totalOTHours,
+        };
+    }, [attendances, leaves, otRequests, getDateRange, selectedEmployee]);
+
+    const handleExportCSV = () => {
+        if (!selectedEmployee) return;
+        generateAttendanceCSV(selectedEmployee.name, attendances, otRequests, summary, leaves, swapRequests);
+    };
+
+    const handleExportPDF = () => {
+        if (!selectedEmployee) return;
+        generateAttendancePDF(selectedEmployee.name, attendances, otRequests, summary, leaves, swapRequests);
     };
 
     const handleLeaveStatusUpdate = async (id: string, status: LeaveRequest["status"]) => {
@@ -420,256 +594,199 @@ export default function SearchPage() {
                                 <>
                                     {activeTab === "attendance" && (
                                         <div className="space-y-4">
+                                            {/* Date Range Filter Bar */}
+                                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
+                                                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                                                    <div className="flex items-center gap-1.5 text-slate-700">
+                                                        <Calendar className="w-4 h-4 text-slate-500 shrink-0" />
+                                                        <span className="text-xs font-semibold">ตัวกรอง:</span>
+                                                    </div>
 
-                                            <div className="flex flex-col gap-4">
-                                                {/* Summary Cards */}
-                                                {(() => {
-                                                    const summary = (() => {
-                                                        const [year, month] = selectedMonth.split('-').map(Number);
-                                                        const daysInMonth = new Date(year, month, 0).getDate();
+                                                    {/* Filter Mode Toggle Pills */}
+                                                    <div className="inline-flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setFilterType("month")}
+                                                            className={`px-3 py-1 rounded-md font-medium transition-all ${
+                                                                filterType === "month"
+                                                                    ? "bg-white text-slate-900 font-semibold shadow-2xs"
+                                                                    : "text-slate-600 hover:text-slate-900"
+                                                            }`}
+                                                        >
+                                                            รายเดือน
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setFilterType("week")}
+                                                            className={`px-3 py-1 rounded-md font-medium transition-all ${
+                                                                filterType === "week"
+                                                                    ? "bg-white text-slate-900 font-semibold shadow-2xs"
+                                                                    : "text-slate-600 hover:text-slate-900"
+                                                            }`}
+                                                        >
+                                                            สัปดาห์
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setFilterType("custom")}
+                                                            className={`px-3 py-1 rounded-md font-medium transition-all ${
+                                                                filterType === "custom"
+                                                                    ? "bg-white text-slate-900 font-semibold shadow-2xs"
+                                                                    : "text-slate-600 hover:text-slate-900"
+                                                            }`}
+                                                        >
+                                                            กำหนดเอง
+                                                        </button>
+                                                    </div>
 
-                                                        // Filter attendances for selected month only (redundant if API filters, but safe)
-                                                        const monthlyAttendances = attendances;
-
-                                                        const attendanceDays = monthlyAttendances.filter(a => a.status === "เข้างาน" || a.status === "สาย" || a.status === "ออกงาน").length;
-
-                                                        // Leaves
-                                                        let leaveDays = 0;
-                                                        leaves.forEach(l => {
-                                                            if (l.status === "อนุมัติ") {
-                                                                leaveDays += getLeaveDayUnits(l);
-                                                            }
-                                                        });
-
-                                                        // Absent Logic (Time Sensitive)
-                                                        const now = new Date();
-                                                        const currentYear = now.getFullYear();
-                                                        const currentMonth = now.getMonth() + 1;
-                                                        const currentDay = now.getDate();
-
-                                                        let daysElapsed = daysInMonth;
-                                                        if (year === currentYear && month === currentMonth) {
-                                                            daysElapsed = currentDay;
-                                                        } else if (year > currentYear || (year === currentYear && month > currentMonth)) {
-                                                            daysElapsed = 0;
-                                                        }
-
-                                                        // Calculate expected work days based on employee settings
-                                                        const weeklyHolidays = selectedEmployee.weeklyHolidays || [0, 6]; // Default to Sunday (0) and Saturday (6)
-                                                        let expectedWorkDays = 0;
-                                                        for (let d = 1; d <= daysInMonth; d++) {
-                                                            const date = new Date(year, month - 1, d);
-                                                            if (!weeklyHolidays.includes(date.getDay())) {
-                                                                expectedWorkDays++;
-                                                            }
-                                                        }
-
-                                                        // Calculate absent days based on elapsed working days
-                                                        let elapsedWorkDays = 0;
-                                                        for (let d = 1; d <= daysElapsed; d++) {
-                                                            const date = new Date(year, month - 1, d);
-                                                            if (!weeklyHolidays.includes(date.getDay())) {
-                                                                elapsedWorkDays++;
-                                                            }
-                                                        }
-                                                        const absentDays = Math.max(0, elapsedWorkDays - attendanceDays - leaveDays);
-
-                                                        const lateCount = monthlyAttendances.filter(a => (a.lateMinutes || 0) > 0).length;
-                                                        const lateMinutes = monthlyAttendances.reduce((sum, a) => sum + (a.lateMinutes || 0), 0);
-
-                                                        const totalOTHours = otRequests
-                                                            .filter(ot => {
-                                                                const otDate = new Date(ot.date);
-                                                                return ot.status === "อนุมัติ" &&
-                                                                    otDate.getMonth() === (month - 1) &&
-                                                                    otDate.getFullYear() === year;
-                                                            })
-                                                            .reduce((sum, ot) => {
-                                                                if (ot.startTime && ot.endTime) {
-                                                                    const start = ot.startTime instanceof Date ? ot.startTime : new Date(ot.startTime);
-                                                                    const end = ot.endTime instanceof Date ? ot.endTime : new Date(ot.endTime);
-                                                                    const minutes = (end.getTime() - start.getTime()) / (1000 * 60);
-                                                                    return sum + minutes;
-                                                                }
-                                                                return sum;
-                                                            }, 0);
-
-                                                        return {
-                                                            totalDays: daysInMonth,
-                                                            attendanceDays,
-                                                            leaveDays,
-                                                            absentDays,
-                                                            expectedWorkDays,
-                                                            lateCount,
-                                                            lateMinutes,
-                                                            totalOTHours
-                                                        };
-                                                    })();
-
-                                                    return (
-                                                        <div className="grid grid-cols-2 md:grid-cols-6 gap-4 p-4 bg-gray-50 rounded-xl border border-slate-200">
-                                                            <div className="text-center">
-                                                                <div className="text-2xl font-bold text-slate-900">{summary.attendanceDays}</div>
-                                                                <div className="text-xs text-slate-600">วันมาทำงาน</div>
-                                                            </div>
-                                                            <div className="text-center">
-                                                                <div className="text-2xl font-bold text-slate-900">{summary.leaveDays}</div>
-                                                                <div className="text-xs text-slate-600">วันลา</div>
-                                                            </div>
-                                                            <div className="text-center">
-                                                                <div className="text-2xl font-bold text-slate-900">
-                                                                    {summary.absentDays} <span className="text-lg text-slate-600 font-normal">/ {summary.expectedWorkDays}</span>
-                                                                </div>
-                                                                <div className="text-xs text-slate-600">วันขาด (โดยประมาณ)</div>
-                                                            </div>
-                                                            <div className="text-center">
-                                                                <div className="text-2xl font-bold text-red-600">{summary.lateCount}</div>
-                                                                <div className="text-xs text-slate-600">สาย (ครั้ง)</div>
-                                                            </div>
-                                                            <div className="text-center">
-                                                                <div className="text-lg font-bold text-red-600">{formatMinutesToHours(summary.lateMinutes)}</div>
-                                                                <div className="text-xs text-slate-600">รวมเวลาสาย</div>
-                                                            </div>
-                                                            <div className="text-center">
-                                                                <div className="text-lg font-bold text-blue-600">{formatMinutesToHours(summary.totalOTHours)}</div>
-                                                                <div className="text-xs text-slate-600">รวม OT (ชม.)</div>
-                                                            </div>
-
-                                                            {/* Hidden CSV/PDF Logic Trigger - keeping clean structure */}
+                                                    {/* Month Input */}
+                                                    {filterType === "month" && (
+                                                        <div className="flex items-center gap-2">
+                                                            <input
+                                                                type="month"
+                                                                value={selectedMonth}
+                                                                onChange={(e) => setSelectedMonth(e.target.value)}
+                                                                className="h-8.5 px-3 bg-white border border-slate-200 rounded-lg text-xs sm:text-sm font-normal text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs"
+                                                            />
                                                         </div>
-                                                    );
-                                                })()}
+                                                    )}
 
-                                                <div className="flex justify-between items-center flex-wrap gap-4">
-                                                    <div className="flex items-center gap-4">
-                                                        <h3 className="font-semibold text-slate-900">ประวัติการลงเวลา</h3>
-                                                        <input
-                                                            type="month"
-                                                            value={selectedMonth}
-                                                            onChange={(e) => setSelectedMonth(e.target.value)}
-                                                            className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                        />
+                                                    {/* Week Input & Navigation */}
+                                                    {filterType === "week" && (
+                                                        <div className="flex flex-wrap items-center gap-1.5">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setSelectedWeekDate(prev => subWeeks(prev, 1))}
+                                                                className="h-8.5 w-8.5 flex items-center justify-center bg-white border border-slate-200 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors shadow-2xs"
+                                                                title="สัปดาห์ก่อนหน้า"
+                                                            >
+                                                                <ChevronLeft className="w-4 h-4" />
+                                                            </button>
+                                                            <input
+                                                                type="date"
+                                                                value={format(selectedWeekDate, "yyyy-MM-dd")}
+                                                                onChange={(e) => {
+                                                                    if (e.target.value) {
+                                                                        const [y, m, d] = e.target.value.split('-').map(Number);
+                                                                        setSelectedWeekDate(new Date(y, m - 1, d));
+                                                                    }
+                                                                }}
+                                                                className="h-8.5 px-2.5 bg-white border border-slate-200 rounded-lg text-xs sm:text-sm font-normal text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs"
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setSelectedWeekDate(prev => addWeeks(prev, 1))}
+                                                                className="h-8.5 w-8.5 flex items-center justify-center bg-white border border-slate-200 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors shadow-2xs"
+                                                                title="สัปดาห์ถัดไป"
+                                                            >
+                                                                <ChevronRight className="w-4 h-4" />
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setSelectedWeekDate(new Date())}
+                                                                className="h-8.5 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium transition-colors border border-slate-200"
+                                                            >
+                                                                สัปดาห์นี้
+                                                            </button>
+                                                            <span className="text-xs font-medium text-blue-700 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-100 hidden sm:inline-block">
+                                                                {format(startOfWeek(selectedWeekDate, { weekStartsOn: 1 }), "d MMM", { locale: th })} - {format(endOfWeek(selectedWeekDate, { weekStartsOn: 1 }), "d MMM yyyy", { locale: th })}
+                                                            </span>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Custom Date Range Input */}
+                                                    {filterType === "custom" && (
+                                                        <div className="flex items-center gap-1.5">
+                                                            <input
+                                                                type="date"
+                                                                value={format(customRange.start, "yyyy-MM-dd")}
+                                                                onChange={(e) => {
+                                                                    if (e.target.value) {
+                                                                        const [y, m, d] = e.target.value.split('-').map(Number);
+                                                                        setCustomRange(prev => ({ ...prev, start: new Date(y, m - 1, d) }));
+                                                                    }
+                                                                }}
+                                                                className="h-8.5 px-2 bg-white border border-slate-200 rounded-lg text-xs font-normal text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs"
+                                                            />
+                                                            <span className="text-slate-400 text-xs font-medium">ถึง</span>
+                                                            <input
+                                                                type="date"
+                                                                value={format(customRange.end, "yyyy-MM-dd")}
+                                                                onChange={(e) => {
+                                                                    if (e.target.value) {
+                                                                        const [y, m, d] = e.target.value.split('-').map(Number);
+                                                                        setCustomRange(prev => ({ ...prev, end: new Date(y, m - 1, d) }));
+                                                                    }
+                                                                }}
+                                                                className="h-8.5 px-2 bg-white border border-slate-200 rounded-lg text-xs font-normal text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs"
+                                                            />
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Export buttons */}
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={handleExportCSV}
+                                                        className="h-8.5 gap-1.5 text-xs text-green-700 border-green-200 hover:bg-green-50"
+                                                    >
+                                                        <FileText className="w-3.5 h-3.5" />
+                                                        Export CSV
+                                                    </Button>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={handleExportPDF}
+                                                        className="h-8.5 gap-1.5 text-xs text-slate-700 border-slate-200 hover:bg-slate-50"
+                                                    >
+                                                        <Download className="w-3.5 h-3.5" />
+                                                        Export PDF
+                                                    </Button>
+                                                </div>
+                                            </div>
+
+                                            {/* Summary Cards */}
+                                            <div className="grid grid-cols-2 md:grid-cols-6 gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200/90">
+                                                <div className="text-center">
+                                                    <div className="text-2xl font-bold text-slate-900 tabular-nums">{summary.attendanceDays}</div>
+                                                    <div className="text-xs text-slate-600 font-normal mt-0.5">วันมาทำงาน</div>
+                                                </div>
+                                                <div className="text-center">
+                                                    <div className="text-2xl font-bold text-slate-900 tabular-nums">{summary.leaveDays}</div>
+                                                    <div className="text-xs text-slate-600 font-normal mt-0.5">วันลา</div>
+                                                </div>
+                                                <div className="text-center">
+                                                    <div className="text-2xl font-bold text-slate-900 tabular-nums">
+                                                        {summary.absentDays} <span className="text-base text-slate-500 font-normal">/ {summary.expectedWorkDays}</span>
                                                     </div>
-                                                    <div className="flex gap-2">
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() => {
-                                                                // Re-calculate summary for export (cleaner to extract function but inline for now)
-                                                                const [year, month] = selectedMonth.split('-').map(Number);
-                                                                const daysInMonth = new Date(year, month, 0).getDate();
-                                                                const attendanceDays = attendances.filter(a => a.status === "เข้างาน" || a.status === "สาย" || a.status === "ออกงาน").length;
-                                                                let leaveDays = 0; leaves.forEach(l => { if (l.status === "อนุมัติ") leaveDays += getLeaveDayUnits(l); });
-                                                                const weeklyHolidays = selectedEmployee.weeklyHolidays || [0, 6];
-                                                                const now = new Date();
-                                                                const currentYear = now.getFullYear();
-                                                                const currentMonth = now.getMonth() + 1;
-                                                                const currentDay = now.getDate();
-                                                                let daysElapsed = daysInMonth;
-                                                                if (year === currentYear && month === currentMonth) daysElapsed = currentDay;
-                                                                else if (year > currentYear || (year === currentYear && month > currentMonth)) daysElapsed = 0;
+                                                    <div className="text-xs text-slate-600 font-normal mt-0.5">วันขาด (โดยประมาณ)</div>
+                                                </div>
+                                                <div className="text-center">
+                                                    <div className="text-2xl font-bold text-rose-600 tabular-nums">{summary.lateCount}</div>
+                                                    <div className="text-xs text-slate-600 font-normal mt-0.5">สาย (ครั้ง)</div>
+                                                </div>
+                                                <div className="text-center">
+                                                    <div className="text-lg font-bold text-rose-600 tabular-nums">{formatMinutesToHours(summary.lateMinutes)}</div>
+                                                    <div className="text-xs text-slate-600 font-normal mt-0.5">รวมเวลาสาย</div>
+                                                </div>
+                                                <div className="text-center">
+                                                    <div className="text-lg font-bold text-blue-600 tabular-nums">{formatMinutesToHours(summary.totalOTHours)}</div>
+                                                    <div className="text-xs text-slate-600 font-normal mt-0.5">รวม OT (ชม.)</div>
+                                                </div>
+                                            </div>
 
-                                                                let expectedWorkDays = 0;
-                                                                for (let d = 1; d <= daysInMonth; d++) {
-                                                                    const date = new Date(year, month - 1, d);
-                                                                    if (!weeklyHolidays.includes(date.getDay())) expectedWorkDays++;
-                                                                }
-
-                                                                let elapsedWorkDays = 0;
-                                                                for (let d = 1; d <= daysElapsed; d++) {
-                                                                    const date = new Date(year, month - 1, d);
-                                                                    if (!weeklyHolidays.includes(date.getDay())) elapsedWorkDays++;
-                                                                }
-                                                                const absentDays = Math.max(0, elapsedWorkDays - attendanceDays - leaveDays);
-
-                                                                const lateCount = attendances.filter(a => (a.lateMinutes || 0) > 0).length;
-                                                                const lateMinutes = attendances.reduce((sum, a) => sum + (a.lateMinutes || 0), 0);
-
-                                                                const totalOTHours = otRequests.filter(ot => {
-                                                                    const otDate = new Date(ot.date);
-                                                                    return ot.status === "อนุมัติ" && otDate.getMonth() === (month - 1) && otDate.getFullYear() === year;
-                                                                }).reduce((sum, ot) => {
-                                                                    if (ot.startTime && ot.endTime) {
-                                                                        const start = ot.startTime instanceof Date ? ot.startTime : new Date(ot.startTime);
-                                                                        const end = ot.endTime instanceof Date ? ot.endTime : new Date(ot.endTime);
-                                                                        const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-                                                                        return sum + hours;
-                                                                    }
-                                                                    return sum;
-                                                                }, 0);
-
-                                                                const summary = { totalDays: daysInMonth, attendanceDays, leaveDays, absentDays, lateCount, lateMinutes, totalOTHours };
-                                                                generateAttendanceCSV(selectedEmployee.name, attendances, otRequests, summary, leaves, swapRequests);
-                                                            }}
-                                                            className="gap-2 text-green-600 border-green-200 hover:bg-green-50"
-                                                        >
-                                                            <FileText className="w-4 h-4" />
-                                                            Export CSV
-                                                        </Button>
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() => {
-                                                                const [year, month] = selectedMonth.split('-').map(Number);
-                                                                const daysInMonth = new Date(year, month, 0).getDate();
-                                                                const attendanceDays = attendances.filter(a => a.status === "เข้างาน" || a.status === "สาย" || a.status === "ออกงาน").length;
-                                                                let leaveDays = 0; leaves.forEach(l => { if (l.status === "อนุมัติ") leaveDays += getLeaveDayUnits(l); });
-                                                                const weeklyHolidays = selectedEmployee.weeklyHolidays || [0, 6];
-                                                                const now = new Date();
-                                                                const currentYear = now.getFullYear();
-                                                                const currentMonth = now.getMonth() + 1;
-                                                                const currentDay = now.getDate();
-                                                                let daysElapsed = daysInMonth;
-                                                                if (year === currentYear && month === currentMonth) daysElapsed = currentDay;
-                                                                else if (year > currentYear || (year === currentYear && month > currentMonth)) daysElapsed = 0;
-
-                                                                let expectedWorkDays = 0;
-                                                                for (let d = 1; d <= daysInMonth; d++) {
-                                                                    const date = new Date(year, month - 1, d);
-                                                                    if (!weeklyHolidays.includes(date.getDay())) expectedWorkDays++;
-                                                                }
-
-                                                                let elapsedWorkDays = 0;
-                                                                for (let d = 1; d <= daysElapsed; d++) {
-                                                                    const date = new Date(year, month - 1, d);
-                                                                    if (!weeklyHolidays.includes(date.getDay())) elapsedWorkDays++;
-                                                                }
-                                                                const absentDays = Math.max(0, elapsedWorkDays - attendanceDays - leaveDays);
-
-                                                                const lateCount = attendances.filter(a => {
-                                                                    if (a.status === "สาย") return true;
-                                                                    if (a.status === "เข้างาน" && a.checkIn && isLate(new Date(a.checkIn))) return true;
-                                                                    return false;
-                                                                }).length;
-                                                                const lateMinutes = attendances.reduce((sum, a) => {
-                                                                    if (a.status === "สาย") return sum + (a.lateMinutes || 0);
-                                                                    if (a.status === "เข้างาน" && a.checkIn && isLate(new Date(a.checkIn))) {
-                                                                        return sum + getLateMinutes(new Date(a.checkIn));
-                                                                    }
-                                                                    return sum;
-                                                                }, 0);
-                                                                const totalOTHours = otRequests.filter(ot => {
-                                                                    const otDate = new Date(ot.date);
-                                                                    return ot.status === "อนุมัติ" && otDate.getMonth() === (month - 1) && otDate.getFullYear() === year;
-                                                                }).reduce((sum, ot) => {
-                                                                    if (ot.startTime && ot.endTime) {
-                                                                        const start = ot.startTime instanceof Date ? ot.startTime : new Date(ot.startTime);
-                                                                        const end = ot.endTime instanceof Date ? ot.endTime : new Date(ot.endTime);
-                                                                        const minutes = (end.getTime() - start.getTime()) / (1000 * 60);
-                                                                        return sum + minutes;
-                                                                    }
-                                                                    return sum;
-                                                                }, 0);
-
-                                                                const summary = { totalDays: daysInMonth, attendanceDays, leaveDays, absentDays, lateCount, lateMinutes, totalOTHours };
-                                                                generateAttendancePDF(selectedEmployee.name, attendances, otRequests, summary, leaves, swapRequests);
-                                                            }}
-                                                            className="gap-2"
-                                                        >
-                                                            <Download className="w-4 h-4" />
-                                                            Export PDF
-                                                        </Button>
-                                                    </div>
+                                            {/* Attendance Table Header & Table */}
+                                            <div className="pt-2">
+                                                <div className="flex items-center justify-between pb-3">
+                                                    <h3 className="font-semibold text-slate-900 text-sm flex items-center gap-2">
+                                                        <span>ประวัติการลงเวลา</span>
+                                                        <span className="text-xs font-normal text-slate-500">({getDateRange().label})</span>
+                                                    </h3>
+                                                    <span className="text-xs text-slate-500">
+                                                        พบ <strong className="text-slate-800">{attendances.length}</strong> รายการ
+                                                    </span>
                                                 </div>
                                                 <AttendanceTable attendances={attendances} locationEnabled={locationEnabled} workTimeEnabled={workTimeEnabled} />
                                             </div>
@@ -745,5 +862,18 @@ export default function SearchPage() {
                 </div>
             )}
         </div>
+    );
+}
+
+export default function SearchPage() {
+    return (
+        <Suspense fallback={
+            <div className="w-full min-h-[400px] flex items-center justify-center text-slate-500 font-normal">
+                <div className="animate-spin w-6 h-6 border-2 border-slate-600 border-t-transparent rounded-full mr-2"></div>
+                กำลังโหลด...
+            </div>
+        }>
+            <SearchContent />
+        </Suspense>
     );
 }

@@ -54,5 +54,12 @@ export function formatLeaveDateRange(leave: Pick<LeaveRequest, "durationUnit" | 
         return `${format(start, "d MMM yyyy", { locale: th })} ${leave.startTime || "--:--"}-${leave.endTime || "--:--"}`;
     }
 
-    return `${format(start, "d MMM yyyy", { locale: th })} - ${format(end, "d MMM yyyy", { locale: th })}`;
+    const startFormatted = format(start, "d MMM yyyy", { locale: th });
+    const endFormatted = format(end, "d MMM yyyy", { locale: th });
+
+    if (startFormatted === endFormatted) {
+        return startFormatted;
+    }
+
+    return `${startFormatted} - ${endFormatted}`;
 }

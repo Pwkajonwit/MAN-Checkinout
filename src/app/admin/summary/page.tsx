@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { PageHeader } from "@/components/layout/PageHeader";
+import Link from "next/link";
 import { attendanceService, employeeService, swapService, systemConfigService, type Employee } from "@/lib/firestore";
 import { useAdmin } from "@/components/auth/AuthProvider";
-import { Users, Calendar, Download, Search, Send } from "lucide-react";
+import { Users, Calendar, Download, Search, Send, ChevronLeft, ChevronRight, Clock, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { formatMinutesToHours } from "@/lib/workTime";
 import { format } from "date-fns";
+import { th } from "date-fns/locale";
 
 interface DailySummary {
     date: Date;
@@ -73,7 +74,7 @@ export default function DailySummaryPage() {
                 // Determine weekly holidays based on useIndividualHolidays setting
                 const useIndividualHolidays = configData?.useIndividualHolidays ?? false;
                 const globalHolidays = configData?.weeklyHolidays || [0, 6];
-                const employeeHolidays = emp.weeklyHolidays || globalHolidays; // Fallback to global if employee doesn't have
+                const employeeHolidays = emp.weeklyHolidays || globalHolidays;
 
                 // Use individual or global based on setting
                 const applicableHolidays = useIndividualHolidays ? employeeHolidays : globalHolidays;
@@ -89,17 +90,14 @@ export default function DailySummaryPage() {
                     const workDate = swap.workDate instanceof Date ? swap.workDate : new Date(swap.workDate);
                     const holidayDate = swap.holidayDate instanceof Date ? swap.holidayDate : new Date(swap.holidayDate);
 
-                    // ถ้าวันนี้เป็นวันที่ขอมาทำงาน (workDate) → ไม่ใช่วันหยุด
                     if (format(workDate, "yyyy-MM-dd") === dateStr) {
                         effectiveHoliday = false;
                     }
-                    // ถ้าวันนี้เป็นวันที่ขอหยุดแทน (holidayDate) → เป็นวันหยุด
                     if (format(holidayDate, "yyyy-MM-dd") === dateStr) {
                         effectiveHoliday = true;
                     }
                 });
 
-                // ดึง lateMinutes จาก record (อาจอยู่ใน checkInRec หรือ lateRec)
                 const actualLateMinutes = lateRec?.lateMinutes || checkInRec?.lateMinutes || 0;
                 const isActuallyLate = actualLateMinutes > 0;
 
@@ -138,6 +136,23 @@ export default function DailySummaryPage() {
         }
     }, [user, loadData]);
 
+    const changeDate = (days: number) => {
+        const d = new Date(selectedDate);
+        d.setDate(d.getDate() + days);
+        setSelectedDate(format(d, "yyyy-MM-dd"));
+    };
+
+    const formatThaiDate = (dateString: string) => {
+        try {
+            const [y, m, d] = dateString.split("-").map(Number);
+            const dateObj = new Date(y, m - 1, d);
+            const thaiYear = dateObj.getFullYear() + 543;
+            return `${format(dateObj, "EEEEที่ d MMMM", { locale: th })} ${thaiYear}`;
+        } catch {
+            return dateString;
+        }
+    };
+
     const formatTime = (date?: Date | null) => {
         if (!date) return "-";
         return format(new Date(date), "HH:mm");
@@ -146,17 +161,43 @@ export default function DailySummaryPage() {
     const getStatusBadge = (status: DailySummary["status"]) => {
         switch (status) {
             case "ปกติ":
-                return <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">✓ ปกติ</span>;
+                return (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200/80 rounded-full text-xs font-normal">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                        ปกติ
+                    </span>
+                );
             case "สาย":
-                return <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-medium">⏰ สาย</span>;
+                return (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-amber-50 text-amber-800 border border-amber-200/80 rounded-full text-xs font-normal">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                        สาย
+                    </span>
+                );
             case "ไม่มาทำงาน":
-                return <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-medium">✗ ไม่มา</span>;
+                return (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-rose-50 text-rose-700 border border-rose-200/80 rounded-full text-xs font-normal">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                        ไม่มา
+                    </span>
+                );
             case "ลา":
-                return <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">📝 ลา</span>;
+                return (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-200/80 rounded-full text-xs font-normal">
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                        ลา
+                    </span>
+                );
             case "วันหยุด":
-                return <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">🏖 วันหยุด</span>;
+                return (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-slate-50 text-slate-700 border border-slate-200 rounded-full text-xs font-normal">
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                        วันหยุด
+                    </span>
+                );
         }
     };
+
     // Filter by employee and search query
     const filteredSummaries = summaries.filter(s => {
         const matchesEmployee = selectedEmployee === "all" || s.employee.id === selectedEmployee;
@@ -216,119 +257,224 @@ export default function DailySummaryPage() {
     };
 
     if (!user) {
-        return <div className="py-12 text-center">กรุณาเข้าสู่ระบบ</div>;
+        return <div className="py-12 text-center text-slate-500 font-normal">กรุณาเข้าสู่ระบบ</div>;
     }
 
+    const isToday = selectedDate === format(new Date(), "yyyy-MM-dd");
+
     return (
-        <div className="space-y-6">
-            <PageHeader
-                title="สรุปรายวัน"
-                subtitle="สรุปการลงเวลารายบุคคลในแต่ละวัน"
-            />
-
-            {/* Filters */}
-            <div className="mb-6 flex flex-wrap items-center gap-4">
-                <div className="flex items-center gap-2">
-                    <Calendar className="w-5 h-5 text-gray-500" />
-                    <input
-                        type="date"
-                        value={selectedDate}
-                        onChange={(e) => setSelectedDate(e.target.value)}
-                        className="px-4 py-2 bg-white border border-gray-200 shadow-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
+        <div className="space-y-4">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200/80">
+                <div>
+                    <div className="flex items-center gap-2.5">
+                        <h1 className="text-xl sm:text-2xl font-semibold text-slate-800 tracking-tight">สรุปรายวัน</h1>
+                        <span className="text-[11px] font-normal px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                            Daily Summary
+                        </span>
+                        {isToday && (
+                            <span className="text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                วันนี้
+                            </span>
+                        )}
+                    </div>
+                    <p className="text-xs sm:text-sm font-normal text-slate-500 mt-1">
+                        สรุปการลงเวลารายบุคคล • {formatThaiDate(selectedDate)}
+                    </p>
                 </div>
-
-                <div className="flex items-center gap-2">
-                    <Search className="w-5 h-5 text-gray-500" />
-                    <input
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="ค้นหาชื่อ หรือ แผนก..."
-                        className="px-4 py-2 bg-white border border-gray-200 shadow-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
-                    />
-                </div>
-
-                <div className="flex items-center gap-2">
-                    <Users className="w-5 h-5 text-gray-500" />
-                    <select
-                        value={selectedEmployee}
-                        onChange={(e) => setSelectedEmployee(e.target.value)}
-                        className="px-4 py-2 bg-white border border-gray-200 shadow-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                        <option value="all">พนักงานทั้งหมด</option>
-                        {employees.map(emp => (
-                            <option key={emp.id} value={emp.id}>{emp.name}</option>
-                        ))}
-                    </select>
-                </div>
-
-                <button
-                    onClick={exportCSV}
-                    disabled={filteredSummaries.length === 0}
-                    className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/80 text-white rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    <Download className="w-4 h-4" />
-                    Export CSV
-                </button>
-
-                <button
-                    onClick={sendDailyReportNotification}
-                    disabled={sendingNotification || loading}
-                    className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    <Send className="w-4 h-4" />
-                    {sendingNotification ? "กำลังส่ง..." : "ส่งแจ้งเตือน"}
-                </button>
             </div>
 
-            {/* Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-                <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-                    <div className="text-2xl font-bold text-gray-800">{stats.total}</div>
-                    <div className="text-sm text-gray-500">ทั้งหมด</div>
+            {/* Compact Filters & Controls */}
+            <div className="bg-white rounded-xl border border-slate-200/90 p-2.5 sm:p-3 shadow-xs flex flex-wrap items-center justify-between gap-2.5">
+                <div className="flex flex-wrap items-center gap-2">
+                    {/* Date Selector with prev/next buttons */}
+                    <div className="inline-flex items-center bg-slate-50 rounded-lg border border-slate-200 p-0.5">
+                        <button
+                            type="button"
+                            onClick={() => changeDate(-1)}
+                            title="วันก่อนหน้า"
+                            className="p-1.5 hover:bg-white hover:shadow-2xs text-slate-600 hover:text-slate-900 rounded-md transition-all"
+                        >
+                            <ChevronLeft className="w-4 h-4" />
+                        </button>
+                        <div className="flex items-center gap-1.5 px-2">
+                            <Calendar className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                            <input
+                                type="date"
+                                value={selectedDate}
+                                onChange={(e) => setSelectedDate(e.target.value)}
+                                className="bg-transparent text-xs sm:text-sm font-normal text-slate-800 focus:outline-none cursor-pointer"
+                            />
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => changeDate(1)}
+                            title="วันถัดไป"
+                            className="p-1.5 hover:bg-white hover:shadow-2xs text-slate-600 hover:text-slate-900 rounded-md transition-all"
+                        >
+                            <ChevronRight className="w-4 h-4" />
+                        </button>
+                    </div>
+
+                    {/* Today Button */}
+                    {!isToday && (
+                        <button
+                            type="button"
+                            onClick={() => setSelectedDate(format(new Date(), "yyyy-MM-dd"))}
+                            className="h-9 px-2.5 text-xs font-medium text-blue-700 bg-blue-50/70 hover:bg-blue-100/70 border border-blue-200 rounded-lg transition-colors"
+                        >
+                            กลับไปวันนี้
+                        </button>
+                    )}
+
+                    {/* Search Input */}
+                    <div className="relative">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="ค้นหาชื่อ หรือ แผนก..."
+                            className="h-9 pl-8 pr-7 py-1 bg-white border border-slate-200 rounded-lg text-xs sm:text-sm font-normal text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400 focus:border-slate-400 w-44 sm:w-56 transition-all"
+                        />
+                        {searchQuery && (
+                            <button
+                                type="button"
+                                onClick={() => setSearchQuery("")}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs p-0.5"
+                            >
+                                ✕
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Employee Dropdown */}
+                    <div className="flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5 text-slate-500 hidden sm:inline shrink-0" />
+                        <select
+                            value={selectedEmployee}
+                            onChange={(e) => setSelectedEmployee(e.target.value)}
+                            className="h-9 px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-xs sm:text-sm font-normal text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-400 focus:border-slate-400 max-w-[190px] transition-all"
+                        >
+                            <option value="all">พนักงานทั้งหมด ({employees.length})</option>
+                            {employees.map(emp => (
+                                <option key={emp.id} value={emp.id}>{emp.name}</option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
-                <div className="bg-green-50 rounded-xl p-4 border border-green-100">
-                    <div className="text-2xl font-bold text-green-700">{stats.normal}</div>
-                    <div className="text-sm text-green-600">ปกติ</div>
+
+                {/* Actions: Export & Send Notification */}
+                <div className="flex items-center gap-2 ml-auto">
+                    <button
+                        onClick={exportCSV}
+                        disabled={filteredSummaries.length === 0}
+                        className="h-9 inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-medium rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed border border-slate-200"
+                    >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Export CSV</span>
+                    </button>
+
+                    <button
+                        onClick={sendDailyReportNotification}
+                        disabled={sendingNotification || loading}
+                        className="h-9 inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-medium rounded-lg shadow-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                        <Send className={`w-3.5 h-3.5 ${sendingNotification ? "animate-pulse" : ""}`} />
+                        <span>{sendingNotification ? "กำลังส่ง..." : "ส่งแจ้งเตือน"}</span>
+                    </button>
                 </div>
-                <div className="bg-orange-50 rounded-xl p-4 border border-orange-100">
-                    <div className="text-2xl font-bold text-orange-700">{stats.late}</div>
-                    <div className="text-sm text-orange-600">สาย</div>
+            </div>
+
+            {/* Compact & Clean Stat Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-2.5">
+                {/* ทั้งหมด */}
+                <div className="bg-white rounded-xl p-3 border border-slate-200/90 shadow-xs hover:border-slate-300 transition-all">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-700">ทั้งหมด</span>
+                        <span className="w-2 h-2 rounded-full bg-slate-400"></span>
+                    </div>
+                    <div className="text-xl sm:text-2xl font-bold text-slate-800 mt-1 tabular-nums">{stats.total}</div>
+                    <div className="text-[11px] font-normal text-slate-400 mt-0.5">พนักงาน</div>
                 </div>
-                <div className="bg-red-50 rounded-xl p-4 border border-red-100">
-                    <div className="text-2xl font-bold text-red-700">{stats.absent}</div>
-                    <div className="text-sm text-red-600">ไม่มา</div>
+
+                {/* ปกติ */}
+                <div className="bg-white rounded-xl p-3 border border-slate-200/90 shadow-xs hover:border-slate-300 transition-all">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-700">ตรงเวลา (ปกติ)</span>
+                        <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    </div>
+                    <div className="text-xl sm:text-2xl font-bold text-slate-800 mt-1 tabular-nums">{stats.normal}</div>
+                    <div className="text-[11px] font-normal text-emerald-600 mt-0.5">
+                        {stats.total > 0 ? `${Math.round((stats.normal / stats.total) * 100)}% ของทั้งหมด` : "-"}
+                    </div>
                 </div>
-                <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                    <div className="text-2xl font-bold text-gray-700">{stats.holiday}</div>
-                    <div className="text-sm text-gray-500">วันหยุด</div>
+
+                {/* สาย */}
+                <div className="bg-white rounded-xl p-3 border border-slate-200/90 shadow-xs hover:border-slate-300 transition-all">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-700">มาสาย</span>
+                        <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                    </div>
+                    <div className="text-xl sm:text-2xl font-bold text-slate-800 mt-1 tabular-nums">{stats.late}</div>
+                    <div className="text-[11px] font-normal text-amber-600 mt-0.5">
+                        {stats.total > 0 ? `${Math.round((stats.late / stats.total) * 100)}% ของทั้งหมด` : "-"}
+                    </div>
+                </div>
+
+                {/* ไม่มา */}
+                <div className="bg-white rounded-xl p-3 border border-slate-200/90 shadow-xs hover:border-slate-300 transition-all">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-700">ไม่มาทำงาน</span>
+                        <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                    </div>
+                    <div className="text-xl sm:text-2xl font-bold text-slate-800 mt-1 tabular-nums">{stats.absent}</div>
+                    <div className="text-[11px] font-normal text-rose-600 mt-0.5">
+                        {stats.total > 0 ? `${Math.round((stats.absent / stats.total) * 100)}% ของทั้งหมด` : "-"}
+                    </div>
+                </div>
+
+                {/* วันหยุด */}
+                <div className="bg-white rounded-xl p-3 border border-slate-200/90 shadow-xs hover:border-slate-300 transition-all col-span-2 sm:col-span-1 md:col-span-1">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-700">วันหยุด</span>
+                        <span className="w-2 h-2 rounded-full bg-slate-400"></span>
+                    </div>
+                    <div className="text-xl sm:text-2xl font-bold text-slate-800 mt-1 tabular-nums">{stats.holiday}</div>
+                    <div className="text-[11px] font-normal text-slate-400 mt-0.5">วันหยุดสัปดาห์ / สลับวัน</div>
                 </div>
             </div>
 
             {/* Table */}
             {loading ? (
-                <div className="text-center py-8">กำลังโหลด...</div>
+                <div className="bg-white rounded-xl border border-slate-200/90 shadow-xs p-10 text-center text-slate-500 font-normal">
+                    <div className="animate-spin w-5 h-5 border-2 border-slate-600 border-t-transparent rounded-full mx-auto mb-2"></div>
+                    กำลังโหลดข้อมูลสรุป...
+                </div>
             ) : (
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="bg-white rounded-xl shadow-xs border border-slate-200/90 overflow-hidden">
                     <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead className="bg-gray-50">
+                        <table className="w-full text-left border-collapse">
+                            <thead className="bg-slate-50/80 border-b border-slate-200">
                                 <tr>
-                                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">พนักงาน</th>
-                                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">สถานะ</th>
-                                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">เข้างาน</th>
-                                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">ออกงาน</th>
-                                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">ออกพื้นที่</th>
-                                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">หมายเหตุ</th>
+                                    <th className="px-3.5 py-2.5 text-xs font-semibold text-slate-700 uppercase tracking-wider">พนักงาน</th>
+                                    <th className="px-3.5 py-2.5 text-xs font-semibold text-slate-700 uppercase tracking-wider">สถานะ</th>
+                                    <th className="px-3.5 py-2.5 text-center text-xs font-semibold text-slate-700 uppercase tracking-wider">เข้างาน</th>
+                                    <th className="px-3.5 py-2.5 text-center text-xs font-semibold text-slate-700 uppercase tracking-wider">ออกงาน</th>
+                                    <th className="px-3.5 py-2.5 text-center text-xs font-semibold text-slate-700 uppercase tracking-wider">ออกพื้นที่</th>
+                                    <th className="px-3.5 py-2.5 text-center text-xs font-semibold text-slate-700 uppercase tracking-wider">หมายเหตุ</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100">
+                            <tbody className="divide-y divide-slate-100">
                                 {filteredSummaries.map((summary, idx) => (
-                                    <tr key={summary.employee.id || idx} className="hover:bg-gray-50">
-                                        <td className="px-4 py-3">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-medium text-sm overflow-hidden">
+                                    <tr key={summary.employee.id || idx} className="hover:bg-slate-50/60 transition-colors">
+                                        <td className="px-3.5 py-2.5">
+                                            <Link
+                                                href={`/admin/search?employeeId=${encodeURIComponent(summary.employee.id || summary.employee.employeeId || "")}&month=${selectedDate.substring(0, 7)}`}
+                                                className="group flex items-center gap-2.5 hover:opacity-95 transition-opacity"
+                                                title={`ดูประวัติและจัดการข้อมูล ${summary.employee.name}`}
+                                            >
+                                                <div className="w-7 h-7 rounded-full bg-slate-100 text-slate-700 font-medium text-xs flex items-center justify-center shrink-0 overflow-hidden ring-1 ring-slate-200 group-hover:ring-blue-400 group-hover:ring-2 transition-all">
                                                     {summary.employee.avatar ? (
                                                         <img
                                                             src={summary.employee.avatar}
@@ -342,44 +488,78 @@ export default function DailySummaryPage() {
                                                         summary.employee.name.charAt(0)
                                                     )}
                                                 </div>
-                                                <div>
-                                                    <div className="font-medium text-gray-800 text-sm">{summary.employee.name}</div>
-                                                    <div className="text-xs text-gray-500">{summary.employee.department}</div>
+                                                <div className="min-w-0">
+                                                    <div className="font-medium text-slate-800 text-sm leading-tight truncate group-hover:text-blue-600 group-hover:underline transition-colors">
+                                                        {summary.employee.name}
+                                                    </div>
+                                                    <div className="text-xs font-normal text-slate-500 leading-tight">
+                                                        {summary.employee.department || "-"}
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            </Link>
                                         </td>
-                                        <td className="px-4 py-3">{getStatusBadge(summary.status)}</td>
-                                        <td className="px-4 py-3 text-center text-sm">
-                                            <span className={summary.isLate ? "text-orange-600 font-medium" : "text-gray-700"}>
-                                                {formatTime(summary.checkIn)}
+                                        <td className="px-3.5 py-2.5 whitespace-nowrap">
+                                            {getStatusBadge(summary.status)}
+                                        </td>
+                                        <td className="px-3.5 py-2.5 text-center text-sm whitespace-nowrap">
+                                            {summary.isLate ? (
+                                                <span className="inline-block px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 font-normal tabular-nums">
+                                                    {formatTime(summary.checkIn)}
+                                                </span>
+                                            ) : (
+                                                <span className={`tabular-nums font-normal ${summary.checkIn ? "text-slate-800" : "text-slate-400"}`}>
+                                                    {formatTime(summary.checkIn)}
+                                                </span>
+                                            )}
+                                        </td>
+                                        <td className="px-3.5 py-2.5 text-center text-sm whitespace-nowrap">
+                                            <span className={`tabular-nums font-normal ${summary.checkOut ? "text-slate-800" : "text-slate-400"}`}>
+                                                {formatTime(summary.checkOut)}
                                             </span>
                                         </td>
-                                        <td className="px-4 py-3 text-center text-sm text-gray-700">{formatTime(summary.checkOut)}</td>
-                                        <td className="px-4 py-3 text-center">
+                                        <td className="px-3.5 py-2.5 text-center whitespace-nowrap">
                                             {summary.offsiteCount > 0 ? (
-                                                <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs">
+                                                <span className="inline-flex items-center px-2.5 py-0.5 bg-purple-50 text-purple-700 border border-purple-200/80 rounded-full text-xs font-normal">
                                                     {summary.offsiteCount} ครั้ง
                                                 </span>
                                             ) : (
-                                                <span className="text-gray-400 text-sm">-</span>
+                                                <span className="text-slate-400 font-normal text-sm">-</span>
                                             )}
                                         </td>
-                                        <td className="px-4 py-3 text-center text-sm">
-                                            {summary.isLate && summary.lateMinutes && (
-                                                <span className="text-orange-600">สาย {formatMinutesToHours(summary.lateMinutes)}</span>
+                                        <td className="px-3.5 py-2.5 text-center text-sm whitespace-nowrap">
+                                            {summary.isLate && summary.lateMinutes ? (
+                                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 text-xs font-normal">
+                                                    <Clock className="w-3 h-3 text-amber-600" />
+                                                    สาย {formatMinutesToHours(summary.lateMinutes)}
+                                                </span>
+                                            ) : (
+                                                <span className="text-slate-400 font-normal text-sm">-</span>
                                             )}
                                         </td>
                                     </tr>
                                 ))}
                                 {filteredSummaries.length === 0 && (
                                     <tr>
-                                        <td colSpan={6} className="px-4 py-12 text-center text-gray-500">
-                                            ไม่มีข้อมูล
+                                        <td colSpan={6} className="px-4 py-12 text-center text-slate-500 font-normal">
+                                            ไม่พบข้อมูลพนักงานที่ตรงกับเงื่อนไขการค้นหา
                                         </td>
                                     </tr>
                                 )}
                             </tbody>
                         </table>
+                    </div>
+
+                    {/* Table Summary Footer */}
+                    <div className="px-3.5 py-2.5 bg-slate-50/80 border-t border-slate-200 text-xs font-normal text-slate-500 flex flex-wrap items-center justify-between gap-2">
+                        <span>
+                            แสดงผล <span className="text-slate-800 font-medium">{filteredSummaries.length}</span> จากทั้งหมด <span className="text-slate-800 font-medium">{summaries.length}</span> คน
+                        </span>
+                        <div className="flex items-center gap-3 text-xs">
+                            <span className="text-emerald-700">✓ ปกติ: {stats.normal}</span>
+                            <span className="text-amber-700">⏰ สาย: {stats.late}</span>
+                            <span className="text-rose-700">✗ ไม่มา: {stats.absent}</span>
+                            <span className="text-slate-600">🏖 วันหยุด: {stats.holiday}</span>
+                        </div>
                     </div>
                 </div>
             )}

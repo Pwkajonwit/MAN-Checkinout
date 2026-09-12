@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { employeeService, attendanceService, otService, swapService, leaveService, systemConfigService, payrollService, installmentService, type Employee, type Attendance, type OTRequest, type SwapRequest, type LeaveRequest, type SystemConfig, type SavedPayrollRecord, type PayrollLineItem } from "@/lib/firestore";
-import { Calendar, DollarSign, Download, Filter, History, Plus, Save, Trash2 } from "lucide-react";
+import { Calendar, DollarSign, Download, Filter, History, Plus, Save, Search, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
 import { getLateMinutes } from "@/lib/workTime";
@@ -13,6 +13,7 @@ interface PayrollItem {
     employeeDocId?: string;
     employeeId: string;
     name: string;
+    avatar?: string | null;
     type: string;
     baseSalary: number;
     workDays: number;
@@ -88,7 +89,9 @@ const buildPayslipRows = (item: PayrollItem) => {
             .map(income => ({ label: income.label || "เงินเพิ่ม", amount: income.amount })),
     ];
     const deductionRows = [
-        { label: `หักมาสาย (${item.lateMinutes} นาที)`, amount: item.payrollBaseDeduction },
+        ...(item.payrollBaseDeduction > 0
+            ? [{ label: `หักมาสาย (${item.lateMinutes} นาที)`, amount: item.payrollBaseDeduction }]
+            : []),
         ...(item.manualDeductions || [])
             .filter(deduction => deduction.label || deduction.amount > 0)
             .map(deduction => ({ label: deduction.label || "รายการหักเพิ่มเติม", amount: deduction.amount })),
@@ -175,9 +178,15 @@ const normalizePayrollItem = (item: PayrollItem): PayrollItem => {
         : [];
     const manualDeductionTotal = manualDeductions.reduce((sum, deduction) => sum + toNumber(deduction.amount), 0);
     const installmentDeductionTotal = installmentDeductions.reduce((sum, deduction) => sum + toNumber(deduction.amount), 0);
-    const payrollBaseDeduction = hasValidNumber(item.payrollBaseDeduction)
+    let payrollBaseDeduction = hasValidNumber(item.payrollBaseDeduction)
         ? toNumber(item.payrollBaseDeduction)
         : Math.max(0, toNumber(item.totalDeduction) - manualDeductionTotal - installmentDeductionTotal);
+
+    // Safeguard for legacy data where payrollBaseDeduction was accidentally saved with totalDeduction (including installments)
+    if (hasValidNumber(item.totalDeduction) && payrollBaseDeduction + manualDeductionTotal + installmentDeductionTotal > toNumber(item.totalDeduction)) {
+        payrollBaseDeduction = Math.max(0, toNumber(item.totalDeduction) - manualDeductionTotal - installmentDeductionTotal);
+    }
+
     const totalDeduction = payrollBaseDeduction + manualDeductionTotal + installmentDeductionTotal;
     const totalIncome = payrollBaseIncome + extraIncome;
     const systemIncomeItems: PayrollLineItem[] = [
@@ -232,6 +241,7 @@ const normalizePayrollItem = (item: PayrollItem): PayrollItem => {
 
     return {
         ...item,
+        avatar: item.avatar || null,
         leaveDays: toNumber(item.leaveDays),
         payrollBaseIncome,
         attendanceAllowance,
@@ -277,14 +287,25 @@ export default function PayrollPage() {
         amount: "",
         target: "all",
     });
+    const [searchQuery, setSearchQuery] = useState("");
+    const [employeeAvatarMap, setEmployeeAvatarMap] = useState<Record<string, string>>({});
 
     useEffect(() => {
         const loadData = async () => {
             const sysConfig = await systemConfigService.get();
             setConfig(sysConfig);
 
-            // Load departments
+            // Load departments and avatar map
             const employees = await employeeService.getAll();
+            const avatarMap: Record<string, string> = {};
+            employees.forEach(emp => {
+                if (emp.avatar) {
+                    if (emp.id) avatarMap[emp.id] = emp.avatar;
+                    if (emp.employeeId) avatarMap[emp.employeeId] = emp.avatar;
+                }
+            });
+            setEmployeeAvatarMap(avatarMap);
+
             const uniqueDepts = Array.from(new Set(employees.map(e => e.department).filter(Boolean))) as string[];
             setDepartments(uniqueDepts.sort());
 
@@ -1352,6 +1373,7 @@ export default function PayrollPage() {
                     employeeDocId,
                     employeeId: employeeCode,
                     name: emp.name,
+                    avatar: emp.avatar || null,
                     type: emp.type || "",
                     baseSalary,
                     workDays,
@@ -1371,7 +1393,7 @@ export default function PayrollPage() {
                     specialAllowance: 0,
                     bonus: 0,
                     manualIncomes: [],
-                    payrollBaseDeduction: deduction,
+                    payrollBaseDeduction: lateDeduction,
                     manualDeductions: [],
                     installmentDeductions,
                     incomeItems: [],
@@ -1395,372 +1417,508 @@ export default function PayrollPage() {
     };
 
     return (
-        <div className="space-y-6">
-            <PageHeader
-                title="เงินเดือน (Payroll)"
-                subtitle="คำนวณงวดเงินเดือนจากเวลาเข้างาน การลา OT รายการเพิ่มหัก และผ่อนสินค้า"
-            />
+        <div className="space-y-4">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200/80">
+                <div>
+                    <div className="flex items-center gap-2.5">
+                        <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                            เงินเดือน (Payroll)
+                        </h1>
+                        <span className="text-[11px] font-normal px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                            Payroll Calculation
+                        </span>
+                        <span className="text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                            {calculationPeriod === "month"
+                                ? `ประจำเดือน ${format(selectedDate, "MMMM yyyy", { locale: th })}`
+                                : `${format(customRange.start, "d MMM", { locale: th })} - ${format(customRange.end, "d MMM yyyy", { locale: th })}`}
+                        </span>
+                    </div>
+                    <p className="text-xs sm:text-sm font-normal text-slate-500 mt-1">
+                        คำนวณงวดเงินเดือนจากเวลาเข้างาน การลา OT รายการเพิ่มหัก และผ่อนสินค้า
+                    </p>
+                </div>
+            </div>
 
-            <div className="space-y-6">
-                {/* Controls */}
-                <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-4 py-4">
-                    <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_150px] xl:items-end">
-                        {/* Filters Grid */}
-                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-[minmax(230px,1.15fr)_minmax(190px,0.95fr)_minmax(210px,1fr)_minmax(220px,1fr)]">
-                            {/* Employee Type */}
-                            <div className="space-y-1">
-                                <label className="text-xs font-semibold text-gray-900 uppercase tracking-wider">ประเภทพนักงาน</label>
-                                <div className="grid grid-cols-3 bg-gray-50 p-1 rounded-lg border border-gray-100">
-                                    {(["ประจำ - รายเดือน", "ประจำ - รายวัน", "ชั่วคราว"] as const).map((type) => (
-                                        <button
-                                            key={type}
-                                            onClick={() => setEmployeeType(type)}
-                                            className={`h-8 px-1.5 rounded-md text-[13px] font-medium transition-all text-center whitespace-nowrap ${employeeType === type
-                                                ? "bg-white text-blue-700 shadow-sm ring-1 ring-black/5"
-                                                : "text-gray-700 hover:text-gray-700"
-                                                }`}
-                                        >
-                                            {type}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Department */}
-                            <div className="space-y-1">
-                                <label className="text-xs font-semibold text-gray-900 uppercase tracking-wider">แผนก/สังกัด</label>
-                                <select
-                                    value={selectedDepartment}
-                                    onChange={(e) => setSelectedDepartment(e.target.value)}
-                                    className="h-[42px] w-full px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white hover:border-blue-400 transition-colors"
-                                >
-                                    <option value="all">ทั้งหมด</option>
-                                    {departments.map((dept) => (
-                                        <option key={dept} value={dept}>
-                                            {dept}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            {/* Calculation Period */}
-                            <div className="space-y-1">
-                                <label className="text-xs font-semibold text-gray-900 uppercase tracking-wider">รูปแบบการคำนวณ</label>
-                                <div className="grid grid-cols-2 gap-2 h-[42px]">
+            {/* Controls Card */}
+            <div className="bg-white rounded-xl border border-slate-200/90 shadow-xs p-3 sm:p-3.5">
+                <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
+                    {/* Filters Grid */}
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-[minmax(220px,1.1fr)_minmax(180px,0.9fr)_minmax(170px,0.85fr)_minmax(210px,1fr)]">
+                        {/* Employee Type */}
+                        <div>
+                            <label className="text-xs font-semibold text-slate-700 mb-1.5 block">
+                                ประเภทพนักงาน
+                            </label>
+                            <div className="h-9 bg-slate-100/80 p-0.5 rounded-lg border border-slate-200/60 flex items-center">
+                                {(["ประจำ - รายเดือน", "ประจำ - รายวัน", "ชั่วคราว"] as const).map((type) => (
                                     <button
-                                        onClick={() => setCalculationPeriod("month")}
-                                        className={`px-2 rounded-lg text-sm transition-all border font-medium whitespace-nowrap ${calculationPeriod === "month"
-                                            ? "bg-blue-50 border-blue-200 text-blue-700"
-                                            : "bg-white border-gray-200 text-gray-800 hover:bg-gray-50"
-                                            }`}
+                                        key={type}
+                                        type="button"
+                                        onClick={() => setEmployeeType(type)}
+                                        className={`h-7.5 flex-1 px-1.5 rounded-md text-xs font-medium transition-all text-center whitespace-nowrap ${
+                                            employeeType === type
+                                                ? "bg-white text-slate-900 shadow-2xs font-semibold"
+                                                : "text-slate-600 hover:text-slate-900"
+                                        }`}
                                     >
-                                        รายเดือน
+                                        {type}
                                     </button>
-                                    <button
-                                        onClick={() => setCalculationPeriod("custom")}
-                                        className={`px-2 rounded-lg text-sm transition-all border font-medium whitespace-nowrap ${calculationPeriod === "custom"
-                                            ? "bg-blue-50 border-blue-200 text-blue-700"
-                                            : "bg-white border-gray-200 text-gray-800 hover:bg-gray-50"
-                                            }`}
-                                    >
-                                        กำหนดเอง
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Date Picker */}
-                            <div className="space-y-1">
-                                <label className="text-xs font-semibold text-gray-900 uppercase tracking-wider">
-                                    {calculationPeriod === "month" ? "ประจำเดือน" : "ช่วงวันที่"}
-                                </label>
-
-                                {calculationPeriod === "month" ? (
-                                    <div className="relative h-[42px]">
-                                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500" />
-                                        <input
-                                            type="month"
-                                            value={format(selectedDate, "yyyy-MM")}
-                                            onChange={(e) => {
-                                                const [y, m] = e.target.value.split('-').map(Number);
-                                                setSelectedDate(new Date(y, m - 1, 1));
-                                            }}
-                                            className="h-full w-full pl-9 pr-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-blue-400 transition-colors"
-                                        />
-                                    </div>
-                                ) : (
-                                    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 h-[42px]">
-                                        <input
-                                            type="date"
-                                            value={format(customRange.start, "yyyy-MM-dd")}
-                                            onChange={(e) => {
-                                                const [y, m, d] = e.target.value.split('-').map(Number);
-                                                setCustomRange({ ...customRange, start: new Date(y, m - 1, d) });
-                                            }}
-                                            className="h-full min-w-0 px-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-blue-400 transition-colors"
-                                        />
-                                        <span className="text-gray-800">-</span>
-                                        <input
-                                            type="date"
-                                            value={format(customRange.end, "yyyy-MM-dd")}
-                                            onChange={(e) => {
-                                                const [y, m, d] = e.target.value.split('-').map(Number);
-                                                setCustomRange({ ...customRange, end: new Date(y, m - 1, d) });
-                                            }}
-                                            className="h-full min-w-0 px-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-blue-400 transition-colors"
-                                        />
-                                    </div>
-                                )}
+                                ))}
                             </div>
                         </div>
 
-                        {/* Actions */}
-                        <div className="grid grid-cols-2 gap-2 border-t border-gray-100 pt-3 sm:flex sm:justify-end xl:grid xl:grid-cols-1 xl:border-t-0 xl:pt-0">
-                            <button
-                                onClick={calculatePayroll}
-                                disabled={loading}
-                                className="h-[42px] px-3 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm font-medium whitespace-nowrap"
+                        {/* Department */}
+                        <div>
+                            <label className="text-xs font-semibold text-slate-700 mb-1.5 block">
+                                แผนก/สังกัด
+                            </label>
+                            <select
+                                value={selectedDepartment}
+                                onChange={(e) => setSelectedDepartment(e.target.value)}
+                                className="h-9 w-full px-2.5 text-xs sm:text-sm border border-slate-200 rounded-lg text-slate-800 bg-white focus:outline-none focus:ring-1 focus:ring-slate-400"
                             >
-                                <DollarSign className="w-4 h-4" />
-                                {loading ? "กำลังคำนวณ..." : "คำนวณเงินเดือน"}
-                            </button>
+                                <option value="all">ทุกแผนก</option>
+                                {departments.map((dept) => (
+                                    <option key={dept} value={dept}>
+                                        {dept}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
 
+                        {/* Calculation Period */}
+                        <div>
+                            <label className="text-xs font-semibold text-slate-700 mb-1.5 block">
+                                รูปแบบงวด
+                            </label>
+                            <div className="h-9 bg-slate-100/80 p-0.5 rounded-lg border border-slate-200/60 flex items-center">
+                                <button
+                                    type="button"
+                                    onClick={() => setCalculationPeriod("month")}
+                                    className={`h-7.5 flex-1 px-2 rounded-md text-xs font-medium transition-all ${
+                                        calculationPeriod === "month"
+                                            ? "bg-white text-slate-900 shadow-2xs font-semibold"
+                                            : "text-slate-600 hover:text-slate-900"
+                                    }`}
+                                >
+                                    รายเดือน
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setCalculationPeriod("custom")}
+                                    className={`h-7.5 flex-1 px-2 rounded-md text-xs font-medium transition-all ${
+                                        calculationPeriod === "custom"
+                                            ? "bg-white text-slate-900 shadow-2xs font-semibold"
+                                            : "text-slate-600 hover:text-slate-900"
+                                    }`}
+                                >
+                                    กำหนดเอง
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Date Picker */}
+                        <div>
+                            <label className="text-xs font-semibold text-slate-700 mb-1.5 block">
+                                {calculationPeriod === "month" ? "ประจำเดือน" : "ช่วงวันที่"}
+                            </label>
+
+                            {calculationPeriod === "month" ? (
+                                <div className="relative h-9">
+                                    <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                                    <input
+                                        type="month"
+                                        value={format(selectedDate, "yyyy-MM")}
+                                        onChange={(e) => {
+                                            const [y, m] = e.target.value.split("-").map(Number);
+                                            setSelectedDate(new Date(y, m - 1, 1));
+                                        }}
+                                        className="h-full w-full pl-8 pr-2.5 text-xs sm:text-sm border border-slate-200 rounded-lg text-slate-800 bg-white focus:outline-none focus:ring-1 focus:ring-slate-400"
+                                    />
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 h-9">
+                                    <input
+                                        type="date"
+                                        value={format(customRange.start, "yyyy-MM-dd")}
+                                        onChange={(e) => {
+                                            const [y, m, d] = e.target.value.split("-").map(Number);
+                                            setCustomRange({ ...customRange, start: new Date(y, m - 1, d) });
+                                        }}
+                                        className="h-full min-w-0 px-2 text-xs border border-slate-200 rounded-lg text-slate-800 bg-white focus:outline-none focus:ring-1 focus:ring-slate-400"
+                                    />
+                                    <span className="text-slate-400 text-xs">-</span>
+                                    <input
+                                        type="date"
+                                        value={format(customRange.end, "yyyy-MM-dd")}
+                                        onChange={(e) => {
+                                            const [y, m, d] = e.target.value.split("-").map(Number);
+                                            setCustomRange({ ...customRange, end: new Date(y, m - 1, d) });
+                                        }}
+                                        className="h-full min-w-0 px-2 text-xs border border-slate-200 rounded-lg text-slate-800 bg-white focus:outline-none focus:ring-1 focus:ring-slate-400"
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Action Button */}
+                    <div className="flex justify-end pt-1 xl:pt-0">
+                        <button
+                            onClick={calculatePayroll}
+                            disabled={loading}
+                            className="h-9 px-4 bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-medium rounded-lg shadow-xs transition-all disabled:opacity-50 flex items-center justify-center gap-1.5 whitespace-nowrap w-full xl:w-auto"
+                        >
+                            <DollarSign className="w-3.5 h-3.5" />
+                            {loading ? "กำลังคำนวณ..." : "คำนวณเงินเดือน"}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Saved Payrolls History Bar */}
+            {savedPayrolls.length > 0 && (
+                <div className="rounded-xl border border-slate-200/90 bg-slate-50/70 p-2.5 sm:p-3 shadow-2xs">
+                    <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between">
+                        <div className="flex items-center gap-2.5">
+                            <div className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 shadow-2xs">
+                                <History className="h-3.5 w-3.5" />
+                            </div>
+                            <div>
+                                <div className="text-xs font-semibold text-slate-800">
+                                    ประวัติงวดเงินเดือนที่บันทึกไว้
+                                </div>
+                                <div className="text-[11px] font-normal text-slate-500">
+                                    โหลดงวดที่เคยบันทึกเพื่อดูรายละเอียดหรือพิมพ์สลิปย้อนหลัง
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 lg:min-w-[500px] justify-end">
+                            <select
+                                value={selectedSavedPayrollId}
+                                onChange={(e) => setSelectedSavedPayrollId(e.target.value)}
+                                className="h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-400 flex-1 min-w-[200px]"
+                            >
+                                <option value="">เลือกงวดที่บันทึกไว้</option>
+                                {savedPayrolls.map((record) => (
+                                    <option key={record.id} value={record.id}>
+                                        {record.periodLabel} - สุทธิ ฿{toNumber(record.totals?.net).toLocaleString()}
+                                    </option>
+                                ))}
+                            </select>
+                            <button
+                                type="button"
+                                onClick={handleLoadSavedPayroll}
+                                disabled={!selectedSavedPayrollId}
+                                className="h-9 rounded-lg bg-slate-900 hover:bg-slate-800 px-3 text-xs font-medium text-white shadow-xs transition-all disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                โหลดดูย้อนหลัง
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleDeleteSavedPayroll}
+                                disabled={!selectedSavedPayrollId}
+                                className="h-9 inline-flex items-center justify-center gap-1 rounded-lg border border-rose-200 bg-white px-2.5 text-xs font-medium text-rose-600 hover:bg-rose-50 shadow-2xs transition-all disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                <Trash2 className="h-3.5 w-3.5" />
+                                <span>ลบ</span>
+                            </button>
                         </div>
                     </div>
                 </div>
+            )}
 
-                {savedPayrolls.length > 0 && (
-                    <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 px-4 py-3 shadow-sm">
-                        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-                            <div className="flex items-start gap-3">
-                                <div className="mt-0.5 rounded-lg bg-white p-2 text-indigo-600 shadow-sm ring-1 ring-indigo-100">
-                                    <History className="h-4 w-4" />
-                                </div>
-                                <div>
-                                    <div className="text-sm font-semibold text-indigo-950">ประวัติเงินเดือนที่บันทึกไว้</div>
-                                    <div className="mt-0.5 text-xs text-indigo-600">เลือกงวดที่เคยบันทึกไว้เพื่อโหลดกลับมาดูหรือพิมพ์ย้อนหลัง</div>
-                                </div>
-                            </div>
-                            <div className="grid gap-2 sm:grid-cols-[minmax(240px,1fr)_120px_90px] lg:min-w-[620px]">
-                                <select
-                                    value={selectedSavedPayrollId}
-                                    onChange={(e) => setSelectedSavedPayrollId(e.target.value)}
-                                    className="h-10 rounded-lg border border-indigo-100 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                                >
-                                    <option value="">เลือกงวดที่บันทึกไว้</option>
-                                    {savedPayrolls.map((record) => (
-                                        <option key={record.id} value={record.id}>
-                                            {record.periodLabel} - สุทธิ ฿{toNumber(record.totals?.net).toLocaleString()}
-                                        </option>
-                                    ))}
-                                </select>
-                                <button
-                                    type="button"
-                                    onClick={handleLoadSavedPayroll}
-                                    disabled={!selectedSavedPayrollId}
-                                    className="h-10 rounded-lg bg-indigo-600 px-3 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                    โหลดดูย้อนหลัง
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={handleDeleteSavedPayroll}
-                                    disabled={!selectedSavedPayrollId}
-                                    className="inline-flex h-10 items-center justify-center gap-1 rounded-lg border border-red-200 bg-white px-3 text-sm font-semibold text-red-600 shadow-sm hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                    <Trash2 className="h-4 w-4" />
-                                    ลบ
-                                </button>
-                            </div>
-                        </div>
+            {/* Config Summary Bar */}
+            {config && (
+                <div className="bg-slate-50/80 border border-slate-200/90 rounded-xl p-2.5 sm:p-3 flex flex-wrap gap-x-6 gap-y-2 items-center text-xs text-slate-700">
+                    <div className="flex items-center gap-1.5 font-semibold text-slate-800 border-r border-slate-200/80 pr-4">
+                        <Filter className="w-3.5 h-3.5 text-slate-500" />
+                        <span>เกณฑ์คำนวณ:</span>
                     </div>
-                )}
 
-                {/* Config Summary */}
-                {config && (
-                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-wrap gap-x-8 gap-y-3 items-center text-xs text-slate-700">
-                        <div className="flex items-center gap-2 font-medium text-slate-900 border-r border-slate-200 pr-6 mr-2">
-                            <div className="p-1.5 bg-blue-100/50 rounded-md text-blue-600">
-                                <Filter className="w-3.5 h-3.5" />
-                            </div>
-                            ค่าที่ใช้คำนวณ
-                        </div>
-
-                        <div className="flex items-center gap-2 group cursor-help" title="เวลาเช็คอิน-เช็คเอาท์ปกติ">
-                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400 group-hover:bg-blue-500 transition-colors"></span>
-                            <span className="text-slate-700">เวลาทำงาน:</span>
-                            <span className="font-semibold font-mono">{config.checkInHour.toString().padStart(2, '0')}:{config.checkInMinute.toString().padStart(2, '0')} - {config.checkOutHour.toString().padStart(2, '0')}:{config.checkOutMinute.toString().padStart(2, '0')}</span>
-                        </div>
-                        <div className="flex items-center gap-2 group cursor-help" title="ระยะเวลาอนุโลมให้สายได้โดยไม่หักเงิน">
-                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400 group-hover:bg-blue-500 transition-colors"></span>
-                            <span className="text-slate-700">สายได้:</span>
-                            <span className="font-semibold">{config.lateGracePeriod} นาที</span>
-                        </div>
-                        <div className="flex items-center gap-2 group cursor-help">
-                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400 group-hover:bg-blue-500 transition-colors"></span>
-                            <span className="text-slate-700">OT ขั้นต่ำ:</span>
-                            <span className="font-semibold">{config.minOTMinutes} นาที</span>
-                        </div>
-                        <div className="flex items-center gap-2 group cursor-help">
-                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400 group-hover:bg-blue-500 transition-colors"></span>
-                            <span className="text-slate-700">OT ปกติ:</span>
-                            <span className="font-semibold">x{config.otMultiplier ?? 1.5}</span>
-                        </div>
-                        <div className="flex items-center gap-2 group cursor-help">
-                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400 group-hover:bg-blue-500 transition-colors"></span>
-                            <span className="text-slate-700">OT วันหยุด:</span>
-                            <span className="font-semibold">x{config.otMultiplierHoliday ?? 3.0}</span>
-                        </div>
-                        <div className="flex items-center gap-2 group cursor-help">
-                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400 group-hover:bg-blue-500 transition-colors"></span>
-                            <span className="text-slate-700">หักสาย:</span>
-                            <span className="font-semibold">
-                                {config.lateDeductionType === "none" ? "ไม่หัก" :
-                                    config.lateDeductionType === "fixed_per_minute" ? `นาทีละ ${config.lateDeductionRate} บาท` :
-                                        "ตามจริง"}
-                            </span>
-                        </div>
+                    <div className="flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                        <span className="text-slate-500 font-normal">เวลาทำงาน:</span>
+                        <span className="font-normal text-slate-800 tabular-nums">
+                            {config.checkInHour.toString().padStart(2, "0")}:{config.checkInMinute.toString().padStart(2, "0")} - {config.checkOutHour.toString().padStart(2, "0")}:{config.checkOutMinute.toString().padStart(2, "0")}
+                        </span>
                     </div>
-                )}
+                    <div className="flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                        <span className="text-slate-500 font-normal">สายได้:</span>
+                        <span className="font-normal text-slate-800 tabular-nums">{config.lateGracePeriod} นาที</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                        <span className="text-slate-500 font-normal">OT ปกติ:</span>
+                        <span className="font-normal text-slate-800 tabular-nums">x{config.otMultiplier ?? 1.5}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                        <span className="text-slate-500 font-normal">OT วันหยุด:</span>
+                        <span className="font-normal text-slate-800 tabular-nums">x{config.otMultiplierHoliday ?? 3.0}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                        <span className="text-slate-500 font-normal">หักสาย:</span>
+                        <span className="font-normal text-slate-800">
+                            {config.lateDeductionType === "none"
+                                ? "ไม่หัก"
+                                : config.lateDeductionType === "fixed_per_minute"
+                                ? `นาทีละ ${config.lateDeductionRate} บ.`
+                                : "ตามจริง"}
+                        </span>
+                    </div>
+                </div>
+            )}
 
-                {/* Results */}
-                {payrollData.length > 0 && (
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                        {(() => {
-                            const normalizedPayroll = payrollData.map(normalizePayrollItem);
-                            const totalBaseIncome = normalizedPayroll.reduce((sum, item) => sum + toNumber(item.payrollBaseIncome), 0);
-                            const totalExtraIncome = normalizedPayroll.reduce((sum, item) => {
-                                const manualIncomeTotal = (item.manualIncomes || []).reduce((incomeSum, income) => incomeSum + toNumber(income.amount), 0);
-                                const legacyIncomeTotal = toNumber(item.attendanceAllowance) + toNumber(item.specialAllowance) + toNumber(item.bonus);
-                                return sum + (Array.isArray(item.manualIncomes) ? manualIncomeTotal : legacyIncomeTotal);
-                            }, 0);
-                            const totalDeduction = normalizedPayroll.reduce((sum, item) => sum + toNumber(item.totalDeduction), 0);
-                            const totalNet = normalizedPayroll.reduce((sum, item) => sum + toNumber(item.netTotal), 0);
+            {/* Results Section */}
+            {payrollData.length > 0 && (
+                <div className="space-y-4">
+                    {(() => {
+                        const normalizedPayroll = payrollData.map(normalizePayrollItem);
+                        const totalBaseIncome = normalizedPayroll.reduce(
+                            (sum, item) => sum + toNumber(item.payrollBaseIncome),
+                            0
+                        );
+                        const totalExtraIncome = normalizedPayroll.reduce((sum, item) => {
+                            const manualIncomeTotal = (item.manualIncomes || []).reduce(
+                                (incomeSum, income) => incomeSum + toNumber(income.amount),
+                                0
+                            );
+                            const legacyIncomeTotal =
+                                toNumber(item.attendanceAllowance) +
+                                toNumber(item.specialAllowance) +
+                                toNumber(item.bonus);
+                            return sum + (Array.isArray(item.manualIncomes) ? manualIncomeTotal : legacyIncomeTotal);
+                        }, 0);
+                        const totalDeduction = normalizedPayroll.reduce(
+                            (sum, item) => sum + toNumber(item.totalDeduction),
+                            0
+                        );
+                        const totalNet = normalizedPayroll.reduce((sum, item) => sum + toNumber(item.netTotal), 0);
 
+                        const filteredPayroll = normalizedPayroll.filter((item) => {
+                            if (!searchQuery.trim()) return true;
+                            const q = searchQuery.toLowerCase();
                             return (
-                                <>
-                                    <div className="px-6 py-5 border-b border-gray-200 bg-gray-50/50">
-                                        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                                                <div className="flex items-center gap-2">
-                                                    <DollarSign className="w-5 h-5 text-emerald-600" />
-                                                    <h3 className="font-semibold text-gray-900">สรุปรายการจ่ายเงินเดือน</h3>
-                                                </div>
-                                                <div className="flex flex-wrap gap-2">
-                                                    <button
-                                                        onClick={handleSavePayroll}
-                                                        disabled={payrollData.length === 0 || savingPayroll}
-                                                        className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white shadow-sm shadow-emerald-600/20 transition-all hover:bg-emerald-700 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
-                                                        title={savingPayroll ? "กำลังบันทึกงวดนี้" : "บันทึกงวดนี้"}
-                                                        aria-label={savingPayroll ? "กำลังบันทึกงวดนี้" : "บันทึกงวดนี้"}
-                                                    >
-                                                        <Save className="h-3.5 w-3.5" />
-                                                        <span>{savingPayroll ? "บันทึก..." : "บันทึก"}</span>
-                                                    </button>
-                                                    <button
-                                                        onClick={handlePrint}
-                                                        disabled={selectedIds.length === 0}
-                                                        className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-slate-950 px-3 text-xs font-semibold text-white shadow-sm shadow-slate-900/20 transition-all hover:bg-slate-800 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
-                                                        title={`พิมพ์สลิป${selectedIds.length > 0 ? ` (${selectedIds.length})` : ""}`}
-                                                        aria-label={`พิมพ์สลิป${selectedIds.length > 0 ? ` (${selectedIds.length})` : ""}`}
-                                                    >
-                                                        <Download className="h-3.5 w-3.5" />
-                                                        <span>สลิป{selectedIds.length > 0 ? ` ${selectedIds.length}` : ""}</span>
-                                                    </button>
-                                                    <button
-                                                        onClick={handleExportPayrollCsv}
-                                                        disabled={selectedIds.length === 0}
-                                                        className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-gray-900 shadow-sm transition-all hover:bg-slate-50 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
-                                                        title={`Export CSV${selectedIds.length > 0 ? ` (${selectedIds.length})` : ""}`}
-                                                        aria-label={`Export CSV${selectedIds.length > 0 ? ` (${selectedIds.length})` : ""}`}
-                                                    >
-                                                        <Download className="h-3.5 w-3.5" />
-                                                        <span>CSV{selectedIds.length > 0 ? ` ${selectedIds.length}` : ""}</span>
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:min-w-[680px]">
-                                                <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-                                                    <div className="text-[13px] font-medium text-slate-700">รายได้คำนวณ</div>
-                                                    <div className="mt-1 text-sm font-bold text-slate-900">฿{totalBaseIncome.toLocaleString()}</div>
-                                                </div>
-                                                <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2">
-                                                    <div className="text-[13px] font-medium text-blue-600">เงินเพิ่ม</div>
-                                                    <div className="mt-1 text-sm font-bold text-blue-700">฿{totalExtraIncome.toLocaleString()}</div>
-                                                </div>
-                                                <div className="rounded-lg border border-red-100 bg-red-50 px-3 py-2">
-                                                    <div className="text-[13px] font-medium text-red-600">รายการหัก</div>
-                                                    <div className="mt-1 text-sm font-bold text-red-700">฿{totalDeduction.toLocaleString()}</div>
-                                                </div>
-                                                <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2">
-                                                    <div className="text-[13px] font-medium text-emerald-600">รวมจ่ายสุทธิ</div>
-                                                    <div className="mt-1 text-lg font-bold text-emerald-700">฿{totalNet.toLocaleString()}</div>
-                                                </div>
-                                            </div>
+                                item.name.toLowerCase().includes(q) ||
+                                item.employeeId.toLowerCase().includes(q)
+                            );
+                        });
+
+                        return (
+                            <>
+                                {/* Compact & Clean Stat Cards */}
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
+                                    {/* รายได้คำนวณ */}
+                                    <div className="bg-white rounded-xl p-3 border border-slate-200/90 shadow-xs">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs font-semibold text-slate-700">รายได้คำนวณ</span>
+                                            <span className="w-2 h-2 rounded-full bg-slate-400"></span>
                                         </div>
+                                        <div className="text-xl sm:text-2xl font-bold text-slate-800 mt-1 tabular-nums">
+                                            ฿{totalBaseIncome.toLocaleString()}
+                                        </div>
+                                        <div className="text-[11px] font-normal text-slate-400 mt-0.5">ฐานเงินเดือน + OT</div>
                                     </div>
 
-                                    <div className="border-b border-gray-200 bg-white px-4 py-3">
-                                        <div className="flex flex-col gap-2 xl:flex-row xl:items-end xl:justify-between">
-                                            <div>
-                                                <div className="text-xs font-semibold text-gray-900">เพิ่มรายการแบบกลุ่ม</div>
-                                                <div className="mt-0.5 text-[13px] text-gray-700">กรอกครั้งเดียวแล้วใช้กับทุกคน หรือเฉพาะพนักงานที่เลือก</div>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-2 sm:grid-cols-[120px_minmax(180px,1fr)_120px_130px_120px] xl:min-w-[760px]">
-                                                <select
-                                                    value={bulkEntry.type}
-                                                    onChange={(e) => setBulkEntry(current => ({ ...current, type: e.target.value as "income" | "deduction" }))}
-                                                    className="h-9 rounded-md border border-gray-200 bg-white px-2 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                >
-                                                    <option value="income">เงินเพิ่ม</option>
-                                                    <option value="deduction">รายการหัก</option>
-                                                </select>
-                                                <input
-                                                    type="text"
-                                                    value={bulkEntry.label}
-                                                    onChange={(e) => setBulkEntry(current => ({ ...current, label: e.target.value }))}
-                                                    className="h-9 rounded-md border border-gray-200 px-3 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                    placeholder="ชื่อรายการ เช่น ค่าอาหาร"
-                                                />
-                                                <input
-                                                    type="number"
-                                                    min="0"
-                                                    value={bulkEntry.amount}
-                                                    onChange={(e) => setBulkEntry(current => ({ ...current, amount: e.target.value }))}
-                                                    className="h-9 rounded-md border border-gray-200 px-3 text-right text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                    placeholder="0"
-                                                />
-                                                <select
-                                                    value={bulkEntry.target}
-                                                    onChange={(e) => setBulkEntry(current => ({ ...current, target: e.target.value as "all" | "selected" }))}
-                                                    className="h-9 rounded-md border border-gray-200 bg-white px-2 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                >
-                                                    <option value="all">ทุกคน</option>
-                                                    <option value="selected">ที่เลือก ({selectedIds.length})</option>
-                                                </select>
+                                    {/* เงินเพิ่ม */}
+                                    <div className="bg-white rounded-xl p-3 border border-slate-200/90 shadow-xs">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs font-semibold text-slate-700">เงินเพิ่ม</span>
+                                            <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                                        </div>
+                                        <div className="text-xl sm:text-2xl font-bold text-blue-700 mt-1 tabular-nums">
+                                            ฿{totalExtraIncome.toLocaleString()}
+                                        </div>
+                                        <div className="text-[11px] font-normal text-slate-400 mt-0.5">เบี้ยเลี้ยง / พิเศษ</div>
+                                    </div>
+
+                                    {/* รายการหัก */}
+                                    <div className="bg-white rounded-xl p-3 border border-slate-200/90 shadow-xs">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs font-semibold text-slate-700">รายการหัก</span>
+                                            <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                                        </div>
+                                        <div className="text-xl sm:text-2xl font-bold text-rose-700 mt-1 tabular-nums">
+                                            ฿{totalDeduction.toLocaleString()}
+                                        </div>
+                                        <div className="text-[11px] font-normal text-slate-400 mt-0.5">สาย / ผ่อน / หักเพิ่ม</div>
+                                    </div>
+
+                                    {/* รวมจ่ายสุทธิ */}
+                                    <div className="bg-white rounded-xl p-3 border border-emerald-200/80 bg-emerald-50/20 shadow-xs">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs font-semibold text-slate-700">รวมจ่ายสุทธิ</span>
+                                            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                        </div>
+                                        <div className="text-xl sm:text-2xl font-bold text-emerald-700 mt-1 tabular-nums">
+                                            ฿{totalNet.toLocaleString()}
+                                        </div>
+                                        <div className="text-[11px] font-normal text-emerald-600/80 mt-0.5">ยอดจ่ายทั้งหมด</div>
+                                    </div>
+                                </div>
+
+                                {/* Toolbar (Search & Export Buttons) */}
+                                <div className="bg-white rounded-xl border border-slate-200/90 p-2.5 sm:p-3 shadow-xs flex flex-wrap items-center justify-between gap-2.5">
+                                    <div className="flex items-center gap-2">
+                                        {/* Search in results */}
+                                        <div className="relative">
+                                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                                            <input
+                                                type="text"
+                                                placeholder="ค้นหาชื่อพนักงาน หรือ รหัส..."
+                                                value={searchQuery}
+                                                onChange={(e) => setSearchQuery(e.target.value)}
+                                                className="h-9 pl-8 pr-7 py-1 bg-white border border-slate-200 rounded-lg text-xs sm:text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400 w-52 sm:w-64 transition-all"
+                                            />
+                                            {searchQuery && (
                                                 <button
                                                     type="button"
-                                                    onClick={applyBulkEntry}
-                                                    disabled={!bulkEntry.label.trim() || !(Number(bulkEntry.amount) > 0) || (bulkEntry.target === "selected" && selectedIds.length === 0)}
-                                                    className={`inline-flex h-9 items-center justify-center gap-1 rounded-md px-3 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 ${bulkEntry.type === "income"
-                                                        ? "bg-blue-600 hover:bg-blue-700"
-                                                        : "bg-red-600 hover:bg-red-700"
-                                                        }`}
+                                                    onClick={() => setSearchQuery("")}
+                                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs p-0.5"
                                                 >
-                                                    <Plus className="h-3.5 w-3.5" />
-                                                    ใช้รายการ
+                                                    ✕
                                                 </button>
-                                            </div>
+                                            )}
                                         </div>
                                     </div>
 
-                                    <div className="divide-y divide-gray-100">
-                                        <div className="hidden grid-cols-[36px_minmax(140px,0.85fr)_minmax(210px,1fr)_minmax(250px,1.15fr)_minmax(260px,1.15fr)_minmax(132px,0.65fr)] items-center gap-3 bg-gray-100 px-4 py-3 text-xs font-semibold uppercase text-gray-900 xl:grid">
+                                    {/* Action Buttons */}
+                                    <div className="flex flex-wrap items-center gap-2 ml-auto">
+                                        <button
+                                            type="button"
+                                            onClick={handleSavePayroll}
+                                            disabled={payrollData.length === 0 || savingPayroll}
+                                            className="h-9 inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3 text-xs font-medium text-white shadow-xs transition-all disabled:cursor-not-allowed disabled:opacity-50"
+                                            title={savingPayroll ? "กำลังบันทึกงวดนี้" : "บันทึกงวดนี้"}
+                                        >
+                                            <Save className="h-3.5 w-3.5" />
+                                            <span>{savingPayroll ? "กำลังบันทึก..." : "บันทึกงวด"}</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handlePrint}
+                                            disabled={selectedIds.length === 0}
+                                            className="h-9 inline-flex items-center justify-center gap-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 px-3 text-xs font-medium text-white shadow-xs transition-all disabled:cursor-not-allowed disabled:opacity-50"
+                                            title={`พิมพ์สลิป${selectedIds.length > 0 ? ` (${selectedIds.length})` : ""}`}
+                                        >
+                                            <Download className="h-3.5 w-3.5" />
+                                            <span>สลิปเงินเดือน{selectedIds.length > 0 ? ` (${selectedIds.length})` : ""}</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handleExportPayrollCsv}
+                                            disabled={selectedIds.length === 0}
+                                            className="h-9 inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3 text-xs font-medium text-slate-700 shadow-2xs transition-all disabled:cursor-not-allowed disabled:opacity-50"
+                                            title={`Export CSV${selectedIds.length > 0 ? ` (${selectedIds.length})` : ""}`}
+                                        >
+                                            <Download className="h-3.5 w-3.5" />
+                                            <span>CSV{selectedIds.length > 0 ? ` (${selectedIds.length})` : ""}</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Bulk Entry Bar */}
+                                <div className="bg-slate-50/70 border border-slate-200/90 rounded-xl p-2.5 sm:p-3 shadow-2xs">
+                                    <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
+                                        <div>
+                                            <div className="text-xs font-semibold text-slate-800">
+                                                เพิ่มรายการแบบกลุ่ม (Bulk Entry)
+                                            </div>
+                                            <div className="text-[11px] font-normal text-slate-500">
+                                                กรอกยอดเงินครั้งเดียวเพื่อใส่ให้กับทุกคน หรือเฉพาะคนที่เลือก
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-[110px_minmax(160px,1fr)_110px_130px_110px] xl:min-w-[720px]">
+                                            <select
+                                                value={bulkEntry.type}
+                                                onChange={(e) =>
+                                                    setBulkEntry((current) => ({
+                                                        ...current,
+                                                        type: e.target.value as "income" | "deduction",
+                                                    }))
+                                                }
+                                                className="h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                                            >
+                                                <option value="income">เงินเพิ่ม</option>
+                                                <option value="deduction">รายการหัก</option>
+                                            </select>
+                                            <input
+                                                type="text"
+                                                value={bulkEntry.label}
+                                                onChange={(e) =>
+                                                    setBulkEntry((current) => ({
+                                                        ...current,
+                                                        label: e.target.value,
+                                                    }))
+                                                }
+                                                className="h-9 rounded-lg border border-slate-200 px-3 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                                                placeholder="ชื่อ เช่น เบี้ยขยัน"
+                                            />
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                value={bulkEntry.amount}
+                                                onChange={(e) =>
+                                                    setBulkEntry((current) => ({
+                                                        ...current,
+                                                        amount: e.target.value,
+                                                    }))
+                                                }
+                                                className="h-9 rounded-lg border border-slate-200 px-3 text-right text-xs font-normal tabular-nums text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                                                placeholder="0"
+                                            />
+                                            <select
+                                                value={bulkEntry.target}
+                                                onChange={(e) =>
+                                                    setBulkEntry((current) => ({
+                                                        ...current,
+                                                        target: e.target.value as "all" | "selected",
+                                                    }))
+                                                }
+                                                className="h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                                            >
+                                                <option value="all">ทุกคน</option>
+                                                <option value="selected">ที่เลือก ({selectedIds.length})</option>
+                                            </select>
+                                            <button
+                                                type="button"
+                                                onClick={applyBulkEntry}
+                                                disabled={
+                                                    !bulkEntry.label.trim() ||
+                                                    !(Number(bulkEntry.amount) > 0) ||
+                                                    (bulkEntry.target === "selected" && selectedIds.length === 0)
+                                                }
+                                                className={`h-9 inline-flex items-center justify-center gap-1 rounded-lg px-3 text-xs font-medium text-white shadow-xs transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
+                                                    bulkEntry.type === "income"
+                                                        ? "bg-blue-600 hover:bg-blue-700"
+                                                        : "bg-rose-600 hover:bg-rose-700"
+                                                }`}
+                                            >
+                                                <Plus className="h-3.5 w-3.5" />
+                                                <span>ปรับใช้</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Table Container */}
+                                <div className="bg-white rounded-xl shadow-xs border border-slate-200/90 overflow-hidden">
+                                    <div className="divide-y divide-slate-100">
+                                        {/* Table Header */}
+                                        <div className="hidden grid-cols-[36px_minmax(140px,0.85fr)_minmax(210px,1fr)_minmax(250px,1.15fr)_minmax(260px,1.15fr)_minmax(132px,0.65fr)] items-center gap-3 bg-slate-50/80 border-b border-slate-200 px-3.5 py-2.5 text-xs font-semibold text-slate-700 uppercase tracking-wider xl:grid">
                                             <div>
                                                 <input
                                                     type="checkbox"
-                                                    checked={selectedIds.length === payrollData.length && payrollData.length > 0}
+                                                    checked={
+                                                        selectedIds.length === payrollData.length &&
+                                                        payrollData.length > 0
+                                                    }
                                                     onChange={handleSelectAll}
-                                                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                                    className="w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-400 cursor-pointer"
                                                 />
                                             </div>
                                             <div>พนักงาน</div>
@@ -1770,212 +1928,381 @@ export default function PayrollPage() {
                                             <div className="text-right">ยอดสุทธิ</div>
                                         </div>
 
-                                        {normalizedPayroll.map((item) => {
-                                            const manualIncomeTotal = (item.manualIncomes || []).reduce((sum, income) => sum + toNumber(income.amount), 0);
-                                            const legacyIncomeTotal = toNumber(item.attendanceAllowance) + toNumber(item.specialAllowance) + toNumber(item.bonus);
-                                            const extraTotal = Array.isArray(item.manualIncomes) ? manualIncomeTotal : legacyIncomeTotal;
-                                            const manualDeductionTotal = (item.manualDeductions || []).reduce((sum, deduction) => sum + toNumber(deduction.amount), 0);
-                                            const installmentDeductionTotal = (item.installmentDeductions || []).reduce((sum, deduction) => sum + toNumber(deduction.amount), 0);
-                                            const totalOtHours = toNumber(item.otHoursNormal) + toNumber(item.otHoursHoliday) + toNumber(item.otHoursSpecial);
+                                        {filteredPayroll.length === 0 ? (
+                                            <div className="px-4 py-12 text-center text-slate-500 font-normal text-sm">
+                                                ไม่พบพนักงานที่ตรงกับเงื่อนไขการค้นหา
+                                            </div>
+                                        ) : (
+                                            filteredPayroll.map((item) => {
+                                                const manualIncomeTotal = (item.manualIncomes || []).reduce(
+                                                    (sum, income) => sum + toNumber(income.amount),
+                                                    0
+                                                );
+                                                const legacyIncomeTotal =
+                                                    toNumber(item.attendanceAllowance) +
+                                                    toNumber(item.specialAllowance) +
+                                                    toNumber(item.bonus);
+                                                const extraTotal = Array.isArray(item.manualIncomes)
+                                                    ? manualIncomeTotal
+                                                    : legacyIncomeTotal;
+                                                const manualDeductionTotal = (item.manualDeductions || []).reduce(
+                                                    (sum, deduction) => sum + toNumber(deduction.amount),
+                                                    0
+                                                );
+                                                const installmentDeductionTotal = (
+                                                    item.installmentDeductions || []
+                                                ).reduce(
+                                                    (sum, deduction) => sum + toNumber(deduction.amount),
+                                                    0
+                                                );
+                                                const totalOtHours =
+                                                    toNumber(item.otHoursNormal) +
+                                                    toNumber(item.otHoursHoliday) +
+                                                    toNumber(item.otHoursSpecial);
 
-                                            return (
-                                                <div key={item.employeeId} className="grid grid-cols-1 items-start gap-4 px-4 py-4 hover:bg-blue-50/30 md:grid-cols-[40px_1fr] xl:grid-cols-[36px_minmax(140px,0.85fr)_minmax(210px,1fr)_minmax(250px,1.15fr)_minmax(260px,1.15fr)_minmax(132px,0.65fr)] xl:gap-3">
-                                                    <div className="pt-1 md:row-span-4 xl:row-span-1">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={selectedIds.includes(item.employeeId)}
-                                                            onChange={() => handleSelectOne(item.employeeId)}
-                                                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                                                        />
-                                                    </div>
+                                                return (
+                                                    <div
+                                                        key={item.employeeId}
+                                                        className="grid grid-cols-1 items-start gap-3 px-3.5 py-3 hover:bg-slate-50/60 transition-colors md:grid-cols-[36px_1fr] xl:grid-cols-[36px_minmax(140px,0.85fr)_minmax(210px,1fr)_minmax(250px,1.15fr)_minmax(260px,1.15fr)_minmax(132px,0.65fr)] xl:gap-3"
+                                                    >
+                                                        {/* Checkbox */}
+                                                        <div className="pt-1 md:row-span-4 xl:row-span-1">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={selectedIds.includes(item.employeeId)}
+                                                                onChange={() => handleSelectOne(item.employeeId)}
+                                                                className="w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-400 cursor-pointer"
+                                                            />
+                                                        </div>
 
-                                                    <div className="min-w-0">
-                                                        <div className="font-semibold text-gray-900">{item.name}</div>
-                                                        <div className="text-xs text-gray-800 font-mono">{item.employeeId}</div>
-                                                        <span className={`mt-2 inline-flex text-xs px-2 py-0.5 rounded-full ${item.type === 'รายเดือน'
-                                                            ? 'bg-blue-50 text-blue-600 border border-blue-100'
-                                                            : 'bg-orange-50 text-orange-600 border border-orange-100'
-                                                            }`}>
-                                                            {item.type}
-                                                        </span>
-                                                    </div>
+                                                        {/* Employee */}
+                                                        <div className="min-w-0">
+                                                            <div className="flex items-center gap-2">
+                                                                {(() => {
+                                                                    const avatar = item.avatar || employeeAvatarMap[item.employeeId] || employeeAvatarMap[item.employeeDocId || ""];
+                                                                    return avatar ? (
+                                                                        <div className="relative w-7 h-7 shrink-0 rounded-full overflow-hidden ring-1 ring-slate-200 bg-slate-100">
+                                                                            <img
+                                                                                src={avatar}
+                                                                                alt={item.name}
+                                                                                className="w-full h-full object-cover"
+                                                                                onError={(e) => {
+                                                                                    e.currentTarget.style.display = "none";
+                                                                                    if (e.currentTarget.nextElementSibling) {
+                                                                                        (e.currentTarget.nextElementSibling as HTMLElement).style.display = "flex";
+                                                                                    }
+                                                                                }}
+                                                                            />
+                                                                            <div className="hidden w-full h-full bg-slate-100 items-center justify-center text-slate-700 font-medium text-xs">
+                                                                                {item.name ? item.name.charAt(0) : "?"}
+                                                                            </div>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-700 font-medium text-xs ring-1 ring-slate-200 shrink-0">
+                                                                            {item.name ? item.name.charAt(0) : "?"}
+                                                                        </div>
+                                                                    );
+                                                                })()}
+                                                                <div className="min-w-0">
+                                                                    <div className="text-sm font-medium text-slate-800 leading-tight truncate">
+                                                                        {item.name}
+                                                                    </div>
+                                                                    <div className="text-[11px] font-normal text-slate-500 font-mono">
+                                                                        {item.employeeId}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <span
+                                                                className={`mt-1.5 inline-flex text-[11px] font-normal px-2 py-0.5 rounded-full border ${
+                                                                    item.type === "รายเดือน"
+                                                                        ? "bg-blue-50 text-blue-700 border-blue-200/80"
+                                                                        : "bg-amber-50 text-amber-800 border-amber-200/80"
+                                                                }`}
+                                                            >
+                                                                {item.type}
+                                                            </span>
+                                                        </div>
 
-                                                    <div className="grid grid-cols-2 gap-2 text-xs">
-                                                        <div className="rounded-md bg-slate-50 px-2.5 py-2">
-                                                            <div className="text-slate-700">วันทำงาน</div>
-                                                            <div className="mt-0.5 font-semibold text-slate-900">{item.workDays.toFixed(2).replace(/\.?0+$/, "")} วัน</div>
-                                                            {item.leaveDays > 0 && (
-                                                                <div className="mt-0.5 text-xs font-medium text-blue-600">
-                                                                    รวมลา {formatLeaveDayHourUnits(item.leaveDays)}
+                                                        {/* Calculation Summary (Numbers normal font) */}
+                                                        <div className="grid grid-cols-2 gap-1.5 text-xs">
+                                                            <div className="rounded-lg bg-slate-50/80 border border-slate-200/60 p-2">
+                                                                <div className="text-[11px] font-normal text-slate-500">
+                                                                    วันทำงาน
+                                                                </div>
+                                                                <div className="mt-0.5 font-normal tabular-nums text-slate-800">
+                                                                    {item.workDays.toFixed(2).replace(/\.?0+$/, "")} วัน
+                                                                </div>
+                                                                {item.leaveDays > 0 && (
+                                                                    <div className="mt-0.5 text-[11px] font-normal text-blue-700">
+                                                                        ลา {formatLeaveDayHourUnits(item.leaveDays)}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            <div className="rounded-lg bg-slate-50/80 border border-slate-200/60 p-2">
+                                                                <div className="text-[11px] font-normal text-slate-500">
+                                                                    ฐานเงินเดือน
+                                                                </div>
+                                                                <div className="mt-0.5 font-normal tabular-nums text-slate-800">
+                                                                    ฿{toNumber(item.baseSalary).toLocaleString()}
+                                                                </div>
+                                                            </div>
+                                                            <div className="rounded-lg bg-slate-50/80 border border-slate-200/60 p-2">
+                                                                <div className="text-[11px] font-normal text-slate-500">
+                                                                    OT รวม
+                                                                </div>
+                                                                <div className="mt-0.5 font-normal tabular-nums text-slate-800">
+                                                                    {totalOtHours > 0
+                                                                        ? `${totalOtHours.toFixed(1)} ชม.`
+                                                                        : "-"}
+                                                                </div>
+                                                            </div>
+                                                            <div className="rounded-lg bg-slate-50/80 border border-slate-200/60 p-2">
+                                                                <div className="text-[11px] font-normal text-slate-500">
+                                                                    สาย
+                                                                </div>
+                                                                <div
+                                                                    className={`mt-0.5 font-normal tabular-nums ${
+                                                                        item.lateMinutes > 0
+                                                                            ? "text-rose-700"
+                                                                            : "text-slate-800"
+                                                                    }`}
+                                                                >
+                                                                    {item.lateMinutes > 0
+                                                                        ? `${item.lateMinutes} นาที`
+                                                                        : "-"}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Extra Income (Numbers normal font) */}
+                                                        <div className="rounded-lg border border-slate-200/80 bg-slate-50/40 p-2">
+                                                            <div className="mb-2 flex items-center justify-between gap-2">
+                                                                <span className="text-xs font-semibold text-slate-700">
+                                                                    เงินเพิ่ม
+                                                                </span>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => addManualIncome(item.employeeId)}
+                                                                    className="inline-flex h-6 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs"
+                                                                >
+                                                                    <Plus className="h-3 w-3" />
+                                                                    <span>เพิ่ม</span>
+                                                                </button>
+                                                            </div>
+
+                                                            {(item.manualIncomes || []).length === 0 ? (
+                                                                <div className="rounded-md border border-dashed border-slate-200 bg-white/60 px-2 py-2 text-center text-xs font-normal text-slate-400">
+                                                                    ไม่มีรายการเงินเพิ่ม
+                                                                </div>
+                                                            ) : (
+                                                                <div className="space-y-1.5">
+                                                                    {(item.manualIncomes || []).map((income) => (
+                                                                        <div
+                                                                            key={income.id}
+                                                                            className="grid grid-cols-[1fr_80px_24px] gap-1.5 items-center"
+                                                                        >
+                                                                            <input
+                                                                                type="text"
+                                                                                value={income.label}
+                                                                                onChange={(e) =>
+                                                                                    updateManualIncome(
+                                                                                        item.employeeId,
+                                                                                        income.id,
+                                                                                        "label",
+                                                                                        e.target.value
+                                                                                    )
+                                                                                }
+                                                                                className="h-7.5 min-w-0 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                                                                                placeholder="ชื่อรายการ"
+                                                                            />
+                                                                            <input
+                                                                                type="number"
+                                                                                min="0"
+                                                                                value={toNumber(income.amount) || ""}
+                                                                                onChange={(e) =>
+                                                                                    updateManualIncome(
+                                                                                        item.employeeId,
+                                                                                        income.id,
+                                                                                        "amount",
+                                                                                        e.target.value
+                                                                                    )
+                                                                                }
+                                                                                className="h-7.5 min-w-0 rounded-md border border-slate-200 bg-white px-2 text-right text-xs font-normal tabular-nums text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                                                                                placeholder="0"
+                                                                            />
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() =>
+                                                                                    removeManualIncome(
+                                                                                        item.employeeId,
+                                                                                        income.id
+                                                                                    )
+                                                                                }
+                                                                                className="flex h-7.5 w-6 items-center justify-center rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                                                                                aria-label="ลบเงินเพิ่ม"
+                                                                            >
+                                                                                <Trash2 className="h-3.5 w-3.5" />
+                                                                            </button>
+                                                                        </div>
+                                                                    ))}
                                                                 </div>
                                                             )}
-                                                        </div>
-                                                        <div className="rounded-md bg-slate-50 px-2.5 py-2">
-                                                            <div className="text-slate-700">ฐานเงินเดือน</div>
-                                                            <div className="mt-0.5 font-semibold text-slate-900">฿{toNumber(item.baseSalary).toLocaleString()}</div>
-                                                        </div>
-                                                        <div className="rounded-md bg-slate-50 px-2.5 py-2">
-                                                            <div className="text-slate-700">OT รวม</div>
-                                                            <div className="mt-0.5 font-semibold text-slate-900">{totalOtHours > 0 ? `${totalOtHours.toFixed(1)} ชม.` : "-"}</div>
-                                                        </div>
-                                                        <div className="rounded-md bg-slate-50 px-2.5 py-2">
-                                                            <div className="text-slate-700">สาย</div>
-                                                            <div className={`mt-0.5 font-semibold ${item.lateMinutes > 0 ? "text-red-600" : "text-slate-900"}`}>
-                                                                {item.lateMinutes > 0 ? `${item.lateMinutes} นาที` : "-"}
+
+                                                            <div className="mt-1.5 text-right text-xs font-normal text-blue-700 tabular-nums">
+                                                                รวมเงินเพิ่ม ฿{extraTotal.toLocaleString()}
                                                             </div>
                                                         </div>
-                                                    </div>
 
-                                                    <div className="rounded-lg border border-blue-100 bg-blue-50/50 p-2">
-                                                        <div className="mb-2 flex items-center justify-between gap-2">
-                                                            <span className="text-[13px] font-semibold text-blue-700">เงินเพิ่ม</span>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => addManualIncome(item.employeeId)}
-                                                                className="inline-flex h-7 items-center gap-1 rounded-md border border-blue-200 bg-white px-2 text-[13px] font-medium text-blue-700 hover:bg-blue-50"
-                                                            >
-                                                                <Plus className="h-3 w-3" />
-                                                                เพิ่ม
-                                                            </button>
-                                                        </div>
-
-                                                        {(item.manualIncomes || []).length === 0 ? (
-                                                            <div className="rounded-md border border-dashed border-blue-100 bg-white/60 px-2 py-2 text-center text-[13px] text-blue-400">
-                                                                ยังไม่มีเงินเพิ่ม
+                                                        {/* Deductions (Numbers normal font) */}
+                                                        <div className="rounded-lg border border-slate-200/80 bg-slate-50/40 p-2">
+                                                            <div className="mb-2 flex items-center justify-between gap-2">
+                                                                <span className="text-xs font-semibold text-slate-700">
+                                                                    รายการหักเพิ่มเติม
+                                                                </span>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => addManualDeduction(item.employeeId)}
+                                                                    className="inline-flex h-6 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs"
+                                                                >
+                                                                    <Plus className="h-3 w-3" />
+                                                                    <span>เพิ่ม</span>
+                                                                </button>
                                                             </div>
-                                                        ) : (
-                                                            <div className="space-y-1.5">
-                                                                {(item.manualIncomes || []).map((income) => (
-                                                                    <div key={income.id} className="grid grid-cols-[1fr_86px_26px] gap-1.5">
-                                                                        <input
-                                                                            type="text"
-                                                                            value={income.label}
-                                                                            onChange={(e) => updateManualIncome(item.employeeId, income.id, "label", e.target.value)}
-                                                                            className="h-8 min-w-0 rounded-md border border-blue-100 bg-white px-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-200"
-                                                                            placeholder="ชื่อรายการ"
-                                                                        />
-                                                                        <input
-                                                                            type="number"
-                                                                            min="0"
-                                                                            value={toNumber(income.amount) || ""}
-                                                                            onChange={(e) => updateManualIncome(item.employeeId, income.id, "amount", e.target.value)}
-                                                                            className="h-8 min-w-0 rounded-md border border-blue-100 bg-white px-2 text-right text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-200"
-                                                                            placeholder="0"
-                                                                        />
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => removeManualIncome(item.employeeId, income.id)}
-                                                                            className="flex h-8 w-6 items-center justify-center rounded-md text-blue-500 hover:bg-blue-100"
-                                                                            aria-label="ลบเงินเพิ่ม"
+
+                                                            {(item.installmentDeductions || []).length > 0 && (
+                                                                <div className="mb-2 space-y-1.5 rounded-md border border-amber-200/70 bg-amber-50/50 px-2 py-1.5">
+                                                                    <div className="text-[11px] font-semibold text-amber-800">
+                                                                        หักผ่อนสินค้าอัตโนมัติ
+                                                                    </div>
+                                                                    {(item.installmentDeductions || []).map((deduction) => (
+                                                                        <div
+                                                                            key={deduction.id}
+                                                                            className="grid grid-cols-[1fr_80px] gap-1.5 items-center"
                                                                         >
-                                                                            <Trash2 className="h-3.5 w-3.5" />
-                                                                        </button>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        )}
+                                                                            <span className="truncate text-xs font-normal text-slate-700">
+                                                                                {deduction.label}
+                                                                            </span>
+                                                                            <input
+                                                                                type="number"
+                                                                                min="0"
+                                                                                value={toNumber(deduction.amount) || ""}
+                                                                                onChange={(e) =>
+                                                                                    updateInstallmentDeduction(
+                                                                                        item.employeeId,
+                                                                                        deduction.id,
+                                                                                        "amount",
+                                                                                        e.target.value
+                                                                                    )
+                                                                                }
+                                                                                className="h-7.5 min-w-0 rounded-md border border-slate-200 bg-white px-2 text-right text-xs font-normal tabular-nums text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                                                                                placeholder="0"
+                                                                            />
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            )}
 
-                                                        <div className="mt-2 text-right text-xs text-blue-700">
-                                                            รวมเงินเพิ่ม ฿{extraTotal.toLocaleString()}
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="rounded-lg border border-red-100 bg-red-50/40 p-2">
-                                                        <div className="mb-2 flex items-center justify-between gap-2">
-                                                            <span className="text-[13px] font-semibold text-red-700">รายการหักเพิ่มเติม</span>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => addManualDeduction(item.employeeId)}
-                                                                className="inline-flex h-7 items-center gap-1 rounded-md border border-red-200 bg-white px-2 text-[13px] font-medium text-red-700 hover:bg-red-50"
-                                                            >
-                                                                <Plus className="h-3 w-3" />
-                                                                เพิ่ม
-                                                            </button>
-                                                        </div>
-
-                                                        {(item.installmentDeductions || []).length > 0 && (
-                                                            <div className="mb-2 space-y-1.5 rounded-md border border-amber-100 bg-amber-50 px-2 py-2">
-                                                                <div className="text-[13px] font-semibold text-amber-700">หักผ่อนสินค้าอัตโนมัติ</div>
-                                                                {(item.installmentDeductions || []).map((deduction) => (
-                                                                    <div key={deduction.id} className="grid grid-cols-[1fr_86px] gap-1.5 items-center">
-                                                                        <span className="truncate text-[13px] text-amber-800">{deduction.label}</span>
-                                                                        <input
-                                                                            type="number"
-                                                                            min="0"
-                                                                            value={toNumber(deduction.amount) || ""}
-                                                                            onChange={(e) => updateInstallmentDeduction(item.employeeId, deduction.id, "amount", e.target.value)}
-                                                                            className="h-8 min-w-0 rounded-md border border-amber-200 bg-white px-2 text-right text-xs font-mono focus:outline-none focus:ring-2 focus:ring-amber-300"
-                                                                            placeholder="0"
-                                                                        />
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        )}
-
-                                                        {(item.manualDeductions || []).length === 0 ? (
-                                                            <div className="rounded-md border border-dashed border-red-100 bg-white/60 px-2 py-2 text-center text-[13px] text-red-400">
-                                                                ยังไม่มีรายการหักเพิ่ม
-                                                            </div>
-                                                        ) : (
-                                                            <div className="space-y-1.5">
-                                                                {(item.manualDeductions || []).map((deduction) => (
-                                                                    <div key={deduction.id} className="grid grid-cols-[1fr_86px_26px] gap-1.5">
-                                                                        <input
-                                                                            type="text"
-                                                                            value={deduction.label}
-                                                                            onChange={(e) => updateManualDeduction(item.employeeId, deduction.id, "label", e.target.value)}
-                                                                            className="h-8 min-w-0 rounded-md border border-red-100 bg-white px-2 text-xs focus:outline-none focus:ring-2 focus:ring-red-200"
-                                                                            placeholder="ชื่อรายการ"
-                                                                        />
-                                                                        <input
-                                                                            type="number"
-                                                                            min="0"
-                                                                            value={toNumber(deduction.amount) || ""}
-                                                                            onChange={(e) => updateManualDeduction(item.employeeId, deduction.id, "amount", e.target.value)}
-                                                                            className="h-8 min-w-0 rounded-md border border-red-100 bg-white px-2 text-right text-xs font-mono focus:outline-none focus:ring-2 focus:ring-red-200"
-                                                                            placeholder="0"
-                                                                        />
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => removeManualDeduction(item.employeeId, deduction.id)}
-                                                                            className="flex h-8 w-6 items-center justify-center rounded-md text-red-500 hover:bg-red-100"
-                                                                            aria-label="ลบรายการหัก"
+                                                            {(item.manualDeductions || []).length === 0 ? (
+                                                                <div className="rounded-md border border-dashed border-slate-200 bg-white/60 px-2 py-2 text-center text-xs font-normal text-slate-400">
+                                                                    ไม่มีรายการหักเพิ่ม
+                                                                </div>
+                                                            ) : (
+                                                                <div className="space-y-1.5">
+                                                                    {(item.manualDeductions || []).map((deduction) => (
+                                                                        <div
+                                                                            key={deduction.id}
+                                                                            className="grid grid-cols-[1fr_80px_24px] gap-1.5 items-center"
                                                                         >
-                                                                            <Trash2 className="h-3.5 w-3.5" />
-                                                                        </button>
-                                                                    </div>
-                                                                ))}
+                                                                            <input
+                                                                                type="text"
+                                                                                value={deduction.label}
+                                                                                onChange={(e) =>
+                                                                                    updateManualDeduction(
+                                                                                        item.employeeId,
+                                                                                        deduction.id,
+                                                                                        "label",
+                                                                                        e.target.value
+                                                                                    )
+                                                                                }
+                                                                                className="h-7.5 min-w-0 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                                                                                placeholder="ชื่อรายการ"
+                                                                            />
+                                                                            <input
+                                                                                type="number"
+                                                                                min="0"
+                                                                                value={toNumber(deduction.amount) || ""}
+                                                                                onChange={(e) =>
+                                                                                    updateManualDeduction(
+                                                                                        item.employeeId,
+                                                                                        deduction.id,
+                                                                                        "amount",
+                                                                                        e.target.value
+                                                                                    )
+                                                                                }
+                                                                                className="h-7.5 min-w-0 rounded-md border border-slate-200 bg-white px-2 text-right text-xs font-normal tabular-nums text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                                                                                placeholder="0"
+                                                                            />
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() =>
+                                                                                    removeManualDeduction(
+                                                                                        item.employeeId,
+                                                                                        deduction.id
+                                                                                    )
+                                                                                }
+                                                                                className="flex h-7.5 w-6 items-center justify-center rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                                                                                aria-label="ลบรายการหัก"
+                                                                            >
+                                                                                <Trash2 className="h-3.5 w-3.5" />
+                                                                            </button>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+
+                                                            <div className="mt-1.5 text-right text-xs font-normal text-rose-700 tabular-nums">
+                                                                รวมหักเพิ่ม ฿{(manualDeductionTotal + installmentDeductionTotal).toLocaleString()}
                                                             </div>
-                                                        )}
+                                                        </div>
 
-                                                        <div className="mt-2 text-right text-xs text-red-700">
-                                                            รวมหักเพิ่ม ฿{(manualDeductionTotal + installmentDeductionTotal).toLocaleString()}
+                                                        {/* Net Total (Numbers normal font) */}
+                                                        <div className="text-right">
+                                                            <div className="text-xs font-normal text-slate-600 tabular-nums">
+                                                                รายรับ ฿{toNumber(item.totalIncome).toLocaleString()}
+                                                            </div>
+                                                            <div className="text-xs font-normal text-rose-700 tabular-nums">
+                                                                หัก {toNumber(item.totalDeduction) > 0 ? `฿${toNumber(item.totalDeduction).toLocaleString()}` : "-"}
+                                                            </div>
+                                                            <div className="mt-1.5 inline-flex rounded-lg border border-emerald-200/80 bg-emerald-50 px-2.5 py-1 text-sm font-normal text-emerald-800 tabular-nums">
+                                                                ฿{toNumber(item.netTotal).toLocaleString()}
+                                                            </div>
                                                         </div>
                                                     </div>
-
-                                                    <div className="text-right">
-                                                        <div className="text-xs text-gray-700">รายรับ ฿{toNumber(item.totalIncome).toLocaleString()}</div>
-                                                        <div className="text-xs text-red-600">หัก {toNumber(item.totalDeduction) > 0 ? `฿${toNumber(item.totalDeduction).toLocaleString()}` : "-"}</div>
-                                                        {manualDeductionTotal > 0 && (
-                                                            <div className="text-[13px] text-red-400">รวมรายการหักเพิ่ม ฿{manualDeductionTotal.toLocaleString()}</div>
-                                                        )}
-                                                        {installmentDeductionTotal > 0 && (
-                                                            <div className="text-[13px] text-amber-600">ผ่อนสินค้า ฿{installmentDeductionTotal.toLocaleString()}</div>
-                                                        )}
-                                                        <div className="mt-2 inline-flex rounded-md border border-emerald-100 bg-emerald-50 px-3 py-1.5 font-mono text-base font-bold text-emerald-700">
-                                                            ฿{toNumber(item.netTotal).toLocaleString()}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
+                                                );
+                                            })
+                                        )}
                                     </div>
-                                </>
-                            );
-                        })()}
-                    </div>
-                )}
-            </div>
+
+                                    {/* Table Footer */}
+                                    <div className="px-3.5 py-2.5 bg-slate-50/80 border-t border-slate-200 text-xs font-normal text-slate-500 flex flex-wrap items-center justify-between gap-2">
+                                        <span>
+                                            แสดงผล <span className="font-semibold text-slate-800">{filteredPayroll.length}</span> จากทั้งหมด{" "}
+                                            <span className="font-semibold text-slate-800">{payrollData.length}</span> คน • เลือกแล้ว{" "}
+                                            <span className="font-semibold text-slate-800">{selectedIds.length}</span> คน
+                                        </span>
+                                        <div className="flex items-center gap-3 text-[11px] text-slate-500">
+                                            <span className="text-emerald-700 font-normal">
+                                                ยอดสุทธิรวม: ฿{totalNet.toLocaleString()}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </>
+                        );
+                    })()}
+                </div>
+            )}
         </div>
     );
 }
+
